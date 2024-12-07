@@ -56,7 +56,7 @@ func (r *TypesenseClusterReconciler) createAdminApiKey(
 	}
 
 	secret := &v1.Secret{
-		ObjectMeta: getObjectMeta(ts, &secretObjectKey.Name),
+		ObjectMeta: getObjectMeta(ts, &secretObjectKey.Name, nil),
 		Type:       v1.SecretTypeOpaque,
 		Data: map[string][]byte{
 			adminApiKeyName: []byte(token),

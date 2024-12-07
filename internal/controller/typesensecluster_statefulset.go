@@ -61,7 +61,7 @@ func (r *TypesenseClusterReconciler) createStatefulSet(
 ) (*appsv1.StatefulSet, error) {
 	sts := &appsv1.StatefulSet{
 		TypeMeta:   metav1.TypeMeta{},
-		ObjectMeta: getObjectMeta(ts, &key.Name),
+		ObjectMeta: getObjectMeta(ts, &key.Name, nil),
 		Spec: appsv1.StatefulSetSpec{
 			ServiceName:         fmt.Sprintf("%s-sts-svc", ts.Name),
 			PodManagementPolicy: appsv1.ParallelPodManagement,
@@ -70,7 +70,7 @@ func (r *TypesenseClusterReconciler) createStatefulSet(
 				MatchLabels: getLabels(ts),
 			},
 			Template: corev1.PodTemplateSpec{
-				ObjectMeta: getObjectMeta(ts, &key.Name),
+				ObjectMeta: getObjectMeta(ts, &key.Name, nil),
 				Spec: corev1.PodSpec{
 					SecurityContext: &corev1.PodSecurityContext{
 						RunAsUser:    ptr.To[int64](10000),

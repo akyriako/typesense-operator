@@ -10,6 +10,7 @@ rules:
   - configmaps
   verbs:
   - create
+  - delete
   - get
   - list
   - patch
@@ -29,8 +30,11 @@ rules:
   - secrets
   verbs:
   - create
+  - delete
   - get
   - list
+  - patch
+  - update
   - watch
 - apiGroups:
   - ""
@@ -38,8 +42,23 @@ rules:
   - services
   verbs:
   - create
+  - delete
   - get
   - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - apps
+  resources:
+  - deployments
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
   - watch
 - apiGroups:
   - apps
@@ -47,6 +66,7 @@ rules:
   - statefulsets
   verbs:
   - create
+  - delete
   - get
   - list
   - patch
@@ -59,6 +79,18 @@ rules:
   verbs:
   - create
   - patch
+- apiGroups:
+  - networking.k8s.io
+  resources:
+  - ingresses
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
 - apiGroups:
   - ts.opentelekomcloud.com
   resources:

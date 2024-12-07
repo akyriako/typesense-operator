@@ -61,7 +61,7 @@ func (r *TypesenseClusterReconciler) createConfigMap(ctx context.Context, key cl
 	}
 
 	cm := &v1.ConfigMap{
-		ObjectMeta: getObjectMeta(ts, &key.Name),
+		ObjectMeta: getObjectMeta(ts, &key.Name, nil),
 		Data: map[string]string{
 			"nodes": strings.Join(nodes, ","),
 		},

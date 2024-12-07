@@ -20,9 +20,7 @@ spec:
         kubectl.kubernetes.io/default-container: manager
     spec:
       containers:
-      - args:
-        {{- toYaml .Values.controllerManager.manager.args | nindent 8 }}
-        - --zap-log-level={{ .Values.controllerManager.manager.logLevel  }}
+      - args: {{- toYaml .Values.controllerManager.manager.args | nindent 8 }}
         command:
         - /manager
         env:

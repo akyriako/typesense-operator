@@ -65,7 +65,7 @@ func (r *TypesenseClusterReconciler) ReconcileServices(ctx context.Context, ts t
 
 func (r *TypesenseClusterReconciler) createHeadlessService(ctx context.Context, key client.ObjectKey, ts *tsv1alpha1.TypesenseCluster) (*v1.Service, error) {
 	svc := &v1.Service{
-		ObjectMeta: getObjectMeta(ts, &key.Name),
+		ObjectMeta: getObjectMeta(ts, &key.Name, nil),
 		Spec: v1.ServiceSpec{
 			ClusterIP:                v1.ClusterIPNone,
 			PublishNotReadyAddresses: true,
@@ -95,7 +95,7 @@ func (r *TypesenseClusterReconciler) createHeadlessService(ctx context.Context, 
 
 func (r *TypesenseClusterReconciler) createService(ctx context.Context, key client.ObjectKey, ts *tsv1alpha1.TypesenseCluster) (*v1.Service, error) {
 	svc := &v1.Service{
-		ObjectMeta: getObjectMeta(ts, &key.Name),
+		ObjectMeta: getObjectMeta(ts, &key.Name, nil),
 		Spec: v1.ServiceSpec{
 			Type:     v1.ServiceTypeClusterIP,
 			Selector: getLabels(ts),

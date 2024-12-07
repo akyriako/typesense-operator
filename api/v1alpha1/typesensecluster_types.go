@@ -80,6 +80,8 @@ type IngressSpec struct {
 	ClusterIssuer string `json:"clusterIssuer"`
 
 	IngressClassName string `json:"ingressClassName"`
+
+	Annotations map[string]string `json:"annotations,omitempty"`
 }
 
 // TypesenseClusterStatus defines the observed state of TypesenseCluster

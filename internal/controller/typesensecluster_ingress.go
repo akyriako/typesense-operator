@@ -11,6 +11,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/ptr"
+	"maps"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -20,12 +21,7 @@ var (
 				http {
 				  server {
 					listen 80;
-				
-					valid_referers server_names %s;
-					if ($invalid_referer) {
-					  return 403;
-					}
-				
+					
 					location / {
 					  proxy_pass http://%s-svc:8108/;
 					  proxy_pass_request_headers on;
@@ -54,16 +50,6 @@ func (r *TypesenseClusterReconciler) ReconcileIngress(ctx context.Context, ts ts
 		return r.deleteIngress(ctx, ig)
 	} else if !ingressExists && ts.Spec.Ingress == nil {
 		return nil
-	}
-
-	if !ingressExists {
-		r.logger.V(debugLevel).Info("creating ingress", "ingress", ingressObjectKey.Name)
-
-		err = r.createIngress(ctx, ingressObjectKey, &ts)
-		if err != nil {
-			r.logger.Error(err, "creating ingress failed", "ingress", ingressObjectKey.Name)
-			return err
-		}
 	}
 
 	configMapName := fmt.Sprintf("%s-reverse-proxy-config", ts.Name)
@@ -142,12 +128,44 @@ func (r *TypesenseClusterReconciler) ReconcileIngress(ctx context.Context, ts ts
 		}
 	}
 
+	if !ingressExists {
+		r.logger.V(debugLevel).Info("creating ingress", "ingress", ingressObjectKey.Name)
+
+		ig, err = r.createIngress(ctx, ingressObjectKey, &ts)
+		if err != nil {
+			r.logger.Error(err, "creating ingress failed", "ingress", ingressObjectKey.Name)
+			return err
+		}
+	}
+
+	//err = ctrl.SetControllerReference(ig, cm, r.Scheme)
+	//if err != nil {
+	//	return err
+	//}
+	//
+	//err = ctrl.SetControllerReference(ig, deployment, r.Scheme)
+	//if err != nil {
+	//	return err
+	//}
+	//
+	//err = ctrl.SetControllerReference(ig, service, r.Scheme)
+	//if err != nil {
+	//	return err
+	//}
+
 	return nil
 }
 
-func (r *TypesenseClusterReconciler) createIngress(ctx context.Context, key client.ObjectKey, ts *tsv1alpha1.TypesenseCluster) error {
+func (r *TypesenseClusterReconciler) createIngress(ctx context.Context, key client.ObjectKey, ts *tsv1alpha1.TypesenseCluster) (*networkingv1.Ingress, error) {
+	annotations := map[string]string{}
+	annotations["cert-manager.io/cluster-issuer"] = ts.Spec.Ingress.ClusterIssuer
+
+	if ts.Spec.Ingress.Annotations != nil {
+		maps.Copy(annotations, ts.Spec.Ingress.Annotations)
+	}
+
 	ingress := &networkingv1.Ingress{
-		ObjectMeta: getObjectMeta(ts, &key.Name),
+		ObjectMeta: getObjectMeta(ts, &key.Name, annotations),
 		Spec: networkingv1.IngressSpec{
 			IngressClassName: ptr.To(ts.Spec.Ingress.IngressClassName),
 			TLS: []networkingv1.IngressTLS{
@@ -184,15 +202,15 @@ func (r *TypesenseClusterReconciler) createIngress(ctx context.Context, key clie
 
 	err := ctrl.SetControllerReference(ts, ingress, r.Scheme)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	err = r.Create(ctx, ingress)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	return nil
+	return ingress, nil
 }
 
 func (r *TypesenseClusterReconciler) deleteIngress(ctx context.Context, ig *networkingv1.Ingress) error {
@@ -206,13 +224,13 @@ func (r *TypesenseClusterReconciler) deleteIngress(ctx context.Context, ig *netw
 
 func (r *TypesenseClusterReconciler) createIngressConfigMap(ctx context.Context, key client.ObjectKey, ts *tsv1alpha1.TypesenseCluster, ig *networkingv1.Ingress) (*v1.ConfigMap, error) {
 	icm := &v1.ConfigMap{
-		ObjectMeta: getObjectMeta(ts, &key.Name),
+		ObjectMeta: getObjectMeta(ts, &key.Name, nil),
 		Data: map[string]string{
-			"nginx.conf": fmt.Sprintf(conf, ts.Spec.Ingress.Referer, ts.Name),
+			"nginx.conf": fmt.Sprintf(conf, ts.Name),
 		},
 	}
 
-	err := ctrl.SetControllerReference(ig, icm, r.Scheme)
+	err := ctrl.SetControllerReference(ts, icm, r.Scheme)
 	if err != nil {
 		return nil, err
 	}
@@ -228,7 +246,7 @@ func (r *TypesenseClusterReconciler) createIngressConfigMap(ctx context.Context,
 func (r *TypesenseClusterReconciler) updateIngressConfigMap(ctx context.Context, cm *v1.ConfigMap, ts *tsv1alpha1.TypesenseCluster) (*v1.ConfigMap, error) {
 	desired := cm.DeepCopy()
 	desired.Data = map[string]string{
-		"nginx.conf": fmt.Sprintf(conf, ts.Spec.Ingress.Referer, ts.Name),
+		"nginx.conf": fmt.Sprintf(conf, ts.Name),
 	}
 
 	if cm.Data["nginx.conf"] != desired.Data["nginx.conf"] {
@@ -244,7 +262,7 @@ func (r *TypesenseClusterReconciler) updateIngressConfigMap(ctx context.Context,
 
 func (r *TypesenseClusterReconciler) createIngressDeployment(ctx context.Context, key client.ObjectKey, ts *tsv1alpha1.TypesenseCluster, ig *networkingv1.Ingress) (*appsv1.Deployment, error) {
 	deployment := &appsv1.Deployment{
-		ObjectMeta: getObjectMeta(ts, &key.Name),
+		ObjectMeta: getObjectMeta(ts, &key.Name, nil),
 		Spec: appsv1.DeploymentSpec{
 			Replicas: ptr.To[int32](3),
 			Selector: &metav1.LabelSelector{
@@ -290,7 +308,7 @@ func (r *TypesenseClusterReconciler) createIngressDeployment(ctx context.Context
 		},
 	}
 
-	err := ctrl.SetControllerReference(ig, deployment, r.Scheme)
+	err := ctrl.SetControllerReference(ts, deployment, r.Scheme)
 	if err != nil {
 		return nil, err
 	}
@@ -305,9 +323,9 @@ func (r *TypesenseClusterReconciler) createIngressDeployment(ctx context.Context
 
 func (r *TypesenseClusterReconciler) createIngressService(ctx context.Context, key client.ObjectKey, ts *tsv1alpha1.TypesenseCluster, ig *networkingv1.Ingress) (*v1.Service, error) {
 	service := &v1.Service{
-		ObjectMeta: getObjectMeta(ts, &key.Name),
+		ObjectMeta: getObjectMeta(ts, &key.Name, nil),
 		Spec: v1.ServiceSpec{
-			Type:     v1.ServiceTypeClusterIP,
+			Type:     v1.ServiceTypeNodePort,
 			Selector: getReverseProxyLabels(ts),
 			Ports: []v1.ServicePort{
 				{
@@ -320,7 +338,7 @@ func (r *TypesenseClusterReconciler) createIngressService(ctx context.Context, k
 		},
 	}
 
-	err := ctrl.SetControllerReference(ig, service, r.Scheme)
+	err := ctrl.SetControllerReference(ts, service, r.Scheme)
 	if err != nil {
 		return nil, err
 	}
