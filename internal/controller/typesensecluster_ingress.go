@@ -52,6 +52,16 @@ func (r *TypesenseClusterReconciler) ReconcileIngress(ctx context.Context, ts ts
 		return nil
 	}
 
+	if !ingressExists {
+		r.logger.V(debugLevel).Info("creating ingress", "ingress", ingressObjectKey.Name)
+
+		ig, err = r.createIngress(ctx, ingressObjectKey, &ts)
+		if err != nil {
+			r.logger.Error(err, "creating ingress failed", "ingress", ingressObjectKey.Name)
+			return err
+		}
+	}
+
 	configMapName := fmt.Sprintf("%s-reverse-proxy-config", ts.Name)
 	configMapExists := true
 	configMapObjectKey := client.ObjectKey{Namespace: ts.Namespace, Name: configMapName}
@@ -127,31 +137,6 @@ func (r *TypesenseClusterReconciler) ReconcileIngress(ctx context.Context, ts ts
 			return err
 		}
 	}
-
-	if !ingressExists {
-		r.logger.V(debugLevel).Info("creating ingress", "ingress", ingressObjectKey.Name)
-
-		ig, err = r.createIngress(ctx, ingressObjectKey, &ts)
-		if err != nil {
-			r.logger.Error(err, "creating ingress failed", "ingress", ingressObjectKey.Name)
-			return err
-		}
-	}
-
-	//err = ctrl.SetControllerReference(ig, cm, r.Scheme)
-	//if err != nil {
-	//	return err
-	//}
-	//
-	//err = ctrl.SetControllerReference(ig, deployment, r.Scheme)
-	//if err != nil {
-	//	return err
-	//}
-	//
-	//err = ctrl.SetControllerReference(ig, service, r.Scheme)
-	//if err != nil {
-	//	return err
-	//}
 
 	return nil
 }
@@ -230,7 +215,7 @@ func (r *TypesenseClusterReconciler) createIngressConfigMap(ctx context.Context,
 		},
 	}
 
-	err := ctrl.SetControllerReference(ts, icm, r.Scheme)
+	err := ctrl.SetControllerReference(ig, icm, r.Scheme)
 	if err != nil {
 		return nil, err
 	}
@@ -308,7 +293,7 @@ func (r *TypesenseClusterReconciler) createIngressDeployment(ctx context.Context
 		},
 	}
 
-	err := ctrl.SetControllerReference(ts, deployment, r.Scheme)
+	err := ctrl.SetControllerReference(ig, deployment, r.Scheme)
 	if err != nil {
 		return nil, err
 	}
@@ -338,7 +323,7 @@ func (r *TypesenseClusterReconciler) createIngressService(ctx context.Context, k
 		},
 	}
 
-	err := ctrl.SetControllerReference(ts, service, r.Scheme)
+	err := ctrl.SetControllerReference(ig, service, r.Scheme)
 	if err != nil {
 		return nil, err
 	}
