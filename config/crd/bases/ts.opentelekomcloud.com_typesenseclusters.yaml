@@ -62,6 +62,24 @@ spec:
                 type: string
               image:
                 type: string
+              ingress:
+                properties:
+                  clusterIssuer:
+                    type: string
+                  host:
+                    pattern: ^([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])(\.([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]{0,61}[a-zA-Z0-9]))*$
+                    type: string
+                  ingressClassName:
+                    type: string
+                  referer:
+                    pattern: ^([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])(\.([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]{0,61}[a-zA-Z0-9]))*$
+                    type: string
+                required:
+                - clusterIssuer
+                - host
+                - ingressClassName
+                - referer
+                type: object
               peeringPort:
                 default: 8107
                 type: integer

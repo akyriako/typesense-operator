@@ -4,7 +4,7 @@ metadata:
   labels:
     app.kubernetes.io/name: typesense-operator
     app.kubernetes.io/managed-by: kustomize
-  name: cluster-1
+  name: c-aws-1
 spec:
   image: typesense/typesense:27.1
   replicas: 3
@@ -18,7 +18,7 @@ metadata:
   labels:
     app.kubernetes.io/name: typesense-operator
     app.kubernetes.io/managed-by: kustomize
-  name: cluster-2
+  name: c-aws-2
 spec:
   image: typesense/typesense:27.1
   replicas: 1

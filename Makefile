@@ -200,11 +200,11 @@ undeploy: kustomize ## Undeploy controller from the K8s cluster specified in ~/.
 
 .PHONY: deploy-with-samples
 deploy-with-samples: kustomize generate manifests install ## Install CRDs into the K8s cluster specified in ~/.kube/config.
-	$(KUSTOMIZE) build config/samples | $(KUBECTL) apply -f -
+	$(KUSTOMIZE) build config/samples | $(KUBECTL) apply -f config/samples/ts_v1alpha1_typesensecluster_kind.yaml
 
 .PHONY: samples
 samples: kustomize ## Install CRDs into the K8s cluster specified in ~/.kube/config.
-	$(KUSTOMIZE) build config/samples | $(KUBECTL) apply -f -
+	$(KUSTOMIZE) build config/samples | $(KUBECTL) apply -f config/samples/ts_v1alpha1_typesensecluster_kind.yaml
 
 ##@ Dependencies
 

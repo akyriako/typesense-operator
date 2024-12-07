@@ -43,6 +43,12 @@ func getLabels(ts *tsv1alpha1.TypesenseCluster) map[string]string {
 	}
 }
 
+func getReverseProxyLabels(ts *tsv1alpha1.TypesenseCluster) map[string]string {
+	return map[string]string{
+		"app": fmt.Sprintf("%s-rp", ts.Name),
+	}
+}
+
 func getObjectMeta(ts *tsv1alpha1.TypesenseCluster, name *string) metav1.ObjectMeta {
 	if name == nil {
 		name = &ts.Name

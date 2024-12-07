@@ -104,7 +104,7 @@ func (r *TypesenseClusterReconciler) getQuorumHealth(ctx context.Context, ts *ts
 				return ConditionReasonQuorumNotReady, 0, err
 			}
 
-			err = r.scaleStatefulSet(ctx, sts, 1)
+			err = r.ScaleStatefulSet(ctx, sts, 1)
 			if err != nil {
 				return ConditionReasonQuorumNotReady, 0, err
 			}
@@ -122,7 +122,7 @@ func (r *TypesenseClusterReconciler) getQuorumHealth(ctx context.Context, ts *ts
 				return ConditionReasonQuorumNotReady, 0, err
 			}
 
-			err = r.scaleStatefulSet(ctx, sts, ts.Spec.Replicas)
+			err = r.ScaleStatefulSet(ctx, sts, ts.Spec.Replicas)
 			if err != nil {
 				return ConditionReasonQuorumNotReady, 0, err
 			}
@@ -132,20 +132,4 @@ func (r *TypesenseClusterReconciler) getQuorumHealth(ctx context.Context, ts *ts
 	}
 
 	return ConditionReasonQuorumReady, healthyNodes, nil
-}
-
-func (r *TypesenseClusterReconciler) scaleStatefulSet(ctx context.Context, sts *appsv1.StatefulSet, desiredReplicas int32) error {
-	if sts.Spec.Replicas != nil && *sts.Spec.Replicas == desiredReplicas {
-		r.logger.V(debugLevel).Info("statefulset already scaled to desired replicas", "name", sts.Name, "replicas", desiredReplicas)
-		return nil
-	}
-
-	desired := sts.DeepCopy()
-	desired.Spec.Replicas = &desiredReplicas
-	if err := r.Client.Update(ctx, desired); err != nil {
-		r.logger.Error(err, "updating stateful replicas failed", "name", desired.Name)
-		return err
-	}
-
-	return nil
 }

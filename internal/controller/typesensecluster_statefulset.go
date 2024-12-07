@@ -215,3 +215,19 @@ func (r *TypesenseClusterReconciler) createStatefulSet(
 
 	return sts, nil
 }
+
+func (r *TypesenseClusterReconciler) ScaleStatefulSet(ctx context.Context, sts *appsv1.StatefulSet, desiredReplicas int32) error {
+	if sts.Spec.Replicas != nil && *sts.Spec.Replicas == desiredReplicas {
+		r.logger.V(debugLevel).Info("statefulset already scaled to desired replicas", "name", sts.Name, "replicas", desiredReplicas)
+		return nil
+	}
+
+	desired := sts.DeepCopy()
+	desired.Spec.Replicas = &desiredReplicas
+	if err := r.Client.Update(ctx, desired); err != nil {
+		r.logger.Error(err, "updating stateful replicas failed", "name", desired.Name)
+		return err
+	}
+
+	return nil
+}

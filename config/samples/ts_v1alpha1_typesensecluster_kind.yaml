@@ -13,13 +13,18 @@ metadata:
   labels:
     app.kubernetes.io/name: typesense-operator
     app.kubernetes.io/managed-by: kustomize
-  name: cluster-1
+  name: c-kind-1
 spec:
   image: typesense/typesense:27.1
   replicas: 3
   storage:
     size: 10Mi
     storageClassName: typesense-local-path
+  ingress:
+    referer: referer.example.com
+    host: host.example.com
+    ingressClassName: nginx
+    clusterIssuer: lets-encrypt-prod
 ---
 apiVersion: ts.opentelekomcloud.com/v1alpha1
 kind: TypesenseCluster
@@ -27,9 +32,14 @@ metadata:
   labels:
     app.kubernetes.io/name: typesense-operator
     app.kubernetes.io/managed-by: kustomize
-  name: cluster-2
+  name: c-kind-2
 spec:
   image: typesense/typesense:26.0
   replicas: 1
   storage:
     storageClassName: typesense-local-path
+  ingress:
+    referer: referer.example.com
+    host: host.example.com
+    ingressClassName: nginx
+    clusterIssuer: lets-encrypt-prod

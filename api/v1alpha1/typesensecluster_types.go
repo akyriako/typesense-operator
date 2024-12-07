@@ -55,6 +55,8 @@ type TypesenseClusterSpec struct {
 	CorsDomains *string `json:"corsDomains,omitempty"`
 
 	Storage *StorageSpec `json:"storage"`
+
+	Ingress *IngressSpec `json:"ingress,omitempty"`
 }
 
 type StorageSpec struct {
@@ -66,12 +68,18 @@ type StorageSpec struct {
 	StorageClassName string `json:"storageClassName"`
 }
 
-type CorsSpec struct {
+type IngressSpec struct {
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Pattern:=`^([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])(\.([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]{0,61}[a-zA-Z0-9]))*$`
+	Referer string `json:"referer"`
 
-	// +optional
-	// +kubebuilder:default=true
-	// +kubebuilder:validation:Type=boolean
-	Enabled bool `json:"enabled,omitempty"`
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Pattern:=`^([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])(\.([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]{0,61}[a-zA-Z0-9]))*$`
+	Host string `json:"host"`
+
+	ClusterIssuer string `json:"clusterIssuer"`
+
+	IngressClassName string `json:"ingressClassName"`
 }
 
 // TypesenseClusterStatus defines the observed state of TypesenseCluster
