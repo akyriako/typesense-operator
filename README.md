@@ -19,34 +19,52 @@ Key features of Typesense Kubernetes Operator include:
     - Continuous active (re)discovery of the quorum configuration reacting to changes in `ReplicaSet` **without the need of an additional sidecar container**,
     - Automatic recovery of a cluster that has lost quorum **without the need of manual intervention**.
 
-### Custom Resource Definition
+### Custom Resource Definitions
 
 Typesense Kubernetes Operator is controlling the lifecycle of multiple Typesense instances in the same Kubernetes cluster by 
 introducing `TypesenseCluster`, a new Custom Resource Definition:  
 
 ![image](https://github.com/user-attachments/assets/23e40781-ca21-4297-93bf-2b5dbebc7e0e)
 
-The _specification_ of the CRD includes the following properties:
+#### TypesenseCluster
 
-- `image`: the Typesense docker image to use, required
-- `replicas`: the size of the cluster, defaults to `1`
-- `apiPort`: the REST/API port, defaults to `8108`
-- `peeringPort`: the peering port, defaults to `8107`
-- `resetPeersOnError`: whether to reset nodes in error state or not, defaults to `true`
-- `corsDomains`: domains that would be allowed for CORS calls, optional.
-- `storage.size`: the size of the underlying `PersistentVolume`, defaults to `100Mi`
-- `storage.storageClassName`: the storage class to use, defaults to `standard`
+**Spec**
 
-The _status_ of the CRD includes a single property, `condition`, of type `[]metav1.Condition`. There is actually only one
-condition, `ConditionReady`, which steers the whole reconciliation process and results to `true` or `false` by evaluating
-the aggregated health of the cluster. There are 5 different condition reasons that can lead to a ready or not ready condition of 
-the CRD:
+| Name              | Description                                  | Optional | Default |
+|-------------------|----------------------------------------------|----------|---------|
+| image             | Typesense image                              |          |         |
+| replicass         | Size of the cluster                          |          | 1       |
+| apiPort           | REST/API port                                |          | 8108    |
+| peeringPort       | Peering port                                 |          | 8107    |
+| resetPeersOnError | automatic reset of peers on error            |          | true    |
+| corsDomains       | domains that would be allowed for CORS calls | X        |         |
 
-- `QuorumReady`: the Typesense cluster is provisioned and fully **operational**
-- `QuorumNotReady`: the Typesense cluster is provisioned but **not operational**
-- `QuorumDegraded`: the Typesense cluster is provisioned but **not operational**, and scheduled for downgrade to single instance
-- `QuorumUpgraded`: the Typesense cluster is provisioned and fully **operational** as a single instance and scheduled for an upgrade to desired replicas
-- `QuorumNeedsIntervention`: the Typesense cluster is provisioned but **not operational**, the allocated memory or disk are not sufficient and administrative intervention is required
+**StorageSpec** (optional)
+
+| Name             | Description               | Optional | Default  |
+|------------------|---------------------------|----------|----------|
+| size             | Size of the underlying PV | X        | 100Mi    |
+| storageClassName | Storage Class to use      |          | standard |
+
+**IngressSpec** (optional)
+
+| Name             | Description                       | Optional | Default |
+|------------------|-----------------------------------|----------|---------|
+| referer          | Allowed FQDNs to access Typesense |          |         |
+| host             | Ingress Host                      |          |         |
+| clusterIssuer    | cert-manager ClusterIssuer        |          |         |
+| ingressClassName | Ingress in use                    |          |         |
+| annotations      | User-Defined annotations          | X        |         |
+
+**Status**
+
+| Condition      | Value | Reasons                 | Description                                                |
+|----------------|-------|-------------------------|------------------------------------------------------------|
+| ConditionReady | true  | QuorumReady             | Cluster is Operational                                     |
+|                | false | QuorumNotReady          | Cluster is not Operational                                 |
+|                |       | QuorumDegraded          | Cluster is not Operational; Scheduled to Single-Instance   |
+|                |       | QuorumUpgraded          | Cluster is Operational; Scheduled to Original Size         |
+|                |       | QuorumNeedsIntervention | Cluster is not Operational; Administrative Action Required |
 
 ### Background
 

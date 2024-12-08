@@ -21,6 +21,8 @@ var (
 				http {
 				  server {
 					listen 80;
+
+					%s
 					
 					location / {
 					  proxy_pass http://%s-svc:8108/;
@@ -28,6 +30,8 @@ var (
 					}
 				  }
 				}`
+
+	referer = ``
 )
 
 func (r *TypesenseClusterReconciler) ReconcileIngress(ctx context.Context, ts tsv1alpha1.TypesenseCluster) (err error) {
