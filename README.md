@@ -19,14 +19,14 @@ Key features of Typesense Kubernetes Operator include:
     - Continuous active (re)discovery of the quorum configuration reacting to changes in `ReplicaSet` **without the need of an additional sidecar container**,
     - Automatic recovery of a cluster that has lost quorum **without the need of manual intervention**.
 
-### Custom Resource Definitions
+## Custom Resource Definitions
 
 Typesense Kubernetes Operator is controlling the lifecycle of multiple Typesense instances in the same Kubernetes cluster by 
 introducing `TypesenseCluster`, a new Custom Resource Definition:  
 
 ![image](https://github.com/user-attachments/assets/23e40781-ca21-4297-93bf-2b5dbebc7e0e)
 
-#### TypesenseCluster
+### TypesenseCluster
 
 **Spec**
 
