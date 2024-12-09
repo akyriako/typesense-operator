@@ -31,7 +31,7 @@ func (r *TypesenseClusterReconciler) ReconcileScraper(ctx context.Context, ts ts
 
 	inSpecs := func(cronJobName string, scrapers []tsv1alpha1.DocSearchScraperSpec) bool {
 		for _, scraper := range scrapers {
-			if cronJobName == fmt.Sprintf("%s-job-scraper", scraper.Name) {
+			if cronJobName == fmt.Sprintf("%s-scraper", scraper.Name) {
 				return true
 			}
 		}
@@ -53,7 +53,7 @@ func (r *TypesenseClusterReconciler) ReconcileScraper(ctx context.Context, ts ts
 	}
 
 	for _, scraper := range ts.Spec.Scrapers {
-		scraperName := fmt.Sprintf("%s-job-scraper", scraper.Name)
+		scraperName := fmt.Sprintf("%s-scraper", scraper.Name)
 		scraperExists := true
 		scraperObjectKey := client.ObjectKey{Namespace: ts.Namespace, Name: scraperName}
 
@@ -84,6 +84,7 @@ func (r *TypesenseClusterReconciler) ReconcileScraper(ctx context.Context, ts ts
 			for _, env := range container.Env {
 				if env.Name == "CONFIG" && env.Value != scraper.Config {
 					hasChangedConfig = true
+					break
 				}
 			}
 
@@ -91,20 +92,18 @@ func (r *TypesenseClusterReconciler) ReconcileScraper(ctx context.Context, ts ts
 				hasChanged = true
 			}
 
-			if !hasChanged {
-				return nil
-			}
+			if hasChanged {
+				err = r.deleteScraper(ctx, scraperCronJob)
+				if err != nil {
+					r.logger.Error(err, "deleting scraper cronjob failed", "cronjob", scraperObjectKey.Name)
+					return err
+				}
 
-			err = r.deleteScraper(ctx, scraperCronJob)
-			if err != nil {
-				r.logger.Error(err, "deleting scraper cronjob failed", "cronjob", scraperObjectKey.Name)
-				return err
-			}
-
-			err = r.createScraper(ctx, scraperObjectKey, &ts, &scraper)
-			if err != nil {
-				r.logger.Error(err, "creating scraper cronjob failed", "cronjob", scraperObjectKey.Name)
-				return err
+				err = r.createScraper(ctx, scraperObjectKey, &ts, &scraper)
+				if err != nil {
+					r.logger.Error(err, "creating scraper cronjob failed", "cronjob", scraperObjectKey.Name)
+					return err
+				}
 			}
 		}
 	}
@@ -132,7 +131,7 @@ func (r *TypesenseClusterReconciler) createScraper(ctx context.Context, key clie
 							RestartPolicy: corev1.RestartPolicyNever,
 							Containers: []corev1.Container{
 								{
-									Name:  fmt.Sprintf("%s-scraper", scraperSpec.Name),
+									Name:  fmt.Sprintf("%s-docsearch-scraper", scraperSpec.Name),
 									Image: scraperSpec.Image,
 									Env: []corev1.EnvVar{
 										{
