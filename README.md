@@ -160,6 +160,7 @@ introducing `TypesenseCluster`, a new Custom Resource Definition:
 | corsDomains       | domains that would be allowed for CORS calls | X        |         |
 | storage           | check StorageSpec below                      |          |         |
 | ingress           | check IngressSpec below                      | X        |         |
+| scrapers          | array of DocSearchScraperSpec; check below   | X        |         |
 
 **StorageSpec** (optional)
 
@@ -177,6 +178,15 @@ introducing `TypesenseCluster`, a new Custom Resource Definition:
 | clusterIssuer    | cert-manager ClusterIssuer           |          |         |
 | ingressClassName | Ingress to use                       |          |         |
 | annotations      | User-Defined annotations             | X        |         |
+
+**DocSearchScraperSpec** (optional)
+
+| Name        | Description                              | Optional | Default |
+|-------------|------------------------------------------|----------|---------|
+| name        | name of the scraper                      |          |         |
+| image       | container image to use                   |          |         |
+| config      | config to use                            |          |         |
+| schedule    | cron expression; no timezone; no seconds |          |         |
 
 > [!CAUTION]
 > Although in Typesense documentation under _Production Best Practices_ -> _Configuration_ is stated:
