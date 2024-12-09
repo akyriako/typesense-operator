@@ -18,6 +18,7 @@ const (
 	ConditionReasonConfigMapNotReady                        = "ConfigMapNotReady"
 	ConditionReasonServicesNotReady                         = "ServicesNotReady"
 	ConditionReasonIngressNotReady                          = "IngressNotReady"
+	ConditionReasonScrapersNotReady                         = "ScrapersNotReady"
 	ConditionReasonQuorumReady              ConditionQuorum = "QuorumReady"
 	ConditionReasonQuorumNotReady           ConditionQuorum = "QuorumNotReady"
 	ConditionReasonQuorumDowngraded         ConditionQuorum = "QuorumDowngraded"

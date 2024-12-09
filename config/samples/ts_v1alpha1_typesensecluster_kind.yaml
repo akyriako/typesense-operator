@@ -42,3 +42,12 @@ spec:
     host: host.example.com
     ingressClassName: nginx
     clusterIssuer: lets-encrypt-prod
+  scrapers:
+    - name: target-1
+      image: typesense/docsearch-scraper:0.11.0
+      config: ''
+      schedule: '*/2 * * * *'
+    - name: target-2
+      image: typesense/docsearch-scraper:0.11.0
+      config: '1'
+      schedule: '*/2 * * * *'
