@@ -153,11 +153,13 @@ introducing `TypesenseCluster`, a new Custom Resource Definition:
 | Name              | Description                                  | Optional | Default |
 |-------------------|----------------------------------------------|----------|---------|
 | image             | Typesense image                              |          |         |
-| replicass         | Size of the cluster                          |          | 1       |
+| replicas          | Size of the cluster                          |          | 1       |
 | apiPort           | REST/API port                                |          | 8108    |
 | peeringPort       | Peering port                                 |          | 8107    |
 | resetPeersOnError | automatic reset of peers on error            |          | true    |
 | corsDomains       | domains that would be allowed for CORS calls | X        |         |
+| storage           | check StorageSpec below                      |          |         |
+| ingress           | check IngressSpec below                      | X        |         |
 
 **StorageSpec** (optional)
 
@@ -168,23 +170,31 @@ introducing `TypesenseCluster`, a new Custom Resource Definition:
 
 **IngressSpec** (optional)
 
-| Name             | Description                       | Optional | Default |
-|------------------|-----------------------------------|----------|---------|
-| referer          | Allowed FQDNs to access Typesense |          |         |
-| host             | Ingress Host                      |          |         |
-| clusterIssuer    | cert-manager ClusterIssuer        |          |         |
-| ingressClassName | Ingress in use                    |          |         |
-| annotations      | User-Defined annotations          | X        |         |
+| Name             | Description                          | Optional | Default |
+|------------------|--------------------------------------|----------|---------|
+| referer          | FQDN allowed to access reverse proxy | X        |         |
+| host             | Ingress Host                         |          |         |
+| clusterIssuer    | cert-manager ClusterIssuer           |          |         |
+| ingressClassName | Ingress to use                       |          |         |
+| annotations      | User-Defined annotations             | X        |         |
+
+> [!CAUTION]
+> Although in Typesense documentation under _Production Best Practices_ -> _Configuration_ is stated:
+> "_Typesense comes built-in with a high performance HTTP server (opens new window)that is used by likes of Fastly (opens new window)in 
+> their edge servers at scale. So Typesense can be directly exposed to incoming public-facing internet traffic, 
+> without the need to place it behind another web server like Nginx / Apache or your backend API._" it is highly recommended
+> , from this operator's perspective, to always expose Typesense behind a reverse proxy (using the `referer` option).
+
 
 **Status**
 
-| Condition      | Value | Reasons                 | Description                                                |
+| Condition      | Value | Reason                  | Description                                                |
 |----------------|-------|-------------------------|------------------------------------------------------------|
 | ConditionReady | true  | QuorumReady             | Cluster is Operational                                     |
 |                | false | QuorumNotReady          | Cluster is not Operational                                 |
-|                |       | QuorumDegraded          | Cluster is not Operational; Scheduled to Single-Instance   |
-|                |       | QuorumUpgraded          | Cluster is Operational; Scheduled to Original Size         |
-|                |       | QuorumNeedsIntervention | Cluster is not Operational; Administrative Action Required |
+|                | false | QuorumDegraded          | Cluster is not Operational; Scheduled to Single-Instance   |
+|                | false | QuorumUpgraded          | Cluster is Operational; Scheduled to Original Size         |
+|                | false | QuorumNeedsIntervention | Cluster is not Operational; Administrative Action Required |
 
 ## Getting Started
 You’ll need a Kubernetes cluster to run against. You can use [KIND](https://sigs.k8s.io/kind) to get a local cluster for testing, or run against a remote cluster.

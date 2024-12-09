@@ -83,7 +83,6 @@ spec:
                 - clusterIssuer
                 - host
                 - ingressClassName
-                - referer
                 type: object
               peeringPort:
                 default: 8107

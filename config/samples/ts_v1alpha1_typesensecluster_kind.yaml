@@ -25,10 +25,6 @@ spec:
     host: host.example.com
     ingressClassName: nginx
     clusterIssuer: lets-encrypt-prod
-    annotations:
-      kubernetes.io/elb.class: union
-      kubernetes.io/elb.id: 1683ab7c-b25b-4dd8-b7fa-7e3068380bf5
-      kubernetes.io/elb.port: "80"
 ---
 apiVersion: ts.opentelekomcloud.com/v1alpha1
 kind: TypesenseCluster
@@ -43,7 +39,6 @@ spec:
   storage:
     storageClassName: typesense-local-path
   ingress:
-    referer: referer.example.com
     host: host.example.com
     ingressClassName: nginx
     clusterIssuer: lets-encrypt-prod

@@ -31,7 +31,10 @@ var (
 				  }
 				}`
 
-	referer = ``
+	referer = `valid_referers server_names %s;   
+					if ($invalid_referer) {  
+				  		return 403;     
+					}`
 )
 
 func (r *TypesenseClusterReconciler) ReconcileIngress(ctx context.Context, ts tsv1alpha1.TypesenseCluster) (err error) {
@@ -82,7 +85,7 @@ func (r *TypesenseClusterReconciler) ReconcileIngress(ctx context.Context, ts ts
 	if !configMapExists {
 		r.logger.V(debugLevel).Info("creating ingress config map", "configmap", configMapObjectKey.Name)
 
-		cm, err = r.createIngressConfigMap(ctx, configMapObjectKey, &ts, ig)
+		_, err = r.createIngressConfigMap(ctx, configMapObjectKey, &ts, ig)
 		if err != nil {
 			r.logger.Error(err, "creating ingress config map failed", "configmap", configMapObjectKey.Name)
 			return err
@@ -90,7 +93,7 @@ func (r *TypesenseClusterReconciler) ReconcileIngress(ctx context.Context, ts ts
 	} else {
 		r.logger.V(debugLevel).Info("updating ingress config map", "configmap", configMapObjectKey.Name)
 
-		cm, err = r.updateIngressConfigMap(ctx, cm, &ts)
+		_, err = r.updateIngressConfigMap(ctx, cm, &ts)
 		if err != nil {
 			return err
 		}
@@ -112,7 +115,7 @@ func (r *TypesenseClusterReconciler) ReconcileIngress(ctx context.Context, ts ts
 	if !deploymentExists {
 		r.logger.V(debugLevel).Info("creating ingress reverse proxy deployment", "deployment", deploymentObjectKey.Name)
 
-		deployment, err = r.createIngressDeployment(ctx, deploymentObjectKey, &ts, ig)
+		_, err = r.createIngressDeployment(ctx, deploymentObjectKey, &ts, ig)
 		if err != nil {
 			r.logger.Error(err, "creating ingress reverse proxy deployment failed", "deployment", deploymentObjectKey.Name)
 			return err
@@ -135,7 +138,7 @@ func (r *TypesenseClusterReconciler) ReconcileIngress(ctx context.Context, ts ts
 	if !serviceExists {
 		r.logger.V(debugLevel).Info("creating ingress reverse proxy service", "service", serviceNameObjectKey.Name)
 
-		service, err = r.createIngressService(ctx, serviceNameObjectKey, &ts, ig)
+		_, err = r.createIngressService(ctx, serviceNameObjectKey, &ts, ig)
 		if err != nil {
 			r.logger.Error(err, "creating ingress reverse proxy service failed", "service", serviceNameObjectKey.Name)
 			return err
@@ -215,7 +218,7 @@ func (r *TypesenseClusterReconciler) createIngressConfigMap(ctx context.Context,
 	icm := &v1.ConfigMap{
 		ObjectMeta: getObjectMeta(ts, &key.Name, nil),
 		Data: map[string]string{
-			"nginx.conf": fmt.Sprintf(conf, ts.Name),
+			"nginx.conf": r.getIngressNginxConf(ts),
 		},
 	}
 
@@ -235,7 +238,7 @@ func (r *TypesenseClusterReconciler) createIngressConfigMap(ctx context.Context,
 func (r *TypesenseClusterReconciler) updateIngressConfigMap(ctx context.Context, cm *v1.ConfigMap, ts *tsv1alpha1.TypesenseCluster) (*v1.ConfigMap, error) {
 	desired := cm.DeepCopy()
 	desired.Data = map[string]string{
-		"nginx.conf": fmt.Sprintf(conf, ts.Name),
+		"nginx.conf": r.getIngressNginxConf(ts),
 	}
 
 	if cm.Data["nginx.conf"] != desired.Data["nginx.conf"] {
@@ -247,6 +250,15 @@ func (r *TypesenseClusterReconciler) updateIngressConfigMap(ctx context.Context,
 	}
 
 	return desired, nil
+}
+
+func (r *TypesenseClusterReconciler) getIngressNginxConf(ts *tsv1alpha1.TypesenseCluster) string {
+	ref := ""
+	if ts.Spec.Ingress != nil && ts.Spec.Ingress.Referer != nil {
+		ref = fmt.Sprintf(referer, *ts.Spec.Ingress.Referer)
+	}
+
+	return fmt.Sprintf(conf, ref, ts.Name)
 }
 
 func (r *TypesenseClusterReconciler) createIngressDeployment(ctx context.Context, key client.ObjectKey, ts *tsv1alpha1.TypesenseCluster, ig *networkingv1.Ingress) (*appsv1.Deployment, error) {
