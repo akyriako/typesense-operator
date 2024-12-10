@@ -28,27 +28,25 @@ func (r *TypesenseClusterReconciler) ReconcileConfigMap(ctx context.Context, ts 
 		}
 	}
 
-	if !configMapExists {
-		r.logger.V(debugLevel).Info("creating config map", "configmap", configMapObjectKey.Name)
-
-		cm, err = r.createConfigMap(ctx, configMapObjectKey, &ts)
-		if err != nil {
-			r.logger.Error(err, "creating config map failed", "configmap", configMapObjectKey.Name)
-			return nil, err
-		}
-	} else {
+	if configMapExists {
 		r.logger.V(debugLevel).Info("updating config map", "configmap", configMapObjectKey.Name)
 
-		cm, _, err = r.updateConfigMap(ctx, &ts, cm, nil)
+		_, _, err = r.updateConfigMap(ctx, &ts, cm, nil)
 		if err != nil {
 			return nil, err
 		}
+
+		return &configMapExists, nil
 	}
 
-	nodes := strings.Split(cm.Data["nodes"], ",")
-	for i := 0; i < len(nodes); i++ {
-		nodes[i] = strings.Replace(nodes[i], fmt.Sprintf(":%d:%d", ts.Spec.PeeringPort, ts.Spec.ApiPort), "", 1)
+	r.logger.V(debugLevel).Info("creating config map", "configmap", configMapObjectKey.Name)
+
+	_, err = r.createConfigMap(ctx, configMapObjectKey, &ts)
+	if err != nil {
+		r.logger.Error(err, "creating config map failed", "configmap", configMapObjectKey.Name)
+		return nil, err
 	}
+
 	return &configMapExists, nil
 }
 
