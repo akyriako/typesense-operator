@@ -80,6 +80,11 @@ The Typesense Kubernetes Operator manages the entire lifecycle of Typesense Clus
 4. A `StatefulSet` is then created. The quorum configuration stored in the `ConfigMap` is mounted as a volume in each `Pod`
    under `/usr/share/typesense/nodelist`. No `Pod` restart is necessary when the `ConfigMap` changes, as raft automatically
    detects and applies the updates.
+5. Optionally, an **nginx:alpine** workload is provisioned as `Deployment` and published via an `Ingress`, in order to exposed safely 
+   the Typesense REST/API endpoint outside the Kubernetes cluster **only** to selected referrers. The configuration of the 
+   nginx workload is stored in a `ConfigMap`.
+6. Optionally, one or more instances of **DocSearch** are deployed as distinct `CronJobs` (one per scraping target URL),
+   which based on user-defined schedules, periodically scrape the target sites and store the results in Typesense.
 
 ![image](https://github.com/user-attachments/assets/2afb802c-11f7-4be4-b44f-5dab9d489971)
 
@@ -88,7 +93,7 @@ The Typesense Kubernetes Operator manages the entire lifecycle of Typesense Clus
 > "breathing room" to carry out its operations—such as leader election, log replication, and bootstrapping—before the
 > next quorum health reconciliation begins.
 
-5. The controller assesses the quorum's health by probing each node at `http://{nodeUrl}:{api-port}/health`. Based on the
+7. The controller assesses the quorum's health by probing each node at `http://{nodeUrl}:{api-port}/health`. Based on the
    results, it formulates an action plan for the next reconciliation loop. This process is detailed in the following section:
 
 ### Problem 2: Recovering a cluster that has lost quorum
