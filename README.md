@@ -204,8 +204,9 @@ introducing `TypesenseCluster`, a new Custom Resource Definition:
 > Although in Typesense documentation under _Production Best Practices_ -> _Configuration_ is stated:
 > "_Typesense comes built-in with a high performance HTTP server (opens new window)that is used by likes of Fastly (opens new window)in 
 > their edge servers at scale. So Typesense can be directly exposed to incoming public-facing internet traffic, 
-> without the need to place it behind another web server like Nginx / Apache or your backend API._" it is highly recommended
-> , from this operator's perspective, to always expose Typesense behind a reverse proxy (using the `referer` option).
+> without the need to place it behind another web server like Nginx / Apache or your backend API._" 
+> 
+> It is highly recommended, from this operator's perspective, to always expose Typesense behind a reverse proxy (using the `referer` option).
 
 
 **Status**
