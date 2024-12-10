@@ -15,6 +15,8 @@ Key features of Typesense Kubernetes Operator include:
     - provision Typesense services (headless & discovery `Services`),
     - actively discover and update Typesense's nodes list (quorum configuration mounted as `ConfigMap`),
     - place claims for Typesense `PersistentVolumes`
+    - _optionally_ expose Typesense API endpoint via an `Ingress`
+    - _optionally_ provision one or multiple instances (one per target URL) of DocSearch as `Cronjobs`
 - **Raft Quorum Configuration & Recovery Automation**:
     - Continuous active (re)discovery of the quorum configuration reacting to changes in `ReplicaSet` **without the need of an additional sidecar container**,
     - Automatic recovery of a cluster that has lost quorum **without the need of manual intervention**.
