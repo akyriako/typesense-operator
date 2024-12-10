@@ -186,6 +186,11 @@ introducing `TypesenseCluster`, a new Custom Resource Definition:
 | ingressClassName | Ingress to use                       |          |         |
 | annotations      | User-Defined annotations             | X        |         |
 
+> [!IMPORTANT]
+> This feature requires the existence of [cert-manager](https://cert-manager.io/) in the cluster, but **does not** actively enforce it with an error.
+> If you are targeting Open Telekom Cloud, you might be interested in provisioning additionally the designated DNS solver webhook
+> for Open Telekom Cloud. You can find it [here](https://github.com/akyriako/cert-manager-webhook-opentelekomcloud).
+
 **DocSearchScraperSpec** (optional)
 
 | Name        | Description                              | Optional | Default |
