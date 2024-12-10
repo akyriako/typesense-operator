@@ -79,7 +79,7 @@ The Typesense Kubernetes Operator manages the entire lifecycle of Typesense Clus
    under `/usr/share/typesense/nodelist`. No `Pod` restart is necessary when the `ConfigMap` changes, as raft automatically
    detects and applies the updates.
 
-![image](https://github.com/user-attachments/assets/30b6989c-c872-46ef-8ece-86c5d4911667)
+![image](https://github.com/user-attachments/assets/2afb802c-11f7-4be4-b44f-5dab9d489971)
 
 > [!NOTE]
 > The interval between reconciliation loops depends on the number of nodes. This approach ensures raft has sufficient
