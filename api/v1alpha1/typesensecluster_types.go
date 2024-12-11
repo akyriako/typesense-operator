@@ -17,6 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -28,6 +29,8 @@ import (
 type TypesenseClusterSpec struct {
 	Image string `json:"image"`
 
+	AdminApiKey *corev1.SecretReference `json:"adminApiKey,omitempty"`
+
 	// +optional
 	// +kubebuilder:default=3
 	// +kubebuilder:validation:Minimum=1
@@ -37,11 +40,19 @@ type TypesenseClusterSpec struct {
 
 	// +optional
 	// +kubebuilder:default=8108
+	// +kubebuilder:validation:Minimum=1024
+	// +kubebuilder:validation:Maximum=65535
+	// +kubebuilder:validation:ExclusiveMinimum=true
+	// +kubebuilder:validation:ExclusiveMaximum=false
 	// +kubebuilder:validation:Type=integer
 	ApiPort int `json:"apiPort,omitempty"`
 
 	// +optional
 	// +kubebuilder:default=8107
+	// +kubebuilder:validation:Minimum=1024
+	// +kubebuilder:validation:Maximum=65535
+	// +kubebuilder:validation:ExclusiveMinimum=true
+	// +kubebuilder:validation:ExclusiveMaximum=false
 	// +kubebuilder:validation:Type=integer
 	PeeringPort int `json:"peeringPort,omitempty"`
 

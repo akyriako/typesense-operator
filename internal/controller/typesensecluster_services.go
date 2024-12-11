@@ -14,7 +14,7 @@ import (
 func (r *TypesenseClusterReconciler) ReconcileServices(ctx context.Context, ts tsv1alpha1.TypesenseCluster) error {
 	r.logger.V(debugLevel).Info("reconciling services")
 
-	headlessSvcName := fmt.Sprintf("%s-sts-svc", ts.Name)
+	headlessSvcName := fmt.Sprintf(ClusterHeadlessService, ts.Name)
 	headlessExists := true
 	headlessObjectKey := client.ObjectKey{Namespace: ts.Namespace, Name: headlessSvcName}
 
@@ -37,7 +37,7 @@ func (r *TypesenseClusterReconciler) ReconcileServices(ctx context.Context, ts t
 		}
 	}
 
-	svcName := fmt.Sprintf("%s-svc", ts.Name)
+	svcName := fmt.Sprintf(ClusterRestService, ts.Name)
 	svcExists := true
 	svcObjectKey := client.ObjectKey{Namespace: ts.Namespace, Name: svcName}
 

@@ -15,7 +15,7 @@ import (
 func (r *TypesenseClusterReconciler) ReconcileConfigMap(ctx context.Context, ts tsv1alpha1.TypesenseCluster) (updated *bool, err error) {
 	r.logger.V(debugLevel).Info("reconciling config map")
 
-	configMapName := fmt.Sprintf("%s-nodeslist", ts.Name)
+	configMapName := fmt.Sprintf(ClusterNodesConfigMap, ts.Name)
 	configMapExists := true
 	configMapObjectKey := client.ObjectKey{Namespace: ts.Namespace, Name: configMapName}
 
@@ -81,7 +81,7 @@ func (r *TypesenseClusterReconciler) createConfigMap(ctx context.Context, key cl
 }
 
 func (r *TypesenseClusterReconciler) updateConfigMap(ctx context.Context, ts *tsv1alpha1.TypesenseCluster, cm *v1.ConfigMap, replicas *int32) (*v1.ConfigMap, int, error) {
-	stsName := fmt.Sprintf("%s-sts", ts.Name)
+	stsName := fmt.Sprintf(ClusterStatefulSet, ts.Name)
 	stsObjectKey := client.ObjectKey{
 		Name:      stsName,
 		Namespace: ts.Namespace,

@@ -40,7 +40,7 @@ var (
 func (r *TypesenseClusterReconciler) ReconcileIngress(ctx context.Context, ts tsv1alpha1.TypesenseCluster) (err error) {
 	r.logger.V(debugLevel).Info("reconciling ingress")
 
-	ingressName := fmt.Sprintf("%s-reverse-proxy", ts.Name)
+	ingressName := fmt.Sprintf(ClusterReverseProxyIngress, ts.Name)
 	ingressExists := true
 	ingressObjectKey := client.ObjectKey{Namespace: ts.Namespace, Name: ingressName}
 
@@ -69,7 +69,7 @@ func (r *TypesenseClusterReconciler) ReconcileIngress(ctx context.Context, ts ts
 		}
 	}
 
-	configMapName := fmt.Sprintf("%s-reverse-proxy-config", ts.Name)
+	configMapName := fmt.Sprintf(ClusterReverseProxyConfigMap, ts.Name)
 	configMapExists := true
 	configMapObjectKey := client.ObjectKey{Namespace: ts.Namespace, Name: configMapName}
 
@@ -99,7 +99,7 @@ func (r *TypesenseClusterReconciler) ReconcileIngress(ctx context.Context, ts ts
 		}
 	}
 
-	deploymentName := fmt.Sprintf("%s-reverse-proxy", ts.Name)
+	deploymentName := fmt.Sprintf(ClusterReverseProxy, ts.Name)
 	deploymentExists := true
 	deploymentObjectKey := client.ObjectKey{Namespace: ts.Namespace, Name: deploymentName}
 
@@ -122,7 +122,7 @@ func (r *TypesenseClusterReconciler) ReconcileIngress(ctx context.Context, ts ts
 		}
 	}
 
-	serviceName := fmt.Sprintf("%s-reverse-proxy-svc", ts.Name)
+	serviceName := fmt.Sprintf(ClusterReverseProxyService, ts.Name)
 	serviceExists := true
 	serviceNameObjectKey := client.ObjectKey{Namespace: ts.Namespace, Name: serviceName}
 
@@ -177,7 +177,7 @@ func (r *TypesenseClusterReconciler) createIngress(ctx context.Context, key clie
 									PathType: ptr.To[networkingv1.PathType](networkingv1.PathTypeImplementationSpecific),
 									Backend: networkingv1.IngressBackend{
 										Service: &networkingv1.IngressServiceBackend{
-											Name: fmt.Sprintf("%s-reverse-proxy-svc", ts.Name),
+											Name: fmt.Sprintf(ClusterReverseProxyService, ts.Name),
 											Port: networkingv1.ServiceBackendPort{
 												Number: 80,
 											},
@@ -276,7 +276,7 @@ func (r *TypesenseClusterReconciler) createIngressDeployment(ctx context.Context
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{
 						{
-							Name:  fmt.Sprintf("%s-reverse-proxy", ts.Name),
+							Name:  fmt.Sprintf(ClusterReverseProxy, ts.Name),
 							Image: "nginx:alpine",
 							Ports: []v1.ContainerPort{
 								{
@@ -298,7 +298,7 @@ func (r *TypesenseClusterReconciler) createIngressDeployment(ctx context.Context
 							VolumeSource: v1.VolumeSource{
 								ConfigMap: &v1.ConfigMapVolumeSource{
 									LocalObjectReference: v1.LocalObjectReference{
-										Name: fmt.Sprintf("%s-reverse-proxy-config", ts.Name),
+										Name: fmt.Sprintf(ClusterReverseProxyConfigMap, ts.Name),
 									},
 								},
 							},

@@ -34,7 +34,7 @@ func (r *TypesenseClusterReconciler) ReconcileQuorum(ctx context.Context, ts tsv
 }
 
 func (r *TypesenseClusterReconciler) getQuorumHealth(ctx context.Context, ts *tsv1alpha1.TypesenseCluster, sts *appsv1.StatefulSet) (ConditionQuorum, int, error) {
-	configMapName := fmt.Sprintf("%s-nodeslist", ts.Name)
+	configMapName := fmt.Sprintf(ClusterNodesConfigMap, ts.Name)
 	configMapObjectKey := client.ObjectKey{Namespace: ts.Namespace, Name: configMapName}
 
 	var cm = &v1.ConfigMap{}

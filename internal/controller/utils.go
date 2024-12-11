@@ -39,13 +39,13 @@ func generateSecureRandomString(length int) (string, error) {
 
 func getLabels(ts *tsv1alpha1.TypesenseCluster) map[string]string {
 	return map[string]string{
-		"app": fmt.Sprintf("%s-sts", ts.Name),
+		"app": fmt.Sprintf(ClusterAppLabel, ts.Name),
 	}
 }
 
 func getReverseProxyLabels(ts *tsv1alpha1.TypesenseCluster) map[string]string {
 	return map[string]string{
-		"app": fmt.Sprintf("%s-rp", ts.Name),
+		"app": fmt.Sprintf(ClusterReverseProxyAppLabel, ts.Name),
 	}
 }
 

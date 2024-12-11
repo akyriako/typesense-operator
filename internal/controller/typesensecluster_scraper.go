@@ -31,7 +31,7 @@ func (r *TypesenseClusterReconciler) ReconcileScraper(ctx context.Context, ts ts
 
 	inSpecs := func(cronJobName string, scrapers []tsv1alpha1.DocSearchScraperSpec) bool {
 		for _, scraper := range scrapers {
-			if cronJobName == fmt.Sprintf("%s-scraper", scraper.Name) {
+			if cronJobName == fmt.Sprintf(ClusterScraperCronJob, scraper.Name) {
 				return true
 			}
 		}
@@ -53,7 +53,7 @@ func (r *TypesenseClusterReconciler) ReconcileScraper(ctx context.Context, ts ts
 	}
 
 	for _, scraper := range ts.Spec.Scrapers {
-		scraperName := fmt.Sprintf("%s-scraper", scraper.Name)
+		scraperName := fmt.Sprintf(ClusterScraperCronJob, scraper.Name)
 		scraperExists := true
 		scraperObjectKey := client.ObjectKey{Namespace: ts.Namespace, Name: scraperName}
 
@@ -131,7 +131,7 @@ func (r *TypesenseClusterReconciler) createScraper(ctx context.Context, key clie
 							RestartPolicy: corev1.RestartPolicyNever,
 							Containers: []corev1.Container{
 								{
-									Name:  fmt.Sprintf("%s-docsearch-scraper", scraperSpec.Name),
+									Name:  fmt.Sprintf(ClusterScraperCronJobContainer, scraperSpec.Name),
 									Image: scraperSpec.Image,
 									Env: []corev1.EnvVar{
 										{
@@ -142,16 +142,16 @@ func (r *TypesenseClusterReconciler) createScraper(ctx context.Context, key clie
 											Name: "TYPESENSE_API_KEY",
 											ValueFrom: &corev1.EnvVarSource{
 												SecretKeyRef: &corev1.SecretKeySelector{
-													Key: "typesense-api-key",
+													Key: ClusterAdminApiKeySecretKeyName,
 													LocalObjectReference: corev1.LocalObjectReference{
-														Name: fmt.Sprintf("%s-admin-key", ts.Name),
+														Name: r.getAdminApiKeyObjectKey(ts).Name,
 													},
 												},
 											},
 										},
 										{
 											Name:  "TYPESENSE_HOST",
-											Value: fmt.Sprintf("%s-svc", ts.Name),
+											Value: fmt.Sprintf(ClusterRestService, ts.Name),
 										},
 										{
 											Name:  "TYPESENSE_PORT",

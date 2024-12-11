@@ -10,18 +10,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-const adminApiKeyName = "typesense-api-key"
-
 func (r *TypesenseClusterReconciler) ReconcileSecret(ctx context.Context, ts tsv1alpha1.TypesenseCluster) error {
 	r.logger.V(debugLevel).Info("reconciling secret")
 
-	secretName := fmt.Sprintf("%s-admin-key", ts.Name)
+	secretName := fmt.Sprintf(ClusterAdminApiKeySecret, ts.Name)
 	secretExists := true
-
-	secretObjectKey := client.ObjectKey{
-		Namespace: ts.Namespace,
-		Name:      secretName,
-	}
+	secretObjectKey := r.getAdminApiKeyObjectKey(&ts)
 
 	var secret = &v1.Secret{}
 	if err := r.Get(ctx, secretObjectKey, secret); err != nil {
@@ -59,7 +53,7 @@ func (r *TypesenseClusterReconciler) createAdminApiKey(
 		ObjectMeta: getObjectMeta(ts, &secretObjectKey.Name, nil),
 		Type:       v1.SecretTypeOpaque,
 		Data: map[string][]byte{
-			adminApiKeyName: []byte(token),
+			ClusterAdminApiKeySecretKeyName: []byte(token),
 		},
 	}
 
@@ -74,4 +68,18 @@ func (r *TypesenseClusterReconciler) createAdminApiKey(
 	}
 
 	return secret, nil
+}
+
+func (r *TypesenseClusterReconciler) getAdminApiKeyObjectKey(ts *tsv1alpha1.TypesenseCluster) client.ObjectKey {
+	if ts.Spec.AdminApiKey != nil {
+		return client.ObjectKey{
+			Namespace: ts.Namespace,
+			Name:      ts.Spec.AdminApiKey.Name,
+		}
+	}
+
+	return client.ObjectKey{
+		Namespace: ts.Namespace,
+		Name:      fmt.Sprintf(ClusterAdminApiKeySecret, ts.Name),
+	}
 }
