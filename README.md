@@ -62,7 +62,22 @@ Typesense may be unacceptable. The Typesense Kubernetes Operator addresses both 
 
 The Typesense Kubernetes Operator manages the entire lifecycle of Typesense Clusters within Kubernetes:
 
-1. A random token is generated and stored as a base64-encoded value in a new `Secret`. This token serves as the Admin API key for bootstrapping the Typesense cluster.
+1. A random token is generated and stored as a base64-encoded value in a new `Secret`. This token serves as the Admin API 
+   key for bootstrapping the Typesense cluster.
+
+> [!NOTE]
+> You can alternative provide your own `Secret` by setting the value of `adminApiKey` in `TypesenseCluster` specs; this will be used instead. 
+> The data key name has to be **always** `typesense-api-key`!
+> ```yaml
+> apiVersion: v1
+> kind: Secret
+> metadata:
+>  name: typesense-common-bootstrap-key
+>  type: Opaque
+> data:
+>  typesense-api-key: SXdpVG9CcnFYTHZYeTJNMG1TS1hPaGt0dlFUY3VWUloxc1M5REtsRUNtMFFwQU93R1hoanVIVWJLQnE2ejdlSQ==
+> ``` 
+
 2. A `ConfigMap` is created, containing the endpoints of the cluster nodes as a single concatenated string in its `data` field.
    During each reconciliation loop, the operator identifies any changes in endpoints and updates the `ConfigMap`. This `ConfigMap`
    is mounted in every `Pod` at the path where raft expects the quorum configuration, ensuring quorum configuration stays always updated.
@@ -157,24 +172,25 @@ introducing `TypesenseCluster`, a new Custom Resource Definition:
 
 **Spec**
 
-| Name              | Description                                  | Optional | Default |
-|-------------------|----------------------------------------------|----------|---------|
-| image             | Typesense image                              |          |         |
-| replicas          | Size of the cluster                          |          | 1       |
-| apiPort           | REST/API port                                |          | 8108    |
-| peeringPort       | Peering port                                 |          | 8107    |
-| resetPeersOnError | automatic reset of peers on error            |          | true    |
-| corsDomains       | domains that would be allowed for CORS calls | X        |         |
-| storage           | check StorageSpec below                      |          |         |
-| ingress           | check IngressSpec below                      | X        |         |
-| scrapers          | array of DocSearchScraperSpec; check below   | X        |         |
+| Name              | Description                                        | Optional | Default |
+|-------------------|----------------------------------------------------|----------|---------|
+| image             | Typesense image                                    |          |         |
+| adminApiKey       | Reference to the `Secret` to be used for bootstrap | X        |         |
+| replicas          | Size of the cluster                                |          | 1       |
+| apiPort           | REST/API port                                      |          | 8108    |
+| peeringPort       | Peering port                                       |          | 8107    |
+| resetPeersOnError | automatic reset of peers on error                  |          | true    |
+| corsDomains       | domains that would be allowed for CORS calls       | X        |         |
+| storage           | check `StorageSpec` below                            |          |         |
+| ingress           | check `IngressSpec` below                            | X        |         |
+| scrapers          | array of `DocSearchScraperSpec`; check below         | X        |         |
 
 **StorageSpec** (optional)
 
-| Name             | Description               | Optional | Default  |
-|------------------|---------------------------|----------|----------|
-| size             | Size of the underlying PV | X        | 100Mi    |
-| storageClassName | Storage Class to use      |          | standard |
+| Name             | Description                 | Optional | Default  |
+|------------------|-----------------------------|----------|----------|
+| size             | Size of the underlying `PV` | X        | 100Mi    |
+| storageClassName | `StorageClass` to be used   |          | standard |
 
 **IngressSpec** (optional)
 
@@ -182,8 +198,8 @@ introducing `TypesenseCluster`, a new Custom Resource Definition:
 |------------------|--------------------------------------|----------|---------|
 | referer          | FQDN allowed to access reverse proxy | X        |         |
 | host             | Ingress Host                         |          |         |
-| clusterIssuer    | cert-manager ClusterIssuer           |          |         |
-| ingressClassName | Ingress to use                       |          |         |
+| clusterIssuer    | cert-manager `ClusterIssuer`         |          |         |
+| ingressClassName | Ingress to be used                   |          |         |
 | annotations      | User-Defined annotations             | X        |         |
 
 > [!IMPORTANT]
@@ -265,25 +281,41 @@ Provision one of the samples available in `config/samples`:
 | kind          | KiND               |                                            | rancher.io/local-path |
 
 ```sh
-kubectl apply -f config/samples/ts_v1alpha1_typesensecluster_{{Suffix}}
+kubectl apply -f config/samples/ts_v1alpha1_typesensecluster_{{Suffix}}.yaml
 ```
 
-e.g. for AWS looks like:
+e.g. for Open Telekom Cloud it would look like:
 
 ```yaml title=ts_v1alpha1_typesensecluster_aws.yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: typesense-bootstrap-key
+type: Opaque
+data:
+  typesense-api-key: SXdpVG9CcnFYTHZYeTJNMG1TS1hPaGt0dlFUY3VWUloxc1M5REtsRUNtMFFwQU93R1hoanVIVWJLQnE2ejdlSQ==
+---
 apiVersion: ts.opentelekomcloud.com/v1alpha1
 kind: TypesenseCluster
 metadata:
-  labels:
-    app.kubernetes.io/name: typesense-operator
-    app.kubernetes.io/managed-by: kustomize
   name: cluster-1
 spec:
   image: typesense/typesense:27.1
   replicas: 3
   storage:
     size: 100Mi
-    storageClassName: gp2
+    storageClassName: csi-disk
+  ingress:
+    host: ts.example.de
+    ingressClassName: nginx
+    clusterIssuer: opentelekomcloud-letsencrypt
+  adminApiKey:
+    name: typesense-common-bootstrap-key
+  scrapers:
+    - name: docusaurus-example-com
+      image: typesense/docsearch-scraper:0.11.0
+      config: "{\"index_name\":\"docusaurus-example\",\"start_urls\":[\"https://docusaurus.example.com/\"],\"sitemap_urls\":[\"https://docusaurus.example.com/sitemap.xml\"],\"sitemap_alternate_links\":true,\"stop_urls\":[\"/tests\"],\"selectors\":{\"lvl0\":{\"selector\":\"(//ul[contains(@class,'menu__list')]//a[contains(@class, 'menu__link menu__link--sublist menu__link--active')]/text() | //nav[contains(@class, 'navbar')]//a[contains(@class, 'navbar__link--active')]/text())[last()]\",\"type\":\"xpath\",\"global\":true,\"default_value\":\"Documentation\"},\"lvl1\":\"header h1\",\"lvl2\":\"article h2\",\"lvl3\":\"article h3\",\"lvl4\":\"article h4\",\"lvl5\":\"article h5, article td:first-child\",\"lvl6\":\"article h6\",\"text\":\"article p, article li, article td:last-child\"},\"strip_chars\":\" .,;:#\",\"custom_settings\":{\"separatorsToIndex\":\"_\",\"attributesForFaceting\":[\"language\",\"version\",\"type\",\"docusaurus_tag\"],\"attributesToRetrieve\":[\"hierarchy\",\"content\",\"anchor\",\"url\",\"url_without_anchor\",\"type\"]},\"conversation_id\":[\"833762294\"],\"nb_hits\":46250}"
+      schedule: '*/2 * * * *'
 ```
 
 #### Uninstall CRDs
