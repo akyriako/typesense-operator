@@ -20,7 +20,8 @@ import (
 	"context"
 	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -77,7 +78,7 @@ var (
 // +kubebuilder:rbac:groups=apps,resources=statefulsets,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=events,verbs=create;patch
 // +kubebuilder:rbac:groups=networking.k8s.io,resources=ingresses,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=batch,resources=cronjobs,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=batch,resources=cronjobs,verbs=get;list;watch;create;update;patch;delete
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -159,6 +160,10 @@ func (r *TypesenseClusterReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	terminationGracePeriodSeconds := *sts.Spec.Template.Spec.TerminationGracePeriodSeconds
 	delayPerReplicaPeriodSeconds := int64(ts.Spec.Replicas)
 
+	toTitle := func(s string) string {
+		return cases.Title(language.Und, cases.NoLower).String(s)
+	}
+
 	if *updated {
 		condition, size, err := r.ReconcileQuorum(ctx, ts, *sts)
 		if err != nil {
@@ -174,7 +179,7 @@ func (r *TypesenseClusterReconciler) Reconcile(ctx context.Context, req ctrl.Req
 				return ctrl.Result{}, cerr
 			}
 
-			r.Recorder.Eventf(&ts, "Warning", string(condition), err.Error())
+			r.Recorder.Eventf(&ts, "Warning", string(condition), toTitle(err.Error()))
 
 			if size != 0 {
 				delayPerReplicaPeriodSeconds = int64(size)
@@ -192,22 +197,20 @@ func (r *TypesenseClusterReconciler) Reconcile(ctx context.Context, req ctrl.Req
 					return ctrl.Result{}, cerr
 				}
 
-				r.Recorder.Eventf(&ts, "Warning", string(condition), err.Error())
+				r.Recorder.Eventf(&ts, "Warning", string(condition), toTitle(err.Error()))
 
 				if size != 0 {
 					delayPerReplicaPeriodSeconds = int64(size)
 				}
 			} else {
-				c := ts.Status.Conditions[0]
+				//c := ts.Status.Conditions[0]
 
 				cerr := r.setConditionReady(ctx, &ts, string(condition))
 				if cerr != nil {
 					return ctrl.Result{}, cerr
 				}
 
-				if c.Status != metav1.ConditionTrue {
-					r.Recorder.Eventf(&ts, "Normal", string(condition), "quorum is ready")
-				}
+				r.Recorder.Eventf(&ts, "Normal", string(condition), toTitle("quorum is ready"))
 
 				delayPerReplicaPeriodSeconds = int64(1)
 			}
