@@ -98,13 +98,14 @@ func (r *TypesenseClusterReconciler) getQuorumHealth(ctx context.Context, ts *ts
 	if healthyNodes < minRequiredNodes {
 		if sts.Status.ReadyReplicas > 1 {
 			r.logger.Info("downgrading quorum")
+			desiredReplicas := int32(1)
 
-			_, size, err := r.updateConfigMap(ctx, ts, cm, ptr.To[int32](1))
+			_, size, err := r.updateConfigMap(ctx, ts, cm, ptr.To[int32](desiredReplicas))
 			if err != nil {
 				return ConditionReasonQuorumNotReady, 0, err
 			}
 
-			err = r.ScaleStatefulSet(ctx, sts, 1)
+			err = r.ScaleStatefulSet(ctx, sts, desiredReplicas)
 			if err != nil {
 				return ConditionReasonQuorumNotReady, 0, err
 			}
