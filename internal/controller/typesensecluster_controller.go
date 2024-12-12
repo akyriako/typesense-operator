@@ -22,6 +22,7 @@ import (
 	"github.com/pkg/errors"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -203,14 +204,16 @@ func (r *TypesenseClusterReconciler) Reconcile(ctx context.Context, req ctrl.Req
 					delayPerReplicaPeriodSeconds = int64(size)
 				}
 			} else {
-				//c := ts.Status.Conditions[0]
+				report := ts.Status.Conditions[0].Status != metav1.ConditionTrue
 
 				cerr := r.setConditionReady(ctx, &ts, string(condition))
 				if cerr != nil {
 					return ctrl.Result{}, cerr
 				}
 
-				r.Recorder.Eventf(&ts, "Normal", string(condition), toTitle("quorum is ready"))
+				if report {
+					r.Recorder.Eventf(&ts, "Normal", string(condition), toTitle("quorum is ready"))
+				}
 
 				delayPerReplicaPeriodSeconds = int64(1)
 			}
