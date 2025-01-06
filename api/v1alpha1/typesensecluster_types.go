@@ -62,8 +62,24 @@ type TypesenseClusterSpec struct {
 	ResetPeersOnError bool `json:"resetPeersOnError,omitempty"`
 
 	// +optional
+	// +kubebuilder:default=false
+	// +kubebuilder:validation:Type=boolean
+	EnableCors bool `json:"enableCors,omitempty"`
+
+	// +optional
 	// +kubebuilder:validation:Type=string
 	CorsDomains *string `json:"corsDomains,omitempty"`
+
+	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
+
+	// +kubebuilder:validation:Optional
+	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
+
+	// +kubebuilder:validation:Optional
+	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
+
+	// +kubebuilder:validation:Optional
+	AdditionalServerConfiguration *corev1.LocalObjectReference `json:"additionalServerConfiguration,omitempty"`
 
 	Storage *StorageSpec `json:"storage"`
 
