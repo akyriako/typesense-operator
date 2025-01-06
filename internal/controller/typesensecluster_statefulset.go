@@ -9,6 +9,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -227,6 +228,29 @@ func (r *TypesenseClusterReconciler) ScaleStatefulSet(ctx context.Context, sts *
 	if err := r.Client.Update(ctx, desired); err != nil {
 		r.logger.Error(err, "updating stateful replicas failed", "name", desired.Name)
 		return err
+	}
+
+	return nil
+}
+
+func (r *TypesenseClusterReconciler) PurgeStatefulSetPods(ctx context.Context, sts *appsv1.StatefulSet) error {
+	labelSelector := labels.SelectorFromSet(sts.Spec.Selector.MatchLabels)
+
+	var pods corev1.PodList
+	if err := r.List(ctx, &pods, &client.ListOptions{
+		Namespace:     sts.Namespace,
+		LabelSelector: labelSelector,
+	}); err != nil {
+		r.logger.Error(err, "failed to list pods", "statefulset", sts.Name)
+		return err
+	}
+
+	for _, pod := range pods.Items {
+		err := r.Delete(ctx, &pod)
+		if err != nil {
+			r.logger.Error(err, "failed to delete pod", "pod", pod.Name)
+			return err
+		}
 	}
 
 	return nil

@@ -113,6 +113,14 @@ func (r *TypesenseClusterReconciler) getQuorumHealth(ctx context.Context, ts *ts
 			return ConditionReasonQuorumDowngraded, size, nil
 		}
 
+		if healthyNodes == 0 && minRequiredNodes == 1 {
+			r.logger.Info("purging quorum")
+			err := r.PurgeStatefulSetPods(ctx, sts)
+			if err != nil {
+				return ConditionReasonQuorumNotReady, 0, err
+			}
+		}
+
 		return ConditionReasonQuorumNotReady, healthyNodes, fmt.Errorf("quorum has %d healthy nodes, minimum required %d", healthyNodes, minRequiredNodes)
 	} else {
 		if sts.Status.ReadyReplicas < ts.Spec.Replicas {
