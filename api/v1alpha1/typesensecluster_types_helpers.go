@@ -5,12 +5,12 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 )
 
-func (s *TypesenseClusterSpec) GetResources() *corev1.ResourceRequirements {
+func (s *TypesenseClusterSpec) GetResources() corev1.ResourceRequirements {
 	if s.Resources != nil {
-		return s.Resources
+		return *s.Resources
 	}
 
-	return &corev1.ResourceRequirements{
+	return corev1.ResourceRequirements{
 		Limits: corev1.ResourceList{
 			corev1.ResourceCPU:    resource.MustParse("1024m"),
 			corev1.ResourceMemory: resource.MustParse("512Mi"),
@@ -33,7 +33,7 @@ func (s *TypesenseClusterSpec) GetAdditionalServerConfiguration() []corev1.EnvFr
 		}
 	}
 
-	return nil
+	return []corev1.EnvFromSource{}
 }
 
 func (s *TypesenseClusterSpec) GetCorsDomains() string {
@@ -43,12 +43,12 @@ func (s *TypesenseClusterSpec) GetCorsDomains() string {
 	return ""
 }
 
-func (s *TypesenseClusterSpec) GetStorage() *StorageSpec {
+func (s *TypesenseClusterSpec) GetStorage() StorageSpec {
 	if s.Storage != nil {
-		return s.Storage
+		return *s.Storage
 	}
 
-	return &StorageSpec{
+	return StorageSpec{
 		Size:             resource.MustParse("100Mi"),
 		StorageClassName: "standard",
 	}

@@ -26,6 +26,14 @@ spec:
     ingressClassName: nginx
     clusterIssuer: lets-encrypt-prod
 ---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: c-kind-2-config
+data:
+  TYPESENSE_ENABLE_SEARCH_ANALYTICS: "true"
+  TYPESENSE_ENABLE_CORS: "true"
+---
 apiVersion: ts.opentelekomcloud.com/v1alpha1
 kind: TypesenseCluster
 metadata:
@@ -36,6 +44,8 @@ metadata:
 spec:
   image: typesense/typesense:26.0
   replicas: 1
+  additionalServerConfiguration:
+    name: c-kind-2-config
   storage:
     storageClassName: typesense-local-path
   ingress:

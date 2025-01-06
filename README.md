@@ -172,18 +172,30 @@ introducing `TypesenseCluster`, a new Custom Resource Definition:
 
 **Spec**
 
-| Name              | Description                                        | Optional | Default |
-|-------------------|----------------------------------------------------|----------|---------|
-| image             | Typesense image                                    |          |         |
-| adminApiKey       | Reference to the `Secret` to be used for bootstrap | X        |         |
-| replicas          | Size of the cluster                                |          | 1       |
-| apiPort           | REST/API port                                      |          | 8108    |
-| peeringPort       | Peering port                                       |          | 8107    |
-| resetPeersOnError | automatic reset of peers on error                  |          | true    |
-| corsDomains       | domains that would be allowed for CORS calls       | X        |         |
-| storage           | check `StorageSpec` below                            |          |         |
-| ingress           | check `IngressSpec` below                            | X        |         |
-| scrapers          | array of `DocSearchScraperSpec`; check below         | X        |         |
+| Name                          | Description                                              | Optional | Default       |
+|-------------------------------|----------------------------------------------------------|----------|---------------|
+| image                         | Typesense image                                          |          |               |
+| adminApiKey                   | Reference to the `Secret` to be used for bootstrap       | X        |               |
+| replicas                      | Size of the cluster                                      |          | 1             |
+| apiPort                       | REST/API port                                            |          | 8108          |
+| peeringPort                   | Peering port                                             |          | 8107          |
+| resetPeersOnError             | automatic reset of peers on error                        |          | true          |
+| enableCors                    | enables CORS                                             | X        | false         |
+| corsDomains                   | domains that would be allowed for CORS calls             | X        |               |
+| resources                     | resource request & limit                                 | X        | _check specs_ |
+| nodeSelector                  | node selection constraint                                | X        |               |
+| tolerations                   | schedule pods with matching taints                       | X        |               |
+| additionalServerConfiguration | a reference to a `ConfigMap` holding extra configuration | X        |               |
+| storage                       | check `StorageSpec` below                                |          |               |
+| ingress                       | check `IngressSpec` below                                | X        |               |
+| scrapers                      | array of `DocSearchScraperSpec`; check below             | X        |               |
+
+> [!IMPORTANT]
+> * Any Typesense server configuration variable that is defined in Spec is overriding any additional reference of
+>   the same variable in `additionalServerConfiguration`. You can find an example of providing an additional `ConfigMap`
+>   in: **config/samples/ts_v1alpha1_typesensecluster_kind.yaml**
+> * Add additional Typesense server configuration variables in `ConfigMap` as described in:
+>   https://typesense.org/docs/27.1/api/server-configuration.html#using-environment-variables
 
 **StorageSpec** (optional)
 

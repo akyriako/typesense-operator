@@ -59,6 +59,9 @@ func (r *TypesenseClusterReconciler) createStatefulSet(
 	key client.ObjectKey,
 	ts *tsv1alpha1.TypesenseCluster,
 ) (*appsv1.StatefulSet, error) {
+
+	envFrom := ts.Spec.GetAdditionalServerConfiguration()
+
 	sts := &appsv1.StatefulSet{
 		TypeMeta:   metav1.TypeMeta{},
 		ObjectMeta: getObjectMeta(ts, &key.Name, nil),
@@ -137,8 +140,8 @@ func (r *TypesenseClusterReconciler) createStatefulSet(
 									Value: strconv.FormatBool(ts.Spec.ResetPeersOnError),
 								},
 							},
-							EnvFrom:   ts.Spec.GetAdditionalServerConfiguration(),
-							Resources: *ts.Spec.GetResources(),
+							EnvFrom:   envFrom,
+							Resources: ts.Spec.GetResources(),
 							VolumeMounts: []corev1.VolumeMount{
 								{
 									MountPath: "/usr/share/typesense",
