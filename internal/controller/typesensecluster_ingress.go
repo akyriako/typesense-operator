@@ -50,6 +50,7 @@ func (r *TypesenseClusterReconciler) ReconcileIngress(ctx context.Context, ts ts
 			ingressExists = false
 		} else {
 			r.logger.Error(err, fmt.Sprintf("unable to fetch ingress: %s", ingressName))
+			return err
 		}
 	}
 

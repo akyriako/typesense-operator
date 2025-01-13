@@ -63,6 +63,7 @@ func (r *TypesenseClusterReconciler) ReconcileScraper(ctx context.Context, ts ts
 				scraperExists = false
 			} else {
 				r.logger.Error(err, fmt.Sprintf("unable to fetch scraper cronjob: %s", scraperObjectKey))
+				return err
 			}
 		}
 

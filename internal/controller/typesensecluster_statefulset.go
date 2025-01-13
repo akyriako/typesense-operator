@@ -34,6 +34,7 @@ func (r *TypesenseClusterReconciler) ReconcileStatefulSet(
 			stsExists = false
 		} else {
 			r.logger.Error(err, fmt.Sprintf("unable to fetch statefulset: %s", stsName))
+			return nil, err
 		}
 	}
 

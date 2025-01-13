@@ -40,6 +40,7 @@ func (r *TypesenseClusterReconciler) getQuorumHealth(ctx context.Context, ts *ts
 	var cm = &v1.ConfigMap{}
 	if err := r.Get(ctx, configMapObjectKey, cm); err != nil {
 		r.logger.Error(err, fmt.Sprintf("unable to fetch config map: %s", configMapName))
+		return ConditionReasonQuorumNotReady, 0, err
 	}
 
 	nodes := strings.Split(cm.Data["nodes"], ",")

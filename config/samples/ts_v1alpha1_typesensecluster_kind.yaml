@@ -7,6 +7,17 @@ reclaimPolicy: Delete
 allowVolumeExpansion: false
 volumeBindingMode: WaitForFirstConsumer
 ---
+apiVersion: v1
+kind: Secret
+metadata:
+  labels:
+    app.kubernetes.io/name: typesense-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: typesense-common-bootstrap-key
+type: Opaque
+data:
+  typesense-api-key: SXdpVG9CcnFYTHZYeTJNMG1TS1hPaGt0dlFUY3VWUloxc1M5REtsRUNtMFFwQU93R1hoanVIVWJLQnE2ejdlSQ==
+---
 apiVersion: ts.opentelekomcloud.com/v1alpha1
 kind: TypesenseCluster
 metadata:
@@ -20,6 +31,8 @@ spec:
   storage:
     size: 10Mi
     storageClassName: typesense-local-path
+  adminApiKey:
+    name: typesense-common-bootstrap-key
   ingress:
     referer: referer.example.com
     host: host.example.com
@@ -32,7 +45,6 @@ metadata:
   name: c-kind-2-config
 data:
   TYPESENSE_ENABLE_SEARCH_ANALYTICS: "true"
-  TYPESENSE_ENABLE_CORS: "true"
 ---
 apiVersion: ts.opentelekomcloud.com/v1alpha1
 kind: TypesenseCluster

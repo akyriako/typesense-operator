@@ -24,6 +24,7 @@ func (r *TypesenseClusterReconciler) ReconcileServices(ctx context.Context, ts t
 			headlessExists = false
 		} else {
 			r.logger.Error(err, fmt.Sprintf("unable to fetch service: %s", headlessSvcName))
+			return err
 		}
 	}
 
@@ -47,6 +48,7 @@ func (r *TypesenseClusterReconciler) ReconcileServices(ctx context.Context, ts t
 			svcExists = false
 		} else {
 			r.logger.Error(err, fmt.Sprintf("unable to fetch service: %s", svcName))
+			return err
 		}
 	}
 

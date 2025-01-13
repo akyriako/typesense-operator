@@ -13,16 +13,16 @@ import (
 func (r *TypesenseClusterReconciler) ReconcileSecret(ctx context.Context, ts tsv1alpha1.TypesenseCluster) error {
 	r.logger.V(debugLevel).Info("reconciling secret")
 
-	secretName := fmt.Sprintf(ClusterAdminApiKeySecret, ts.Name)
 	secretExists := true
 	secretObjectKey := r.getAdminApiKeyObjectKey(&ts)
 
 	var secret = &v1.Secret{}
 	if err := r.Get(ctx, secretObjectKey, secret); err != nil {
-		if apierrors.IsNotFound(err) {
+		if apierrors.IsNotFound(err) && ts.Spec.AdminApiKey == nil {
 			secretExists = false
 		} else {
-			r.logger.Error(err, fmt.Sprintf("unable to fetch secret: %s", secretName))
+			r.logger.Error(err, fmt.Sprintf("unable to fetch secret: %s", secretObjectKey))
+			return err
 		}
 	}
 
