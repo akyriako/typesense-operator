@@ -16,6 +16,11 @@ const (
 	ClusterReverseProxy          = "%s-reverse-proxy"
 	ClusterReverseProxyService   = "%s-reverse-proxy-svc"
 
+	ClusterPrometheusExporterAppLabel       = "%s-prometheus-exporter"
+	ClusterPrometheusExporterDeployment     = "%s-prometheus-exporter"
+	ClusterPrometheusExporterService        = "%s-prometheus-exporter-svc"
+	ClusterPrometheusExporterServiceMonitor = "%s-prometheus-exporter-servicemonitor"
+
 	ClusterScraperCronJob          = "%s-scraper"
 	ClusterScraperCronJobContainer = "%s-docsearch-scraper"
 )

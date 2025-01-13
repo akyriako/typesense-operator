@@ -150,6 +150,15 @@ func (r *TypesenseClusterReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		return ctrl.Result{}, err
 	}
 
+	err = r.ReconcileMetricsExporter(ctx, ts)
+	if err != nil {
+		cerr := r.setConditionNotReady(ctx, &ts, ConditionReasonMetricsExporterNotReady, err)
+		if cerr != nil {
+			err = errors.Wrap(err, cerr.Error())
+		}
+		return ctrl.Result{}, err
+	}
+
 	sts, err := r.ReconcileStatefulSet(ctx, ts)
 	if err != nil {
 		cerr := r.setConditionNotReady(ctx, &ts, ConditionReasonStatefulSetNotReady, err)

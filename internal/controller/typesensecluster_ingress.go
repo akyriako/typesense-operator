@@ -80,6 +80,7 @@ func (r *TypesenseClusterReconciler) ReconcileIngress(ctx context.Context, ts ts
 			configMapExists = false
 		} else {
 			r.logger.Error(err, fmt.Sprintf("unable to fetch ingress config map: %s", configMapName))
+			return err
 		}
 	}
 
@@ -110,6 +111,7 @@ func (r *TypesenseClusterReconciler) ReconcileIngress(ctx context.Context, ts ts
 			deploymentExists = false
 		} else {
 			r.logger.Error(err, fmt.Sprintf("unable to fetch ingress reverse proxy deployment: %s", deploymentName))
+			return err
 		}
 	}
 
@@ -133,6 +135,7 @@ func (r *TypesenseClusterReconciler) ReconcileIngress(ctx context.Context, ts ts
 			serviceExists = false
 		} else {
 			r.logger.Error(err, fmt.Sprintf("unable to fetch ingress reverse proxy service: %s", serviceName))
+			return err
 		}
 	}
 
