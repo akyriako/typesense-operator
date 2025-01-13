@@ -86,6 +86,11 @@ type TypesenseClusterSpec struct {
 	Ingress *IngressSpec `json:"ingress,omitempty"`
 
 	Scrapers []DocSearchScraperSpec `json:"scrapers,omitempty"`
+
+	// +optional
+	// +kubebuilder:default=false
+	// +kubebuilder:validation:Type=boolean
+	EnableMetricsExporter bool `json:"enableMetricsExporter,omitempty"`
 }
 
 type StorageSpec struct {

@@ -99,6 +99,9 @@ spec:
               enableCors:
                 default: false
                 type: boolean
+              enableMetricsExporter:
+                default: false
+                type: boolean
               image:
                 type: string
               ingress:
