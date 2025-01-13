@@ -7,23 +7,23 @@ import (
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"strconv"
 )
 
 func (r *TypesenseClusterReconciler) ReconcileMetricsExporter(ctx context.Context, ts tsv1alpha1.TypesenseCluster) error {
 	r.logger.V(debugLevel).Info("reconciling metrics exporter")
 
-	if !r.IsPrometheusDeployed(ctx) {
-		err := fmt.Errorf("monitoring.coreos.com custom resources were not found in cluster")
-		r.logger.Error(err, "reconciling metrics exporter skipped")
-		return nil
-	}
+	//if !r.IsPrometheusDeployed(ctx) {
+	//	err := fmt.Errorf("monitoring.coreos.com custom resources were not found in cluster")
+	//	r.logger.Error(err, "reconciling metrics exporter skipped")
+	//	return nil
+	//}
 
 	deploymentName := fmt.Sprintf(ClusterPrometheusExporterDeployment, ts.Name)
 	deploymentExists := true
@@ -130,6 +130,35 @@ func (r *TypesenseClusterReconciler) createMetricsExporterDeployment(ctx context
 						{
 							Name:  "typesense-prometheus-exporter",
 							Image: "akyriako78/typesense-prometheus-exporter:0.1.6",
+							Env: []v1.EnvVar{
+								{
+									Name: "TYPESENSE_API_KEY",
+									ValueFrom: &v1.EnvVarSource{
+										SecretKeyRef: &v1.SecretKeySelector{
+											Key: ClusterAdminApiKeySecretKeyName,
+											LocalObjectReference: v1.LocalObjectReference{
+												Name: r.getAdminApiKeyObjectKey(ts).Name,
+											},
+										},
+									},
+								},
+								{
+									Name:  "TYPESENSE_HOST",
+									Value: fmt.Sprintf(ClusterRestService, ts.Name),
+								},
+								{
+									Name:  "TYPESENSE_PORT",
+									Value: strconv.Itoa(ts.Spec.ApiPort),
+								},
+								{
+									Name:  "TYPESENSE_PROTOCOL",
+									Value: "http",
+								},
+								{
+									Name:  "TYPESENSE_CLUSTER",
+									Value: ts.Name,
+								},
+							},
 							Ports: []v1.ContainerPort{
 								{
 									ContainerPort: 8908,
@@ -229,12 +258,12 @@ func (r *TypesenseClusterReconciler) createMetricsExporterServiceMonitor(ctx con
 	return nil
 }
 
-func (r *TypesenseClusterReconciler) IsCrdDeployed(ctx context.Context, name string) bool {
-	crd := &apiextensions.CustomResourceDefinition{}
-	err := r.Get(ctx, client.ObjectKey{Name: name}, crd)
-	return err == nil
-}
-
-func (r *TypesenseClusterReconciler) IsPrometheusDeployed(ctx context.Context) bool {
-	return r.IsCrdDeployed(ctx, "servicemonitors.monitoring.coreos.com")
-}
+//func (r *TypesenseClusterReconciler) IsCrdDeployed(ctx context.Context, name string) bool {
+//	crd := &apiextensions.CustomResourceDefinition{}
+//	err := r.Get(ctx, client.ObjectKey{Name: name}, crd)
+//	return err == nil
+//}
+//
+//func (r *TypesenseClusterReconciler) IsPrometheusDeployed(ctx context.Context) bool {
+//	return r.IsCrdDeployed(ctx, "servicemonitors.monitoring.coreos.com")
+//}
