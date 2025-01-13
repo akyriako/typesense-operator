@@ -26,3 +26,4 @@ go.work.sum
 /bin/
 /bin/controller-gen
 /bin/controller-gen-v0.15.0
+/config/samples/ts_v1alpha1_typesensecluster_blueprints.yaml
