@@ -255,7 +255,7 @@ introducing `TypesenseCluster`, a new Custom Resource Definition:
 > 
 > name:             promstack-kube-prometheus-operator-755485dc68-dmkw2
 > Namespace:        monitoring
-> ...
+> [...]
 > Labels:           app=kube-prometheus-stack-operator
 > app.kubernetes.io/component=prometheus-operator
 > app.kubernetes.io/instance=promstack
@@ -267,7 +267,7 @@ introducing `TypesenseCluster`, a new Custom Resource Definition:
 > heritage=Helm
 > pod-template-hash=755485dc68
 > release=promstack
-> ...
+> [...]
 > ```
 
 
