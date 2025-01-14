@@ -266,16 +266,6 @@ func (r *TypesenseClusterReconciler) createMetricsExporterServiceMonitor(ctx con
 	return nil
 }
 
-//func (r *TypesenseClusterReconciler) IsCrdDeployed(ctx context.Context, name string) bool {
-//	crd := &apiextensions.CustomResourceDefinition{}
-//	err := r.Get(ctx, client.ObjectKey{Name: name}, crd)
-//	return err == nil
-//}
-//
-//func (r *TypesenseClusterReconciler) IsPrometheusDeployed(ctx context.Context) bool {
-//	return r.IsCrdDeployed(ctx, "servicemonitors.monitoring.coreos.com")
-//}
-
 func (r *TypesenseClusterReconciler) IsPrometheusDeployed() (bool, error) {
 	apiGroupList, err := r.DiscoveryClient.ServerGroups()
 	if err != nil {
