@@ -255,10 +255,7 @@ introducing `TypesenseCluster`, a new Custom Resource Definition:
 > 
 > name:             promstack-kube-prometheus-operator-755485dc68-dmkw2
 > Namespace:        monitoring
-> Priority:         0
-> Service Account:  promstack-kube-prometheus-operator
-> Node:             tsopdev3-control-plane/172.18.0.2
-> Start Time:       Wed, 08 Jan 2025 06:52:41 +0100
+> ...
 > Labels:           app=kube-prometheus-stack-operator
 > app.kubernetes.io/component=prometheus-operator
 > app.kubernetes.io/instance=promstack
