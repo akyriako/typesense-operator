@@ -220,7 +220,7 @@ func (r *TypesenseClusterReconciler) deleteIngress(ctx context.Context, ig *netw
 
 func (r *TypesenseClusterReconciler) createIngressConfigMap(ctx context.Context, key client.ObjectKey, ts *tsv1alpha1.TypesenseCluster, ig *networkingv1.Ingress) (*v1.ConfigMap, error) {
 	icm := &v1.ConfigMap{
-		ObjectMeta: getObjectMeta(ts, &key.Name, nil),
+		ObjectMeta: getReverseProxyObjectMeta(ts, &key.Name, nil),
 		Data: map[string]string{
 			"nginx.conf": r.getIngressNginxConf(ts),
 		},
@@ -267,7 +267,7 @@ func (r *TypesenseClusterReconciler) getIngressNginxConf(ts *tsv1alpha1.Typesens
 
 func (r *TypesenseClusterReconciler) createIngressDeployment(ctx context.Context, key client.ObjectKey, ts *tsv1alpha1.TypesenseCluster, ig *networkingv1.Ingress) (*appsv1.Deployment, error) {
 	deployment := &appsv1.Deployment{
-		ObjectMeta: getObjectMeta(ts, &key.Name, nil),
+		ObjectMeta: getReverseProxyObjectMeta(ts, &key.Name, nil),
 		Spec: appsv1.DeploymentSpec{
 			Replicas: ptr.To[int32](3),
 			Selector: &metav1.LabelSelector{
@@ -328,7 +328,7 @@ func (r *TypesenseClusterReconciler) createIngressDeployment(ctx context.Context
 
 func (r *TypesenseClusterReconciler) createIngressService(ctx context.Context, key client.ObjectKey, ts *tsv1alpha1.TypesenseCluster, ig *networkingv1.Ingress) (*v1.Service, error) {
 	service := &v1.Service{
-		ObjectMeta: getObjectMeta(ts, &key.Name, nil),
+		ObjectMeta: getReverseProxyObjectMeta(ts, &key.Name, nil),
 		Spec: v1.ServiceSpec{
 			Type:     v1.ServiceTypeNodePort,
 			Selector: getReverseProxyLabels(ts),

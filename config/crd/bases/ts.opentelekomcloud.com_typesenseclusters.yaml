@@ -99,9 +99,6 @@ spec:
               enableCors:
                 default: false
                 type: boolean
-              enableMetricsExporter:
-                default: false
-                type: boolean
               image:
                 type: string
               ingress:
@@ -124,6 +121,21 @@ spec:
                 - clusterIssuer
                 - host
                 - ingressClassName
+                type: object
+              metrics:
+                properties:
+                  image:
+                    default: akyriako78/typesense-prometheus-exporter:0.1.6
+                    type: string
+                  interval:
+                    default: 15
+                    maximum: 60
+                    minimum: 15
+                    type: integer
+                  release:
+                    type: string
+                required:
+                - release
                 type: object
               nodeSelector:
                 additionalProperties:

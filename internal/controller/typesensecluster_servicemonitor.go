@@ -21,7 +21,7 @@ const prometheusApiGroup = "monitoring.coreos.com"
 func (r *TypesenseClusterReconciler) ReconcileMetricsExporter(ctx context.Context, ts tsv1alpha1.TypesenseCluster) error {
 	r.logger.V(debugLevel).Info("reconciling metrics exporter")
 
-	if ts.Spec.EnableMetricsExporter {
+	if ts.Spec.Metrics != nil {
 		if deployed, err := r.IsPrometheusDeployed(); err != nil || !deployed {
 			err := fmt.Errorf("prometheus api group %s was not found in cluster", prometheusApiGroup)
 			r.logger.Error(err, "reconciling metrics exporter skipped")
@@ -43,7 +43,7 @@ func (r *TypesenseClusterReconciler) ReconcileMetricsExporter(ctx context.Contex
 		}
 	}
 
-	if !ts.Spec.EnableMetricsExporter {
+	if ts.Spec.Metrics == nil {
 		if deploymentExists {
 			err := r.deleteMetricsExporterDeployment(ctx, deployment)
 			if err != nil {
@@ -123,7 +123,7 @@ func (r *TypesenseClusterReconciler) ReconcileMetricsExporter(ctx context.Contex
 
 func (r *TypesenseClusterReconciler) createMetricsExporterDeployment(ctx context.Context, key client.ObjectKey, ts *tsv1alpha1.TypesenseCluster) (*appsv1.Deployment, error) {
 	deployment := &appsv1.Deployment{
-		ObjectMeta: getObjectMeta(ts, &key.Name, nil),
+		ObjectMeta: getMetricsExporterObjectMeta(ts, &key.Name, nil),
 		Spec: appsv1.DeploymentSpec{
 			Replicas: ptr.To[int32](1),
 			Selector: &metav1.LabelSelector{
@@ -137,7 +137,7 @@ func (r *TypesenseClusterReconciler) createMetricsExporterDeployment(ctx context
 					Containers: []v1.Container{
 						{
 							Name:  "typesense-prometheus-exporter",
-							Image: "akyriako78/typesense-prometheus-exporter:0.1.6",
+							Image: ts.Spec.Metrics.Image,
 							Env: []v1.EnvVar{
 								{
 									Name: "TYPESENSE_API_KEY",
@@ -203,7 +203,7 @@ func (r *TypesenseClusterReconciler) deleteMetricsExporterDeployment(ctx context
 
 func (r *TypesenseClusterReconciler) createMetricsExporterService(ctx context.Context, key client.ObjectKey, ts *tsv1alpha1.TypesenseCluster, deployment *appsv1.Deployment) error {
 	service := &v1.Service{
-		ObjectMeta: getObjectMeta(ts, &key.Name, nil),
+		ObjectMeta: getMetricsExporterObjectMeta(ts, &key.Name, nil),
 		Spec: v1.ServiceSpec{
 			Type:     v1.ServiceTypeClusterIP,
 			Selector: getMetricsExporterLabels(ts),
@@ -232,8 +232,11 @@ func (r *TypesenseClusterReconciler) createMetricsExporterService(ctx context.Co
 }
 
 func (r *TypesenseClusterReconciler) createMetricsExporterServiceMonitor(ctx context.Context, key client.ObjectKey, ts *tsv1alpha1.TypesenseCluster, deployment *appsv1.Deployment) error {
+	objectMeta := getMetricsExporterObjectMeta(ts, &key.Name, nil)
+	objectMeta.Labels["release"] = ts.Spec.Metrics.Release
+
 	serviceMonitor := &monitoringv1.ServiceMonitor{
-		ObjectMeta: getObjectMeta(ts, &key.Name, nil),
+		ObjectMeta: objectMeta,
 		Spec: monitoringv1.ServiceMonitorSpec{
 			Selector: metav1.LabelSelector{
 				MatchLabels: getMetricsExporterLabels(ts),
@@ -245,7 +248,7 @@ func (r *TypesenseClusterReconciler) createMetricsExporterServiceMonitor(ctx con
 				{
 					Port:     "metrics",
 					Path:     "/metrics",
-					Interval: "15s",
+					Interval: monitoringv1.Duration(fmt.Sprintf("%ds", ts.Spec.Metrics.IntervalInSeconds)),
 					Scheme:   "http",
 				},
 			},

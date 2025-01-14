@@ -43,18 +43,6 @@ func getLabels(ts *tsv1alpha1.TypesenseCluster) map[string]string {
 	}
 }
 
-func getReverseProxyLabels(ts *tsv1alpha1.TypesenseCluster) map[string]string {
-	return map[string]string{
-		"app": fmt.Sprintf(ClusterReverseProxyAppLabel, ts.Name),
-	}
-}
-
-func getMetricsExporterLabels(ts *tsv1alpha1.TypesenseCluster) map[string]string {
-	return map[string]string{
-		"app": fmt.Sprintf(ClusterPrometheusExporterAppLabel, ts.Name),
-	}
-}
-
 func getObjectMeta(ts *tsv1alpha1.TypesenseCluster, name *string, annotations map[string]string) metav1.ObjectMeta {
 	if name == nil {
 		name = &ts.Name
@@ -64,6 +52,44 @@ func getObjectMeta(ts *tsv1alpha1.TypesenseCluster, name *string, annotations ma
 		Name:        *name,
 		Namespace:   ts.Namespace,
 		Labels:      getLabels(ts),
+		Annotations: annotations,
+	}
+}
+
+func getReverseProxyLabels(ts *tsv1alpha1.TypesenseCluster) map[string]string {
+	return map[string]string{
+		"app": fmt.Sprintf(ClusterReverseProxyAppLabel, ts.Name),
+	}
+}
+
+func getReverseProxyObjectMeta(ts *tsv1alpha1.TypesenseCluster, name *string, annotations map[string]string) metav1.ObjectMeta {
+	if name == nil {
+		name = &ts.Name
+	}
+
+	return metav1.ObjectMeta{
+		Name:        *name,
+		Namespace:   ts.Namespace,
+		Labels:      getReverseProxyLabels(ts),
+		Annotations: annotations,
+	}
+}
+
+func getMetricsExporterLabels(ts *tsv1alpha1.TypesenseCluster) map[string]string {
+	return map[string]string{
+		"app": fmt.Sprintf(ClusterPrometheusExporterAppLabel, ts.Name),
+	}
+}
+
+func getMetricsExporterObjectMeta(ts *tsv1alpha1.TypesenseCluster, name *string, annotations map[string]string) metav1.ObjectMeta {
+	if name == nil {
+		name = &ts.Name
+	}
+
+	return metav1.ObjectMeta{
+		Name:        *name,
+		Namespace:   ts.Namespace,
+		Labels:      getMetricsExporterLabels(ts),
 		Annotations: annotations,
 	}
 }
