@@ -4,7 +4,7 @@ controllerManager:
     - --metrics-bind-address=:8443
     - --leader-elect
     - --health-probe-bind-address=:8081
-    - --zap-log-level=info
+    - --zap-log-level=debug
     containerSecurityContext:
       allowPrivilegeEscalation: false
       capabilities:
@@ -12,7 +12,7 @@ controllerManager:
         - ALL
     image:
       repository: akyriako78/typesense-operator
-      tag: 0.2.8
+      tag: 0.2.9
     resources:
       limits:
         cpu: 500m
