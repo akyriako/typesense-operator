@@ -169,7 +169,7 @@ of manual intervention in order to recover a cluster that has lost quorum.
 Typesense Kubernetes Operator is controlling the lifecycle of multiple Typesense instances in the same Kubernetes cluster by
 introducing `TypesenseCluster`, a new Custom Resource Definition:
 
-![image](https://github.com/user-attachments/assets/3dd20498-fb4b-46b7-9f60-ff413fadc942)
+![image](https://github.com/user-attachments/assets/841ad290-0401-4d7c-b85f-60a219ba88c5)
 
 **Spec**
 
