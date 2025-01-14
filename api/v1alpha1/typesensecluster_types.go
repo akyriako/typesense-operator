@@ -129,7 +129,7 @@ type MetricsExporterSpec struct {
 	Release string `json:"release"`
 
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default:="akyriako78/typesense-prometheus-exporter:0.1.6"
+	// +kubebuilder:default:="akyriako78/typesense-prometheus-exporter:0.1.7"
 	Image string `json:"image,omitempty"`
 
 	// +optional
