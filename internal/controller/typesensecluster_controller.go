@@ -24,6 +24,7 @@ import (
 	"golang.org/x/text/language"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
@@ -39,9 +40,10 @@ import (
 // TypesenseClusterReconciler reconciles a TypesenseCluster object
 type TypesenseClusterReconciler struct {
 	client.Client
-	Scheme   *runtime.Scheme
-	logger   logr.Logger
-	Recorder record.EventRecorder
+	Scheme          *runtime.Scheme
+	logger          logr.Logger
+	Recorder        record.EventRecorder
+	DiscoveryClient *discovery.DiscoveryClient
 }
 
 type TypesenseClusterReconciliationPhase struct {

@@ -16,14 +16,18 @@ import (
 	"strconv"
 )
 
+const prometheusApiGroup = "monitoring.coreos.com"
+
 func (r *TypesenseClusterReconciler) ReconcileMetricsExporter(ctx context.Context, ts tsv1alpha1.TypesenseCluster) error {
 	r.logger.V(debugLevel).Info("reconciling metrics exporter")
 
-	//if !r.IsPrometheusDeployed(ctx) {
-	//	err := fmt.Errorf("monitoring.coreos.com custom resources were not found in cluster")
-	//	r.logger.Error(err, "reconciling metrics exporter skipped")
-	//	return nil
-	//}
+	if ts.Spec.EnableMetricsExporter {
+		if deployed, err := r.IsPrometheusDeployed(); err != nil || !deployed {
+			err := fmt.Errorf("prometheus api group %s was not found in cluster", prometheusApiGroup)
+			r.logger.Error(err, "reconciling metrics exporter skipped")
+			return nil
+		}
+	}
 
 	deploymentName := fmt.Sprintf(ClusterPrometheusExporterDeployment, ts.Name)
 	deploymentExists := true
@@ -61,6 +65,10 @@ func (r *TypesenseClusterReconciler) ReconcileMetricsExporter(ctx context.Contex
 
 		deployment = dpl
 	}
+
+	//else {
+	//	// check if the image version is  the same otherwise update
+	//}
 
 	serviceName := fmt.Sprintf(ClusterPrometheusExporterService, ts.Name)
 	serviceExists := true
@@ -267,3 +275,18 @@ func (r *TypesenseClusterReconciler) createMetricsExporterServiceMonitor(ctx con
 //func (r *TypesenseClusterReconciler) IsPrometheusDeployed(ctx context.Context) bool {
 //	return r.IsCrdDeployed(ctx, "servicemonitors.monitoring.coreos.com")
 //}
+
+func (r *TypesenseClusterReconciler) IsPrometheusDeployed() (bool, error) {
+	apiGroupList, err := r.DiscoveryClient.ServerGroups()
+	if err != nil {
+		return false, err
+	}
+
+	for _, apiGroup := range apiGroupList.Groups {
+		if apiGroup.Name == prometheusApiGroup {
+			return true, nil
+		}
+	}
+
+	return false, nil
+}
