@@ -242,7 +242,7 @@ introducing `TypesenseCluster`, a new Custom Resource Definition:
 
 | Name     | Description                               | Optional | Default                                        |
 |----------|-------------------------------------------|----------|------------------------------------------------|
-| image    | container image to use                    | X        | akyriako78/typesense-prometheus-exporter:0.1.6 |
+| image    | container image to use                    | X        | akyriako78/typesense-prometheus-exporter:0.1.7 |
 | release  | Prometheus release to become a target of  |          |                                                |
 | interval | interval in _seconds_ between two scrapes | X        | 15                                             |
 
