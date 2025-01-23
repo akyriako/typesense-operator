@@ -28,6 +28,7 @@ metadata:
 spec:
   image: typesense/typesense:27.1
   replicas: 3
+  corsDomains: "http://localhost,https://www.example.de"
   storage:
     size: 10Mi
     storageClassName: typesense-local-path
@@ -58,6 +59,7 @@ metadata:
 spec:
   image: typesense/typesense:26.0
   replicas: 1
+  enableCors: true
   additionalServerConfiguration:
     name: c-kind-2-config
   storage:
@@ -77,3 +79,29 @@ spec:
       schedule: '*/2 * * * *'
   metrics:
     release: promstack
+---
+apiVersion: ts.opentelekomcloud.com/v1alpha1
+kind: TypesenseCluster
+metadata:
+  labels:
+    app.kubernetes.io/name: typesense-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: c-kind-3
+spec:
+  image: typesense/typesense:27.1
+  replicas: 1
+  enableCors: true
+  corsDomains: "http://localhost,https://www.example.de"
+  storage:
+    size: 10Mi
+    storageClassName: typesense-local-path
+  adminApiKey:
+    name: typesense-common-bootstrap-key
+  ingress:
+    referer: referer.example.com
+    host: host.example.com
+    ingressClassName: nginx
+    clusterIssuer: lets-encrypt-prod
+  metrics:
+    release: promstack
+---

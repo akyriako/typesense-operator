@@ -182,7 +182,7 @@ introducing `TypesenseCluster`, a new Custom Resource Definition:
 | peeringPort                   | Peering port                                             |          | 8107          |
 | resetPeersOnError             | automatic reset of peers on error                        |          | true          |
 | enableCors                    | enables CORS                                             | X        | false         |
-| corsDomains                   | domains that would be allowed for CORS calls             | X        |               |
+| corsDomains                   | comma separated list of domains allowed for CORS         | X        |               |
 | resources                     | resource request & limit                                 | X        | _check specs_ |
 | nodeSelector                  | node selection constraint                                | X        |               |
 | tolerations                   | schedule pods with matching taints                       | X        |               |

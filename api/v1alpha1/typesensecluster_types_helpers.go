@@ -37,10 +37,10 @@ func (s *TypesenseClusterSpec) GetAdditionalServerConfiguration() []corev1.EnvFr
 }
 
 func (s *TypesenseClusterSpec) GetCorsDomains() string {
-	if s.EnableCors {
-		return *s.CorsDomains
+	if s.CorsDomains == nil {
+		return ""
 	}
-	return ""
+	return *s.CorsDomains
 }
 
 func (s *TypesenseClusterSpec) GetStorage() StorageSpec {

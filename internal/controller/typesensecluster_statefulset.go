@@ -61,13 +61,12 @@ func (r *TypesenseClusterReconciler) createStatefulSet(
 	ts *tsv1alpha1.TypesenseCluster,
 ) (*appsv1.StatefulSet, error) {
 
-	envFrom := ts.Spec.GetAdditionalServerConfiguration()
-
+	clusterName := ts.Name
 	sts := &appsv1.StatefulSet{
 		TypeMeta:   metav1.TypeMeta{},
 		ObjectMeta: getObjectMeta(ts, &key.Name, nil),
 		Spec: appsv1.StatefulSetSpec{
-			ServiceName:         fmt.Sprintf(ClusterHeadlessService, ts.Name),
+			ServiceName:         fmt.Sprintf(ClusterHeadlessService, clusterName),
 			PodManagementPolicy: appsv1.ParallelPodManagement,
 			Replicas:            ptr.To[int32](ts.Spec.Replicas),
 			Selector: &metav1.LabelSelector{
@@ -141,7 +140,7 @@ func (r *TypesenseClusterReconciler) createStatefulSet(
 									Value: strconv.FormatBool(ts.Spec.ResetPeersOnError),
 								},
 							},
-							EnvFrom:   envFrom,
+							EnvFrom:   ts.Spec.GetAdditionalServerConfiguration(),
 							Resources: ts.Spec.GetResources(),
 							VolumeMounts: []corev1.VolumeMount{
 								{
@@ -163,7 +162,7 @@ func (r *TypesenseClusterReconciler) createStatefulSet(
 							VolumeSource: corev1.VolumeSource{
 								ConfigMap: &corev1.ConfigMapVolumeSource{
 									LocalObjectReference: corev1.LocalObjectReference{
-										Name: fmt.Sprintf(ClusterNodesConfigMap, ts.Name),
+										Name: fmt.Sprintf(ClusterNodesConfigMap, clusterName),
 									},
 								},
 							},
