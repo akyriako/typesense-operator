@@ -150,7 +150,7 @@ func (r *TypesenseClusterReconciler) deleteConfigMap(ctx context.Context, cm *v1
 func (r *TypesenseClusterReconciler) getNodes(ts *tsv1alpha1.TypesenseCluster, replicas int32) ([]string, error) {
 	nodes := make([]string, replicas)
 	for i := 0; i < int(replicas); i++ {
-		nodeName := fmt.Sprintf("%s-sts-%d.%s-sts-svc.%s.svc.cluster.local", ts.Name, i, ts.Name, ts.Namespace)
+		nodeName := fmt.Sprintf("%s-sts-%d.%s-sts-svc", ts.Name, i, ts.Name)
 		if len(nodeName) > nodeNameLenLimit {
 			return nil, fmt.Errorf("raft error: node name should not exceed %d characters: %s", nodeNameLenLimit, nodeName)
 		}
@@ -159,4 +159,11 @@ func (r *TypesenseClusterReconciler) getNodes(ts *tsv1alpha1.TypesenseCluster, r
 	}
 
 	return nodes, nil
+}
+
+func (r *TypesenseClusterReconciler) getNodeFullyQualifiedDomainName(ts *tsv1alpha1.TypesenseCluster, raftNodeEndpoint string) string {
+	node := strings.Replace(raftNodeEndpoint, fmt.Sprintf(":%d:%d", ts.Spec.PeeringPort, ts.Spec.ApiPort), "", 1)
+	fqdn := fmt.Sprintf("%s.%s.svc.cluster.local", node, ts.Namespace)
+
+	return fqdn
 }

@@ -82,14 +82,17 @@ The Typesense Kubernetes Operator manages the entire lifecycle of Typesense Clus
 2. A `ConfigMap` is created, containing the endpoints of the cluster nodes as a single concatenated string in its `data` field.
    During each reconciliation loop, the operator identifies any changes in endpoints and updates the `ConfigMap`. This `ConfigMap`
    is mounted in every `Pod` at the path where raft expects the quorum configuration, ensuring quorum configuration stays always updated.
-   The Fully Qualified Domain Name (FQDN) for each endpoint of the headless service adheres to the following naming convention:
+   The endpoint of each `Pod` the headless service adheres to the following naming convention:
 
-`{cluster-name}-sts-{pod-index}.{cluster-name}-sts-svc.{namespace}.svc.cluster.local:{peering-port}:{api-port}`
+        `{cluster-name}-sts-{pod-index}.{cluster-name}-sts-svc`
 
 > [!IMPORTANT]
-> **This completely eliminates the need for a sidecar** to translate the endpoints of the headless `Service` into `Pod` IP addresses.
-> The FQDN of the endpoints automatically resolves to the new IP addresses, and raft will begin contacting these endpoints
+> * **This completely eliminates the need for a sidecar** to translate the endpoints of the headless `Service` into `Pod` IP addresses.
+> The endpoints automatically resolves to the new IP addresses, and raft will begin contacting these endpoints
 > within its 30-second polling interval.
+> * Be cautious while choosing the cluster name (`Spec.Name`) in `TypesenseCluster` CRDs, as raft expects the combined endpoint name and 
+> API and Peering ports (e.g. `{cluster-name}-sts-{pod-index}.{cluster-name}-sts-svc:8107:8108`) **not** to exceed  **64** characters 
+> in length.
 
 3. Next, the reconciler creates a headless `Service` required for the `StatefulSet`, along with a standard Kubernetes
    Service of type `ClusterIP`. The latter exposes the REST/API endpoints of the Typesense cluster to external systems.

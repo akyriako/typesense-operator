@@ -56,8 +56,8 @@ func (r *TypesenseClusterReconciler) getQuorumHealth(ctx context.Context, ts *ts
 	}
 
 	for _, node := range nodes {
-		nodeUrl := strings.Replace(node, fmt.Sprintf(":%d", ts.Spec.PeeringPort), "", 1)
-		resp, err := httpClient.Get(fmt.Sprintf("http://%s/health", nodeUrl))
+		fqdn := r.getNodeFullyQualifiedDomainName(ts, node)
+		resp, err := httpClient.Get(fmt.Sprintf("http://%s:%d/health", fqdn, ts.Spec.ApiPort))
 		if err != nil {
 			r.logger.Error(err, "health check failed", "node", node)
 			healthResults[node] = false
