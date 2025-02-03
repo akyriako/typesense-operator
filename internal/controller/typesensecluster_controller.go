@@ -171,7 +171,7 @@ func (r *TypesenseClusterReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	}
 
 	terminationGracePeriodSeconds := *sts.Spec.Template.Spec.TerminationGracePeriodSeconds
-	delayPerReplicaPeriodSeconds := int64(ts.Spec.Replicas)
+	delayPerReplicaFactor := getDelayPerReplicaFactor(int(ts.Spec.Replicas))
 
 	toTitle := func(s string) string {
 		return cases.Title(language.Und, cases.NoLower).String(s)
@@ -194,11 +194,8 @@ func (r *TypesenseClusterReconciler) Reconcile(ctx context.Context, req ctrl.Req
 
 			r.Recorder.Eventf(&ts, "Warning", string(condition), toTitle(err.Error()))
 
-			if size != 0 {
-				delayPerReplicaPeriodSeconds = int64(size)
-			}
-
-			requeueAfter = time.Duration(delayPerReplicaPeriodSeconds*60+terminationGracePeriodSeconds) * time.Second
+			delayPerReplicaFactor = getDelayPerReplicaFactor(size)
+			requeueAfter = time.Duration(delayPerReplicaFactor*60+terminationGracePeriodSeconds) * time.Second
 			return ctrl.Result{RequeueAfter: requeueAfter}, err
 		} else {
 			if condition != ConditionReasonQuorumReady {
@@ -212,9 +209,7 @@ func (r *TypesenseClusterReconciler) Reconcile(ctx context.Context, req ctrl.Req
 
 				r.Recorder.Eventf(&ts, "Warning", string(condition), toTitle(err.Error()))
 
-				if size != 0 {
-					delayPerReplicaPeriodSeconds = int64(size)
-				}
+				delayPerReplicaFactor = getDelayPerReplicaFactor(size)
 			} else {
 				report := ts.Status.Conditions[0].Status != metav1.ConditionTrue
 
@@ -227,12 +222,12 @@ func (r *TypesenseClusterReconciler) Reconcile(ctx context.Context, req ctrl.Req
 					r.Recorder.Eventf(&ts, "Normal", string(condition), toTitle("quorum is ready"))
 				}
 
-				delayPerReplicaPeriodSeconds = int64(1)
+				delayPerReplicaFactor = minDelayPerReplicaFactor
 			}
 		}
 	}
 
-	requeueAfter = time.Duration(delayPerReplicaPeriodSeconds*60+terminationGracePeriodSeconds) * time.Second
+	requeueAfter = time.Duration(delayPerReplicaFactor*60+terminationGracePeriodSeconds) * time.Second
 	r.logger.Info("reconciling cluster completed", "requeueAfter", requeueAfter)
 
 	return ctrl.Result{RequeueAfter: requeueAfter}, nil

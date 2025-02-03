@@ -180,7 +180,7 @@ introducing `TypesenseCluster`, a new Custom Resource Definition:
 |-------------------------------|----------------------------------------------------------|----------|---------------|
 | image                         | Typesense image                                          |          |               |
 | adminApiKey                   | Reference to the `Secret` to be used for bootstrap       | X        |               |
-| replicas                      | Size of the cluster                                      |          | 1             |
+| replicas                      | Size of the cluster (allowed 1, 3, 5 or 7)               |          | 3             |
 | apiPort                       | REST/API port                                            |          | 8108          |
 | peeringPort                   | Peering port                                             |          | 8107          |
 | resetPeersOnError             | automatic reset of peers on error                        |          | true          |

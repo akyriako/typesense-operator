@@ -93,3 +93,19 @@ func getMetricsExporterObjectMeta(ts *tsv1alpha1.TypesenseCluster, name *string,
 		Annotations: annotations,
 	}
 }
+
+const (
+	minDelayPerReplicaFactor = 1
+	maxDelayPerReplicaFactor = 3
+)
+
+func getDelayPerReplicaFactor(size int) int64 {
+	if size != 0 {
+		if size <= maxDelayPerReplicaFactor {
+			return int64(size)
+		} else {
+			return maxDelayPerReplicaFactor
+		}
+	}
+	return minDelayPerReplicaFactor
+}

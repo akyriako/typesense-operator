@@ -34,8 +34,11 @@ type TypesenseClusterSpec struct {
 	// +optional
 	// +kubebuilder:default=3
 	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Maximum=7
 	// +kubebuilder:validation:ExclusiveMinimum=false
+	// +kubebuilder:validation:ExclusiveMaximum=false
 	// +kubebuilder:validation:Type=integer
+	// +kubebuilder:validation:Enum=1;3;5;7
 	Replicas int32 `json:"replicas,omitempty"`
 
 	// +optional

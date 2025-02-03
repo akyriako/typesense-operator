@@ -149,7 +149,13 @@ spec:
                 type: integer
               replicas:
                 default: 3
+                enum:
+                - 1
+                - 3
+                - 5
+                - 7
                 format: int32
+                maximum: 7
                 minimum: 1
                 type: integer
               resetPeersOnError:
