@@ -4,6 +4,8 @@ const (
 	ClusterNodesConfigMap           = "%s-nodeslist"
 	ClusterAdminApiKeySecret        = "%s-admin-key"
 	ClusterAdminApiKeySecretKeyName = "typesense-api-key"
+	ClusterApiKeySecretKeyName      = "typesense-api-key"
+	ClusterApiKeySecretIdName       = "typesense-api-key-id"
 
 	ClusterHeadlessService = "%s-sts-svc"
 	ClusterRestService     = "%s-svc"

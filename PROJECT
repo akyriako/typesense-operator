@@ -20,4 +20,13 @@ resources:
   kind: TypesenseCluster
   path: github.com/akyriako/typesense-operator/api/v1alpha1
   version: v1alpha1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: opentelekomcloud.com
+  group: ts
+  kind: TypesenseKeyRequest
+  path: github.com/akyriako/typesense-operator/api/v1alpha1
+  version: v1alpha1
 version: "3"

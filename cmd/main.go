@@ -19,9 +19,10 @@ package main
 import (
 	"crypto/tls"
 	"flag"
+	"os"
+
 	"go.uber.org/zap/zapcore"
 	"k8s.io/client-go/discovery"
-	"os"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
@@ -170,6 +171,13 @@ func main() {
 		DiscoveryClient: discoveryClient,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "TypesenseCluster")
+		os.Exit(1)
+	}
+	if err = (&controller.TypesenseKeyRequestReconciler{
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "TypesenseKeyRequest")
 		os.Exit(1)
 	}
 	// +kubebuilder:scaffold:builder

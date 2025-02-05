@@ -1,0 +1,23 @@
+# permissions for end users to view typesensekeyrequests.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: typesense-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: typesensekeyrequest-viewer-role
+rules:
+- apiGroups:
+  - ts.opentelekomcloud.com
+  resources:
+  - typesensekeyrequests
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - ts.opentelekomcloud.com
+  resources:
+  - typesensekeyrequests/status
+  verbs:
+  - get

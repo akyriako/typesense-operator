@@ -1,0 +1,27 @@
+# permissions for end users to edit typesensekeyrequests.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: typesense-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: typesensekeyrequest-editor-role
+rules:
+- apiGroups:
+  - ts.opentelekomcloud.com
+  resources:
+  - typesensekeyrequests
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - ts.opentelekomcloud.com
+  resources:
+  - typesensekeyrequests/status
+  verbs:
+  - get

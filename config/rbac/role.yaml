@@ -142,3 +142,29 @@ rules:
   - get
   - patch
   - update
+- apiGroups:
+  - ts.opentelekomcloud.com
+  resources:
+  - typesensekeyrequests
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - ts.opentelekomcloud.com
+  resources:
+  - typesensekeyrequests/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - ts.opentelekomcloud.com
+  resources:
+  - typesensekeyrequests/status
+  verbs:
+  - get
+  - patch
+  - update

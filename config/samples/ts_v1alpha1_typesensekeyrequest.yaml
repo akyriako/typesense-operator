@@ -1,0 +1,15 @@
+apiVersion: ts.opentelekomcloud.com/v1alpha1
+kind: TypesenseKeyRequest
+metadata:
+  labels:
+    app.kubernetes.io/name: typesense-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: typesensekeyrequest-sample
+spec:
+  cluster:
+    apiVersion: ts.opentelekomcloud.com/v1alpha1
+    kind: TypesenseCluster
+    name: c-kind-1
+    namespace: default
+  actions : "[\"documents:search\"]"
+  collections: "[\"companies\"]"
