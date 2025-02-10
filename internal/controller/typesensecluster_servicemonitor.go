@@ -70,6 +70,7 @@ func (r *TypesenseClusterReconciler) ReconcileMetricsExporter(ctx context.Contex
 
 			dpl, err := r.updateMetricsExporterDeployment(ctx, *deployment, &ts)
 			if err != nil {
+				r.logger.Error(err, "updating metrics exporter deployment failed", "deployment", deploymentObjectKey.Name)
 				return err
 			}
 

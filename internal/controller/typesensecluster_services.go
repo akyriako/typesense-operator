@@ -29,12 +29,22 @@ func (r *TypesenseClusterReconciler) ReconcileServices(ctx context.Context, ts t
 	}
 
 	if !headlessExists {
-		r.logger.V(debugLevel).Info("creating headless service", "service", headlessObjectKey)
+		r.logger.V(debugLevel).Info("creating headless service", "service", headlessObjectKey.Name)
 
 		_, err := r.createHeadlessService(ctx, headlessObjectKey, &ts)
 		if err != nil {
-			r.logger.Error(err, "creating headless service failed", "service", headlessObjectKey)
+			r.logger.Error(err, "creating headless service failed", "service", headlessObjectKey.Name)
 			return err
+		}
+	} else {
+		if int32(ts.Spec.ApiPort) != headless.Spec.Ports[0].Port {
+			r.logger.V(debugLevel).Info("updating headless service", "service", headlessObjectKey.Name)
+
+			err := r.updateHeadlessService(ctx, *headless, &ts)
+			if err != nil {
+				r.logger.Error(err, "updating headless service failed", "service", headlessObjectKey.Name)
+				return err
+			}
 		}
 	}
 
@@ -53,12 +63,22 @@ func (r *TypesenseClusterReconciler) ReconcileServices(ctx context.Context, ts t
 	}
 
 	if !svcExists {
-		r.logger.V(debugLevel).Info("creating resolver service", "service", svcObjectKey)
+		r.logger.V(debugLevel).Info("creating resolver service", "service", svcObjectKey.Name)
 
 		_, err := r.createService(ctx, svcObjectKey, &ts)
 		if err != nil {
-			r.logger.Error(err, "creating resolver service failed", "service", svcObjectKey)
+			r.logger.Error(err, "creating resolver service failed", "service", svcObjectKey.Name)
 			return err
+		}
+	} else {
+		if int32(ts.Spec.ApiPort) != svc.Spec.Ports[0].Port {
+			r.logger.V(debugLevel).Info("updating resolver service  service", "service", svcObjectKey.Name)
+
+			err := r.updateService(ctx, *svc, &ts)
+			if err != nil {
+				r.logger.Error(err, "updating resolver service  service failed", "service", svcObjectKey.Name)
+				return err
+			}
 		}
 	}
 
@@ -95,6 +115,17 @@ func (r *TypesenseClusterReconciler) createHeadlessService(ctx context.Context, 
 	return svc, nil
 }
 
+func (r *TypesenseClusterReconciler) updateHeadlessService(ctx context.Context, headless v1.Service, ts *tsv1alpha1.TypesenseCluster) error {
+	patch := client.MergeFrom(headless.DeepCopy())
+	headless.Spec.Ports[0].Port = int32(ts.Spec.ApiPort)
+
+	if err := r.Patch(ctx, &headless, patch); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (r *TypesenseClusterReconciler) createService(ctx context.Context, key client.ObjectKey, ts *tsv1alpha1.TypesenseCluster) (*v1.Service, error) {
 	svc := &v1.Service{
 		ObjectMeta: getObjectMeta(ts, &key.Name, nil),
@@ -122,4 +153,15 @@ func (r *TypesenseClusterReconciler) createService(ctx context.Context, key clie
 	}
 
 	return svc, nil
+}
+
+func (r *TypesenseClusterReconciler) updateService(ctx context.Context, svc v1.Service, ts *tsv1alpha1.TypesenseCluster) error {
+	patch := client.MergeFrom(svc.DeepCopy())
+	svc.Spec.Ports[0].Port = int32(ts.Spec.ApiPort)
+
+	if err := r.Patch(ctx, &svc, patch); err != nil {
+		return err
+	}
+
+	return nil
 }
