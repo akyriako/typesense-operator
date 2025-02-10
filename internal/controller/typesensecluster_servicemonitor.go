@@ -64,11 +64,18 @@ func (r *TypesenseClusterReconciler) ReconcileMetricsExporter(ctx context.Contex
 		}
 
 		deployment = dpl
-	}
+	} else {
+		if ts.Spec.Metrics.Image != deployment.Spec.Template.Spec.Containers[0].Image {
+			r.logger.V(debugLevel).Info("updating metrics exporter deployment", "deployment", deploymentObjectKey.Name)
 
-	//else {
-	//	// check if the image version is  the same otherwise update
-	//}
+			dpl, err := r.updateMetricsExporterDeployment(ctx, *deployment, &ts)
+			if err != nil {
+				return err
+			}
+
+			deployment = dpl
+		}
+	}
 
 	serviceName := fmt.Sprintf(ClusterPrometheusExporterService, ts.Name)
 	serviceExists := true
@@ -115,6 +122,22 @@ func (r *TypesenseClusterReconciler) ReconcileMetricsExporter(ctx context.Contex
 		if err != nil {
 			r.logger.Error(err, "creating metrics exporter servicemonitor failed", "servicemonitor", serviceMonitorObjectKey.Name)
 			return err
+		}
+	} else {
+		if ts.Spec.Metrics.Release != serviceMonitor.ObjectMeta.Labels["release"] || monitoringv1.Duration(fmt.Sprintf("%ds", ts.Spec.Metrics.IntervalInSeconds)) != serviceMonitor.Spec.Endpoints[0].Interval {
+			r.logger.V(debugLevel).Info("updating metrics exporter servicemonitor", "deployment", deploymentObjectKey.Name)
+
+			err := r.deleteMetricsExporterServiceMonitor(ctx, serviceMonitor)
+			if err != nil {
+				r.logger.Error(err, "deleting metrics exporter servicemonitor failed", "servicemonitor", serviceMonitorObjectKey.Name)
+				return err
+			}
+
+			err = r.createMetricsExporterServiceMonitor(ctx, serviceMonitorObjectKey, &ts, deployment)
+			if err != nil {
+				r.logger.Error(err, "creating metrics exporter servicemonitor failed", "servicemonitor", serviceMonitorObjectKey.Name)
+				return err
+			}
 		}
 	}
 
@@ -201,6 +224,17 @@ func (r *TypesenseClusterReconciler) deleteMetricsExporterDeployment(ctx context
 	return nil
 }
 
+func (r *TypesenseClusterReconciler) updateMetricsExporterDeployment(ctx context.Context, deployment appsv1.Deployment, ts *tsv1alpha1.TypesenseCluster) (*appsv1.Deployment, error) {
+	patch := client.MergeFrom(deployment.DeepCopy())
+	deployment.Spec.Template.Spec.Containers[0].Image = ts.Spec.Metrics.Image
+
+	if err := r.Patch(ctx, &deployment, patch); err != nil {
+		return nil, err
+	}
+
+	return &deployment, nil
+}
+
 func (r *TypesenseClusterReconciler) createMetricsExporterService(ctx context.Context, key client.ObjectKey, ts *tsv1alpha1.TypesenseCluster, deployment *appsv1.Deployment) error {
 	service := &v1.Service{
 		ObjectMeta: getMetricsExporterObjectMeta(ts, &key.Name, nil),
@@ -262,6 +296,15 @@ func (r *TypesenseClusterReconciler) createMetricsExporterServiceMonitor(ctx con
 	}
 
 	err = r.Create(ctx, serviceMonitor)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (r *TypesenseClusterReconciler) deleteMetricsExporterServiceMonitor(ctx context.Context, serviceMonitor *monitoringv1.ServiceMonitor) error {
+	err := r.Delete(ctx, serviceMonitor)
 	if err != nil {
 		return err
 	}

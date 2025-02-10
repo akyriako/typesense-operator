@@ -47,10 +47,10 @@ func (r *TypesenseClusterReconciler) ReconcileConfigMap(ctx context.Context, ts 
 		}
 	}
 
-	nodes := strings.Split(cm.Data["nodes"], ",")
-	for i := 0; i < len(nodes); i++ {
-		nodes[i] = strings.Replace(nodes[i], fmt.Sprintf(":%d:%d", ts.Spec.PeeringPort, ts.Spec.ApiPort), "", 1)
-	}
+	//nodes := strings.Split(cm.Data["nodes"], ",")
+	//for i := 0; i < len(nodes); i++ {
+	//	nodes[i] = strings.Replace(nodes[i], fmt.Sprintf(":%d:%d", ts.Spec.PeeringPort, ts.Spec.ApiPort), "", 1)
+	//}
 	return &configMapExists, nil
 }
 
