@@ -107,6 +107,7 @@ func (r *TypesenseClusterReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		return ctrl.Result{}, err
 	}
 
+	// Update strategy: Admin Secret is Immutable, will not be update on any future change
 	err = r.ReconcileSecret(ctx, ts)
 	if err != nil {
 		cerr := r.setConditionNotReady(ctx, &ts, ConditionReasonSecretNotReady, err)
