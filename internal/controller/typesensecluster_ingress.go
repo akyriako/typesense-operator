@@ -12,6 +12,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/ptr"
 	"maps"
+	"reflect"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -68,6 +69,21 @@ func (r *TypesenseClusterReconciler) ReconcileIngress(ctx context.Context, ts ts
 			r.logger.Error(err, "creating ingress failed", "ingress", ingressObjectKey.Name)
 			return err
 		}
+	} else {
+		if ts.Spec.Ingress.Host != ig.Spec.Rules[0].Host ||
+			ts.Spec.Ingress.ClusterIssuer != ig.Annotations["cert-manager.io/cluster-issuer"] ||
+			!reflect.DeepEqual(ts.Spec.Ingress.Annotations, r.getIngressAnnotations(ig)) ||
+			ts.Spec.Ingress.IngressClassName != *ig.Spec.IngressClassName {
+
+			r.logger.V(debugLevel).Info("updating ingress", "ingress", ingressObjectKey.Name)
+
+			ig, err = r.updateIngress(ctx, *ig, &ts)
+			if err != nil {
+				r.logger.Error(err, "updating ingress failed", "ingress", ingressObjectKey.Name)
+				return err
+			}
+		}
+
 	}
 
 	configMapName := fmt.Sprintf(ClusterReverseProxyConfigMap, ts.Name)
@@ -209,6 +225,27 @@ func (r *TypesenseClusterReconciler) createIngress(ctx context.Context, key clie
 	return ingress, nil
 }
 
+func (r *TypesenseClusterReconciler) updateIngress(ctx context.Context, ig networkingv1.Ingress, ts *tsv1alpha1.TypesenseCluster) (*networkingv1.Ingress, error) {
+	patch := client.MergeFrom(ig.DeepCopy())
+
+	ig.Spec.Rules[0].Host = ts.Spec.Ingress.Host
+	ig.Spec.IngressClassName = ptr.To[string](ts.Spec.Ingress.IngressClassName)
+
+	annotations := map[string]string{}
+	annotations["cert-manager.io/cluster-issuer"] = ts.Spec.Ingress.ClusterIssuer
+
+	if ts.Spec.Ingress.Annotations != nil {
+		maps.Copy(annotations, ts.Spec.Ingress.Annotations)
+	}
+	ig.Annotations = annotations
+
+	if err := r.Patch(ctx, &ig, patch); err != nil {
+		return nil, err
+	}
+
+	return &ig, nil
+}
+
 func (r *TypesenseClusterReconciler) deleteIngress(ctx context.Context, ig *networkingv1.Ingress) error {
 	err := r.Delete(ctx, ig)
 	if err != nil {
@@ -216,6 +253,20 @@ func (r *TypesenseClusterReconciler) deleteIngress(ctx context.Context, ig *netw
 	}
 
 	return nil
+}
+
+func (r *TypesenseClusterReconciler) getIngressAnnotations(ig *networkingv1.Ingress) map[string]string {
+	annotations := make(map[string]string, len(ig.Annotations))
+	for k, v := range ig.Annotations {
+		annotations[k] = v
+	}
+
+	delete(annotations, "cert-manager.io/cluster-issuer")
+	if len(annotations) == 0 {
+		annotations = nil
+	}
+
+	return annotations
 }
 
 func (r *TypesenseClusterReconciler) createIngressConfigMap(ctx context.Context, key client.ObjectKey, ts *tsv1alpha1.TypesenseCluster, ig *networkingv1.Ingress) (*v1.ConfigMap, error) {

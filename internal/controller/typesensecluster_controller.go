@@ -117,7 +117,7 @@ func (r *TypesenseClusterReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		return ctrl.Result{}, err
 	}
 
-	// Update strategy: Updates the existing object, if changes are identified in the desired.Data["nodes"]
+	// Update strategy: Update the existing object, if changes are identified in the desired.Data["nodes"]
 	updated, err := r.ReconcileConfigMap(ctx, ts)
 	if err != nil {
 		cerr := r.setConditionNotReady(ctx, &ts, ConditionReasonConfigMapNotReady, err)
@@ -127,8 +127,7 @@ func (r *TypesenseClusterReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		return ctrl.Result{}, err
 	}
 
-	// Update strategy: Updates the existing objects, if changes are identified in api and peering ports
-	// TODO: Update the existing objects, if changes are identified in api and peering ports
+	// Update strategy: Update the existing objects, if changes are identified in api and peering ports
 	err = r.ReconcileServices(ctx, ts)
 	if err != nil {
 		cerr := r.setConditionNotReady(ctx, &ts, ConditionReasonServicesNotReady, err)
@@ -138,8 +137,7 @@ func (r *TypesenseClusterReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		return ctrl.Result{}, err
 	}
 
-	// Update strategy: Drops the existing objects and recreates them, if changes are identified in any of the ingress properties
-	// TODO: Drop the existing objects and recreate them, if changes are identified in any of the ingress properties
+	// Update strategy: Update the existing objects, if changes are identified in api and peering ports
 	err = r.ReconcileIngress(ctx, ts)
 	if err != nil {
 		cerr := r.setConditionNotReady(ctx, &ts, ConditionReasonIngressNotReady, err)
@@ -149,7 +147,7 @@ func (r *TypesenseClusterReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		return ctrl.Result{}, err
 	}
 
-	// Update strategy: Drops the existing objects and recreates them, if changes are identified
+	// Update strategy: Drop the existing objects and recreate them, if changes are identified
 	err = r.ReconcileScraper(ctx, ts)
 	if err != nil {
 		cerr := r.setConditionNotReady(ctx, &ts, ConditionReasonScrapersNotReady, err)

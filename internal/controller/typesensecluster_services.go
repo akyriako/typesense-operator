@@ -72,11 +72,11 @@ func (r *TypesenseClusterReconciler) ReconcileServices(ctx context.Context, ts t
 		}
 	} else {
 		if int32(ts.Spec.ApiPort) != svc.Spec.Ports[0].Port {
-			r.logger.V(debugLevel).Info("updating resolver service  service", "service", svcObjectKey.Name)
+			r.logger.V(debugLevel).Info("updating resolver service", "service", svcObjectKey.Name)
 
 			err := r.updateService(ctx, *svc, &ts)
 			if err != nil {
-				r.logger.Error(err, "updating resolver service  service failed", "service", svcObjectKey.Name)
+				r.logger.Error(err, "updating resolver service failed", "service", svcObjectKey.Name)
 				return err
 			}
 		}
