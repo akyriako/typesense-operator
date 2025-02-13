@@ -78,25 +78,6 @@ func (r *TypesenseKeyRequestReconciler) Reconcile(ctx context.Context, req ctrl.
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	clusterObjectKey := client.ObjectKey{Namespace: keyRequest.Namespace, Name: keyRequest.Spec.Cluster.Name}
-	var cluster tsv1alpha1.TypesenseCluster
-	if err := r.Get(ctx, clusterObjectKey, &cluster); err != nil {
-		return ctrl.Result{}, err
-	}
-
-	var adminKeySecret v1.Secret
-	adminKeySecretObjectKey := client.ObjectKey{Namespace: keyRequest.Namespace, Name: cluster.Spec.AdminApiKey.Name}
-	if err := r.Get(ctx, adminKeySecretObjectKey, &adminKeySecret); err != nil {
-		return ctrl.Result{}, err
-	}
-
-	encodedValue, exists := adminKeySecret.Data["typesense-api-key"]
-	if !exists {
-
-		return ctrl.Result{}, errors.New("Typesense API key not found in secret")
-	}
-	decodedValue := string(encodedValue)
-
 	// Check if the Memcached instance is marked to be deleted, which is
 	// indicated by the deletion timestamp being set.
 	isKeyRequestMarkedToBeDeleted := keyRequest.GetDeletionTimestamp() != nil
@@ -105,7 +86,7 @@ func (r *TypesenseKeyRequestReconciler) Reconcile(ctx context.Context, req ctrl.
 			// Run finalization logic for memcachedFinalizer. If the
 			// finalization logic fails, don't remove the finalizer so
 			// that we can retry during the next reconciliation.
-			if err := r.finalizeKeyRequest(ctx, decodedValue, &keyRequest, &cluster); err != nil {
+			if err := r.finalizeKeyRequest(ctx, &keyRequest); err != nil {
 				return ctrl.Result{}, err
 			}
 
@@ -129,21 +110,50 @@ func (r *TypesenseKeyRequestReconciler) Reconcile(ctx context.Context, req ctrl.
 		}
 	}
 
-	var apiKeySecret v1.Secret
-	apiKeySecretExists := true
-	apiKeySecretObjectKey := client.ObjectKey{Namespace: keyRequest.Namespace, Name: keyRequest.Name}
-
-	if err := r.Get(ctx, apiKeySecretObjectKey, &apiKeySecret); err != nil {
-		if apierrors.IsNotFound(err) {
-			apiKeySecretExists = false
-		} else {
-			r.logger.Error(err, fmt.Sprintf("unable to fetch secret: %s", apiKeySecret.Name))
-			return ctrl.Result{}, err
-		}
+	clusterObjectKey := client.ObjectKey{Namespace: keyRequest.Namespace, Name: keyRequest.Spec.Cluster.Name}
+	var cluster tsv1alpha1.TypesenseCluster
+	if err := r.Get(ctx, clusterObjectKey, &cluster); err != nil {
+		return ctrl.Result{}, err
 	}
 
-	if apiKeySecretExists {
-		return ctrl.Result{}, nil
+	var adminKeySecret v1.Secret
+	adminKeySecretObjectKey := client.ObjectKey{Namespace: keyRequest.Namespace, Name: cluster.Spec.AdminApiKey.Name}
+	if err := r.Get(ctx, adminKeySecretObjectKey, &adminKeySecret); err != nil {
+		return ctrl.Result{}, err
+	}
+
+	encodedValue, exists := adminKeySecret.Data["typesense-api-key"]
+	if !exists {
+
+		return ctrl.Result{}, errors.New("Typesense API key not found in secret")
+	}
+	decodedValue := string(encodedValue)
+
+	var apiKeyValue string
+	var apiKeySecret v1.Secret
+
+	if keyRequest.Spec.ApiKey != nil {
+		apiKeySecretObjectKey := client.ObjectKey{Namespace: keyRequest.Spec.ApiKey.Namespace, Name: keyRequest.Spec.ApiKey.Name}
+		if err := r.Get(ctx, apiKeySecretObjectKey, &apiKeySecret); err != nil {
+			return ctrl.Result{}, err
+		}
+	} else {
+		apiKeySecretExists := true
+		apiKeySecretObjectKey := client.ObjectKey{Namespace: keyRequest.Namespace, Name: keyRequest.Name}
+
+		if err := r.Get(ctx, apiKeySecretObjectKey, &apiKeySecret); err != nil {
+			if apierrors.IsNotFound(err) {
+				apiKeySecretExists = false
+			} else {
+				r.logger.Error(err, fmt.Sprintf("unable to fetch secret: %s", apiKeySecret.Name))
+				return ctrl.Result{}, err
+			}
+		}
+
+		if apiKeySecretExists {
+			return ctrl.Result{}, nil
+		}
+
 	}
 
 	//TODO: change url back
@@ -199,7 +209,7 @@ func (r *TypesenseKeyRequestReconciler) createApiKeySecret(
 	return secret, nil
 }
 
-func (r *TypesenseKeyRequestReconciler) finalizeKeyRequest(ctx context.Context, adminApiKey string, keyRequest *tsv1alpha1.TypesenseKeyRequest, cluster *tsv1alpha1.TypesenseCluster) error {
+func (r *TypesenseKeyRequestReconciler) finalizeKeyRequest(ctx context.Context, keyRequest *tsv1alpha1.TypesenseKeyRequest) error {
 	var apiKeySecret v1.Secret
 	apiKeySecretObjectKey := client.ObjectKey{Namespace: keyRequest.Namespace, Name: keyRequest.Name}
 
@@ -212,6 +222,34 @@ func (r *TypesenseKeyRequestReconciler) finalizeKeyRequest(ctx context.Context, 
 		}
 	}
 	apiKeyID := string(apiKeySecret.Data[ClusterApiKeySecretIdName])
+
+	clusterObjectKey := client.ObjectKey{Namespace: keyRequest.Namespace, Name: keyRequest.Spec.Cluster.Name}
+	var cluster tsv1alpha1.TypesenseCluster
+	if err := r.Get(ctx, clusterObjectKey, &cluster); err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil
+		} else {
+			r.logger.Error(err, fmt.Sprintf("unable to fetch cluster in finalizer: %s", apiKeySecret.Name))
+			return err
+		}
+	}
+
+	var adminKeySecret v1.Secret
+	adminKeySecretObjectKey := client.ObjectKey{Namespace: keyRequest.Namespace, Name: cluster.Spec.AdminApiKey.Name}
+	if err := r.Get(ctx, adminKeySecretObjectKey, &adminKeySecret); err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil
+		} else {
+			r.logger.Error(err, fmt.Sprintf("unable to fetch secret in finalizer: %s", apiKeySecret.Name))
+			return err
+		}
+	}
+
+	encodedValue, exists := adminKeySecret.Data["typesense-api-key"]
+	if !exists {
+		return nil
+	}
+	adminApiKey := string(encodedValue)
 
 	//TODO: change url back
 	//svcURL := fmt.Sprintf("http://%s:%d/keys", fmt.Sprintf(ClusterRestService, cluster.Name), cluster.Spec.ApiPort)
