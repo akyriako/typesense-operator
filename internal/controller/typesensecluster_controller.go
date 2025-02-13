@@ -52,7 +52,7 @@ type TypesenseClusterReconciliationPhase struct {
 }
 
 var (
-	eventFilters = builder.WithPredicates(predicate.Funcs{
+	clusterEventFilters = builder.WithPredicates(predicate.Funcs{
 		UpdateFunc: func(e event.UpdateEvent) bool {
 			// We only need to check generation changes here, because it is only
 			// updated on spec changes. On the other hand RevisionVersion
@@ -236,6 +236,6 @@ func (r *TypesenseClusterReconciler) Reconcile(ctx context.Context, req ctrl.Req
 // SetupWithManager sets up the controller with the Manager.
 func (r *TypesenseClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&tsv1alpha1.TypesenseCluster{}, eventFilters).
+		For(&tsv1alpha1.TypesenseCluster{}, clusterEventFilters).
 		Complete(r)
 }

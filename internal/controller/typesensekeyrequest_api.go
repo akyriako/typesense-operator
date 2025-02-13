@@ -18,7 +18,7 @@ type KeyResponse struct {
 	Value       string   `json:"value"`
 }
 
-func (r *TypesenseKeyRequestReconciler) CreateAPIKey(ctx context.Context, apiKey string, apiKeysURL string, keyRequest tsv1alpha1.TypesenseKeyRequest) (*KeyResponse, error) {
+func (r *TypesenseKeyRequestReconciler) CreateAPIKey(ctx context.Context, adminApiKey string, apiKeysURL string, keyRequest tsv1alpha1.TypesenseKeyRequest) (*KeyResponse, error) {
 	//payload := fmt.Sprintf("{'description':'%s','actions': '%s' , 'collections': '%s' }", keyRequest.Spec.Description, keyRequest.Spec.Actions, keyRequest.Spec.Collections)
 	payload := fmt.Sprintf(`{"description":"%s","actions": %s, "collections": %s}`, keyRequest.Spec.Description, keyRequest.Spec.Actions, keyRequest.Spec.Collections)
 	payloadAsBytes := []byte(payload)
@@ -27,7 +27,7 @@ func (r *TypesenseKeyRequestReconciler) CreateAPIKey(ctx context.Context, apiKey
 	if err != nil {
 		return nil, err
 	}
-	request.Header.Set("X-TYPESENSE-API-KEY", apiKey)
+	request.Header.Set("X-TYPESENSE-API-KEY", adminApiKey)
 	request.Header.Set("Content-Type", "application/json")
 
 	client := http.Client{}
@@ -53,4 +53,27 @@ func (r *TypesenseKeyRequestReconciler) CreateAPIKey(ctx context.Context, apiKey
 	}
 
 	return data, nil
+}
+
+func (r *TypesenseKeyRequestReconciler) DeleteAPIKey(ctx context.Context, adminApiKey string, apiKeyID string, apiKeysURL string) error {
+
+	apiKeysURL = fmt.Sprintf("%s/%s", apiKeysURL, apiKeyID)
+	request, err := http.NewRequestWithContext(ctx, http.MethodDelete, apiKeysURL, nil)
+	if err != nil {
+		return err
+	}
+	request.Header.Set("X-TYPESENSE-API-KEY", adminApiKey)
+
+	client := http.Client{}
+
+	response, err := client.Do(request)
+	if err != nil {
+		return err
+	}
+
+	if !(response.StatusCode == http.StatusNoContent || response.StatusCode == http.StatusOK || response.StatusCode == http.StatusNotFound) {
+		return fmt.Errorf("unexpected status code: %d", response.StatusCode)
+	}
+
+	return nil
 }
