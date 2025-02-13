@@ -76,8 +76,6 @@ func (r *TypesenseClusterReconciler) ReconcileScraper(ctx context.Context, ts ts
 				return err
 			}
 		} else {
-			r.logger.V(debugLevel).Info("updating scraper cronjob", "cronjob", scraperObjectKey.Name)
-
 			hasChanged := false
 			hasChangedConfig := false
 			container := scraperCronJob.Spec.JobTemplate.Spec.Template.Spec.Containers[0]
@@ -94,6 +92,8 @@ func (r *TypesenseClusterReconciler) ReconcileScraper(ctx context.Context, ts ts
 			}
 
 			if hasChanged {
+				r.logger.V(debugLevel).Info("updating scraper cronjob", "cronjob", scraperObjectKey.Name)
+
 				err = r.deleteScraper(ctx, scraperCronJob)
 				if err != nil {
 					r.logger.Error(err, "deleting scraper cronjob failed", "cronjob", scraperObjectKey.Name)

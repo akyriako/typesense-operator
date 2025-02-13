@@ -4,7 +4,7 @@ metadata:
   name: typesense-local-path
 provisioner: rancher.io/local-path
 reclaimPolicy: Delete
-allowVolumeExpansion: false
+allowVolumeExpansion: true
 volumeBindingMode: WaitForFirstConsumer
 ---
 apiVersion: v1
@@ -58,12 +58,13 @@ metadata:
   name: c-kind-2
 spec:
   image: typesense/typesense:26.0
-  replicas: 1
+  replicas: 5
   enableCors: true
   apiPort: 8108
   additionalServerConfiguration:
     name: c-kind-2-config
   storage:
+    size: 75Mi
     storageClassName: typesense-local-path
   ingress:
     host: host.example.com
@@ -93,6 +94,8 @@ metadata:
 spec:
   image: typesense/typesense:27.1
   replicas: 1
+  apiPort: 18108
+  peeringPort: 18107
   enableCors: true
   corsDomains: "http://localhost,https://www.example.de"
   storage:

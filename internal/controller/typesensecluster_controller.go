@@ -18,6 +18,7 @@ package controller
 
 import (
 	"context"
+	"fmt"
 	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
 	"golang.org/x/text/cases"
@@ -167,8 +168,8 @@ func (r *TypesenseClusterReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		return ctrl.Result{}, err
 	}
 
-	// Update strategy: TBD
-	// TODO: TBD
+	// Update strategy: Update the whole specs when changes are identified
+	// TODO: Update the whole specs when changes are identified
 	sts, err := r.ReconcileStatefulSet(ctx, ts)
 	if err != nil {
 		cerr := r.setConditionNotReady(ctx, &ts, ConditionReasonStatefulSetNotReady, err)
@@ -235,8 +236,12 @@ func (r *TypesenseClusterReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		}
 	}
 
+	lastAction := "bootstrapping"
+	if *updated {
+		lastAction = "reconciling"
+	}
 	requeueAfter = time.Duration(delayPerReplicaFactor*60+terminationGracePeriodSeconds) * time.Second
-	r.logger.Info("reconciling cluster completed", "requeueAfter", requeueAfter)
+	r.logger.Info(fmt.Sprintf("%s cluster completed", lastAction), "requeueAfter", requeueAfter)
 
 	return ctrl.Result{RequeueAfter: requeueAfter}, nil
 }

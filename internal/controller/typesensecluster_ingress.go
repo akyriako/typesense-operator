@@ -109,11 +109,13 @@ func (r *TypesenseClusterReconciler) ReconcileIngress(ctx context.Context, ts ts
 			return err
 		}
 	} else {
-		r.logger.V(debugLevel).Info("updating ingress config map", "configmap", configMapObjectKey.Name)
+		if r.shouldUpdateIngressConfigMap(cm, &ts) {
+			r.logger.V(debugLevel).Info("updating ingress config map", "configmap", configMapObjectKey.Name)
 
-		_, err = r.updateIngressConfigMap(ctx, cm, &ts)
-		if err != nil {
-			return err
+			_, err = r.updateIngressConfigMap(ctx, cm, &ts)
+			if err != nil {
+				return err
+			}
 		}
 	}
 
@@ -296,15 +298,17 @@ func (r *TypesenseClusterReconciler) updateIngressConfigMap(ctx context.Context,
 		"nginx.conf": r.getIngressNginxConf(ts),
 	}
 
-	if cm.Data["nginx.conf"] != desired.Data["nginx.conf"] {
-		err := r.Update(ctx, desired)
-		if err != nil {
-			r.logger.Error(err, "updating ingress config map failed")
-			return nil, err
-		}
+	err := r.Update(ctx, desired)
+	if err != nil {
+		r.logger.Error(err, "updating ingress config map failed")
+		return nil, err
 	}
 
 	return desired, nil
+}
+
+func (r *TypesenseClusterReconciler) shouldUpdateIngressConfigMap(cm *v1.ConfigMap, ts *tsv1alpha1.TypesenseCluster) bool {
+	return cm.Data["nginx.conf"] != r.getIngressNginxConf(ts)
 }
 
 func (r *TypesenseClusterReconciler) getIngressNginxConf(ts *tsv1alpha1.TypesenseCluster) string {

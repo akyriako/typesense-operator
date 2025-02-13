@@ -60,3 +60,12 @@ func (r *TypesenseClusterReconciler) setConditionReady(ctx context.Context, ts *
 	}
 	return nil
 }
+
+func (r *TypesenseClusterReconciler) getConditionReady(ts *tsv1alpha1.TypesenseCluster) *metav1.Condition {
+	condition := ts.Status.Conditions[0]
+	if condition.Type != ConditionTypeReady {
+		return nil
+	}
+
+	return &condition
+}

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	tsv1alpha1 "github.com/akyriako/typesense-operator/api/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sort"
 )
 
 const (
@@ -108,4 +109,15 @@ func getDelayPerReplicaFactor(size int) int64 {
 		}
 	}
 	return minDelayPerReplicaFactor
+}
+
+func contains(values []string, value string) bool {
+	sort.Strings(values)
+	for _, v := range values {
+		if v == value {
+			return true
+		}
+	}
+
+	return false
 }

@@ -10,15 +10,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/utils/ptr"
+	"reflect"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"strconv"
 )
 
-func (r *TypesenseClusterReconciler) ReconcileStatefulSet(
-	ctx context.Context,
-	ts tsv1alpha1.TypesenseCluster,
-) (*appsv1.StatefulSet, error) {
+func (r *TypesenseClusterReconciler) ReconcileStatefulSet(ctx context.Context, ts tsv1alpha1.TypesenseCluster) (*appsv1.StatefulSet, error) {
 	r.logger.V(debugLevel).Info("reconciling statefulset")
 
 	stsName := fmt.Sprintf(ClusterStatefulSet, ts.Name)
@@ -39,7 +37,7 @@ func (r *TypesenseClusterReconciler) ReconcileStatefulSet(
 	}
 
 	if !stsExists {
-		r.logger.V(debugLevel).Info("creating statefulset", "sts", stsObjectKey)
+		r.logger.V(debugLevel).Info("creating statefulset", "sts", stsObjectKey.Name)
 
 		sts, err := r.createStatefulSet(
 			ctx,
@@ -47,19 +45,76 @@ func (r *TypesenseClusterReconciler) ReconcileStatefulSet(
 			&ts,
 		)
 		if err != nil {
-			r.logger.Error(err, "creating statefulset failed", "sts", stsObjectKey)
+			r.logger.Error(err, "creating statefulset failed", "sts", stsObjectKey.Name)
 			return nil, err
 		}
 		return sts, nil
+	} else {
+		skipConditions := []string{
+			string(ConditionReasonQuorumDowngraded),
+			string(ConditionReasonQuorumUpgraded),
+			string(ConditionReasonQuorumNeedsAttention),
+			ConditionReasonStatefulSetNotReady}
+
+		if !contains(skipConditions, r.getConditionReady(&ts).Reason) {
+			desiredSts := r.buildStatefulSet(stsObjectKey, &ts)
+			if r.shouldUpdateStatefulSet(sts, &ts) {
+				r.logger.V(debugLevel).Info("updating statefulset", "sts", stsObjectKey.Name)
+
+				updatedSts, err := r.updateStatefulSet(ctx, sts, desiredSts)
+				if err != nil {
+					r.logger.Error(err, "updating statefulset failed", "sts", stsObjectKey.Name)
+					return nil, err
+				}
+
+				configMapName := fmt.Sprintf(ClusterNodesConfigMap, ts.Name)
+				configMapObjectKey := client.ObjectKey{Namespace: ts.Namespace, Name: configMapName}
+
+				var cm = &corev1.ConfigMap{}
+				if err := r.Get(ctx, configMapObjectKey, cm); err != nil {
+					r.logger.V(debugLevel).Error(err, fmt.Sprintf("unable to fetch config map: %s", configMapName))
+				}
+
+				_, _, err = r.updateConfigMap(ctx, &ts, cm, updatedSts.Spec.Replicas)
+				if err != nil {
+					r.logger.V(debugLevel).Error(err, fmt.Sprintf("unable to update config map: %s", configMapName))
+				}
+
+				return updatedSts, nil
+			}
+		}
 	}
+
 	return sts, nil
 }
 
-func (r *TypesenseClusterReconciler) createStatefulSet(
-	ctx context.Context,
-	key client.ObjectKey,
-	ts *tsv1alpha1.TypesenseCluster,
-) (*appsv1.StatefulSet, error) {
+func (r *TypesenseClusterReconciler) createStatefulSet(ctx context.Context, key client.ObjectKey, ts *tsv1alpha1.TypesenseCluster) (*appsv1.StatefulSet, error) {
+	sts := r.buildStatefulSet(key, ts)
+	err := ctrl.SetControllerReference(ts, sts, r.Scheme)
+	if err != nil {
+		return nil, err
+	}
+
+	err = r.Create(ctx, sts)
+	if err != nil {
+		return nil, err
+	}
+
+	return sts, nil
+}
+
+func (r *TypesenseClusterReconciler) updateStatefulSet(ctx context.Context, sts *appsv1.StatefulSet, desired *appsv1.StatefulSet) (*appsv1.StatefulSet, error) {
+	patch := client.MergeFrom(sts.DeepCopy())
+	sts.Spec = desired.Spec
+
+	if err := r.Patch(ctx, sts, patch); err != nil {
+		return nil, err
+	}
+
+	return sts, nil
+}
+
+func (r *TypesenseClusterReconciler) buildStatefulSet(key client.ObjectKey, ts *tsv1alpha1.TypesenseCluster) *appsv1.StatefulSet {
 
 	clusterName := ts.Name
 	sts := &appsv1.StatefulSet{
@@ -200,17 +255,66 @@ func (r *TypesenseClusterReconciler) createStatefulSet(
 		},
 	}
 
-	err := ctrl.SetControllerReference(ts, sts, r.Scheme)
-	if err != nil {
-		return nil, err
+	return sts
+}
+
+func (r *TypesenseClusterReconciler) shouldUpdateStatefulSet(sts *appsv1.StatefulSet, ts *tsv1alpha1.TypesenseCluster) bool {
+	if *sts.Spec.Replicas != ts.Spec.Replicas {
+		return true
 	}
 
-	err = r.Create(ctx, sts)
-	if err != nil {
-		return nil, err
+	if sts.Spec.Template.Spec.Containers[0].Ports[0].ContainerPort != int32(ts.Spec.ApiPort) {
+		return true
 	}
 
-	return sts, nil
+	checkEnvVar := func(key string, value string) bool {
+		for _, e := range sts.Spec.Template.Spec.Containers[0].Env {
+			if e.Name == key && e.Value == value {
+				return true
+			}
+		}
+
+		return false
+	}
+
+	if !checkEnvVar("TYPESENSE_PEERING_PORT", strconv.Itoa(ts.Spec.PeeringPort)) {
+		return true
+	}
+
+	if !checkEnvVar("TYPESENSE_RESET_PEERS_ON_ERROR", strconv.FormatBool(ts.Spec.ResetPeersOnError)) {
+		return true
+	}
+
+	if !checkEnvVar("TYPESENSE_ENABLE_CORS", strconv.FormatBool(ts.Spec.EnableCors)) {
+		return true
+	}
+
+	if !checkEnvVar("TYPESENSE_CORS_DOMAINS", ts.Spec.GetCorsDomains()) {
+		return true
+	}
+
+	if !reflect.DeepEqual(sts.Spec.Template.Spec.Containers[0].Resources, ts.Spec.GetResources()) {
+		return true
+	}
+
+	if !reflect.DeepEqual(sts.Spec.Template.Spec.NodeSelector, ts.Spec.NodeSelector) {
+		return true
+	}
+
+	if !reflect.DeepEqual(sts.Spec.Template.Spec.Tolerations, ts.Spec.Tolerations) {
+		return true
+	}
+
+	if !reflect.DeepEqual(sts.Spec.Template.Spec.Containers[0].EnvFrom, ts.Spec.GetAdditionalServerConfiguration()) {
+		return true
+	}
+
+	//if &ts.Spec.Storage.Size != sts.Spec.VolumeClaimTemplates[0].Spec.Resources.Requests.Storage() ||
+	//	&ts.Spec.Storage.StorageClassName != sts.Spec.VolumeClaimTemplates[0].Spec.StorageClassName {
+	//	return true
+	//}
+
+	return false
 }
 
 func (r *TypesenseClusterReconciler) ScaleStatefulSet(ctx context.Context, sts *appsv1.StatefulSet, desiredReplicas int32) error {
