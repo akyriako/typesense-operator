@@ -6,6 +6,7 @@ import (
 	"fmt"
 	tsv1alpha1 "github.com/akyriako/typesense-operator/api/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"os"
 )
 
 const (
@@ -108,4 +109,20 @@ func getDelayPerReplicaFactor(size int) int64 {
 		}
 	}
 	return minDelayPerReplicaFactor
+}
+
+func inCluster() bool {
+	return os.Getenv("KUBERNETES_SERVICE_HOST") != ""
+}
+
+func getApiKeysUrl(cluster *tsv1alpha1.TypesenseCluster) string {
+	return fmt.Sprintf("%s/keys", getClusterServiceUrl(cluster))
+}
+
+func getClusterServiceUrl(cluster *tsv1alpha1.TypesenseCluster) string {
+	if inCluster() {
+		return fmt.Sprintf("http://%s:%d", fmt.Sprintf(ClusterRestService, cluster.Name), cluster.Spec.ApiPort)
+	}
+
+	return fmt.Sprintf("http://%s:%d", "localhost", cluster.Spec.ApiPort)
 }

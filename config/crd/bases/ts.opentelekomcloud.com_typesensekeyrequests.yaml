@@ -21,6 +21,12 @@ spec:
     - jsonPath: .spec.collections
       name: Collections
       type: string
+    - jsonPath: .status.ready
+      name: Ready
+      type: string
+    - jsonPath: .status.keyId
+      name: Key ID
+      type: string
     name: v1alpha1
     schema:
       openAPIV3Schema:
@@ -50,7 +56,7 @@ spec:
               actions:
                 minLength: 1
                 type: string
-              apiKey:
+              apiKeySecret:
                 description: |-
                   SecretReference represents a Secret Reference. It has enough information to retrieve secret
                   in any namespace
@@ -140,6 +146,13 @@ spec:
             type: object
           status:
             description: TypesenseKeyRequestStatus defines the observed state of TypesenseKeyRequest
+            properties:
+              keyId:
+                format: int32
+                type: integer
+              ready:
+                default: false
+                type: boolean
             type: object
         type: object
     served: true

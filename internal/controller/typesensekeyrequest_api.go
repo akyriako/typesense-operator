@@ -8,9 +8,10 @@ import (
 	tsv1alpha1 "github.com/akyriako/typesense-operator/api/v1alpha1"
 	"io"
 	"net/http"
+	"strings"
 )
 
-type KeyResponse struct {
+type CreateApiKeySuccessHttpResponse struct {
 	Actions     []string `json:"actions"`
 	Collections []string `json:"collections"`
 	Description string   `json:"description"`
@@ -18,16 +19,45 @@ type KeyResponse struct {
 	Value       string   `json:"value"`
 }
 
-func (r *TypesenseKeyRequestReconciler) CreateAPIKey(ctx context.Context, adminApiKey string, apiKeysURL string, keyRequest tsv1alpha1.TypesenseKeyRequest) (*KeyResponse, error) {
-	//payload := fmt.Sprintf("{'description':'%s','actions': '%s' , 'collections': '%s' }", keyRequest.Spec.Description, keyRequest.Spec.Actions, keyRequest.Spec.Collections)
-	payload := fmt.Sprintf(`{"description":"%s","actions": %s, "collections": %s}`, keyRequest.Spec.Description, keyRequest.Spec.Actions, keyRequest.Spec.Collections)
+type CreateApiKeyFailHttpResponse struct {
+	Message string `json:"message"`
+}
+
+func (r *TypesenseKeyRequestReconciler) createApiKeyHttpRequest(
+	ctx context.Context,
+	cluster *tsv1alpha1.TypesenseCluster,
+	adminApiKey string,
+	apiKeyRequest tsv1alpha1.TypesenseKeyRequest,
+	apiKeyValue *string,
+) (*CreateApiKeySuccessHttpResponse, error) {
+	apiKeysUrl := getApiKeysUrl(cluster)
+
+	var payload string
+	if apiKeyValue != nil {
+		payload = fmt.Sprintf(
+			`{"description":"%s","actions": %s, "collections": %s, "value": "%s"}`,
+			apiKeyRequest.Spec.Description,
+			apiKeyRequest.Spec.Actions,
+			apiKeyRequest.Spec.Collections,
+			*apiKeyValue,
+		)
+	} else {
+		payload = fmt.Sprintf(
+			`{"description":"%s","actions": %s, "collections": %s}`,
+			apiKeyRequest.Spec.Description,
+			apiKeyRequest.Spec.Actions,
+			apiKeyRequest.Spec.Collections,
+		)
+	}
+
 	payloadAsBytes := []byte(payload)
 
-	request, err := http.NewRequestWithContext(ctx, http.MethodPost, apiKeysURL, bytes.NewBuffer(payloadAsBytes))
+	request, err := http.NewRequestWithContext(ctx, http.MethodPost, apiKeysUrl, bytes.NewBuffer(payloadAsBytes))
 	if err != nil {
 		return nil, err
 	}
-	request.Header.Set("X-TYPESENSE-API-KEY", adminApiKey)
+
+	request.Header.Set(HttpRequestTypesenseApiKeyHeaderKey, adminApiKey)
 	request.Header.Set("Content-Type", "application/json")
 
 	client := http.Client{}
@@ -38,16 +68,24 @@ func (r *TypesenseKeyRequestReconciler) CreateAPIKey(ctx context.Context, adminA
 	}
 	defer request.Body.Close()
 
-	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
-		return nil, fmt.Errorf("unexpected status code: %d", response.StatusCode)
-	}
-
 	body, err := io.ReadAll(response.Body)
 	if err != nil {
 		return nil, err
 	}
 
-	data := &KeyResponse{}
+	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
+		data := &CreateApiKeyFailHttpResponse{}
+		if err := json.Unmarshal(body, data); err != nil {
+			return nil, err
+		}
+
+		err = fmt.Errorf("creating api key failed: %s", strings.ToLower(data.Message))
+		r.logger.Error(err, "http/post request failed", "httpStatusCode", response.StatusCode)
+
+		return nil, err
+	}
+
+	data := &CreateApiKeySuccessHttpResponse{}
 	if err := json.Unmarshal(body, data); err != nil {
 		return nil, err
 	}
@@ -55,14 +93,20 @@ func (r *TypesenseKeyRequestReconciler) CreateAPIKey(ctx context.Context, adminA
 	return data, nil
 }
 
-func (r *TypesenseKeyRequestReconciler) DeleteAPIKey(ctx context.Context, adminApiKey string, apiKeyID string, apiKeysURL string) error {
-
-	apiKeysURL = fmt.Sprintf("%s/%s", apiKeysURL, apiKeyID)
-	request, err := http.NewRequestWithContext(ctx, http.MethodDelete, apiKeysURL, nil)
+func (r *TypesenseKeyRequestReconciler) deleteApiKeyHttpRequest(
+	ctx context.Context,
+	cluster *tsv1alpha1.TypesenseCluster,
+	adminApiKey string,
+	keyId string,
+) error {
+	apiKeysUrl := getApiKeysUrl(cluster)
+	apiKeysUrl = fmt.Sprintf("%s/%s", apiKeysUrl, keyId)
+	request, err := http.NewRequestWithContext(ctx, http.MethodDelete, apiKeysUrl, nil)
 	if err != nil {
 		return err
 	}
-	request.Header.Set("X-TYPESENSE-API-KEY", adminApiKey)
+
+	request.Header.Set(HttpRequestTypesenseApiKeyHeaderKey, adminApiKey)
 
 	client := http.Client{}
 
@@ -72,7 +116,10 @@ func (r *TypesenseKeyRequestReconciler) DeleteAPIKey(ctx context.Context, adminA
 	}
 
 	if !(response.StatusCode == http.StatusNoContent || response.StatusCode == http.StatusOK || response.StatusCode == http.StatusNotFound) {
-		return fmt.Errorf("unexpected status code: %d", response.StatusCode)
+		err := fmt.Errorf("deleting api key failed")
+		r.logger.Error(err, "http/delete request failed", "httpStatusCode", response.StatusCode)
+
+		return err
 	}
 
 	return nil

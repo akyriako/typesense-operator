@@ -52,7 +52,7 @@ type TypesenseClusterReconciliationPhase struct {
 }
 
 var (
-	clusterEventFilters = builder.WithPredicates(predicate.Funcs{
+	typesenseClusterEventFilters = builder.WithPredicates(predicate.Funcs{
 		UpdateFunc: func(e event.UpdateEvent) bool {
 			// We only need to check generation changes here, because it is only
 			// updated on spec changes. On the other hand RevisionVersion
@@ -94,7 +94,7 @@ var (
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.18.4/pkg/reconcile
 func (r *TypesenseClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	r.logger = log.Log.WithValues("namespace", req.Namespace, "cluster", req.Name)
+	r.logger = log.Log.WithName("TypesenseCluster").WithValues("namespace", req.Namespace, "cluster", req.Name)
 	r.logger.Info("reconciling cluster")
 
 	var ts tsv1alpha1.TypesenseCluster
@@ -236,6 +236,6 @@ func (r *TypesenseClusterReconciler) Reconcile(ctx context.Context, req ctrl.Req
 // SetupWithManager sets up the controller with the Manager.
 func (r *TypesenseClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&tsv1alpha1.TypesenseCluster{}, clusterEventFilters).
+		For(&tsv1alpha1.TypesenseCluster{}, typesenseClusterEventFilters).
 		Complete(r)
 }

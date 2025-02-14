@@ -25,4 +25,6 @@ const (
 
 	ClusterScraperCronJob          = "%s-scraper"
 	ClusterScraperCronJobContainer = "%s-docsearch-scraper"
+
+	HttpRequestTypesenseApiKeyHeaderKey = "X-TYPESENSE-API-KEY"
 )
