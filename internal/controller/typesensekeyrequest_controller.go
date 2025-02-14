@@ -147,7 +147,14 @@ func (r *TypesenseKeyRequestReconciler) Reconcile(ctx context.Context, req ctrl.
 			r.logger.Error(err, "deleting api key failed")
 			return ctrl.Result{}, err
 		}
-		return ctrl.Result{}, nil
+
+		_, err = r.updateKeyRequestKeyIdStatus(ctx, &apiKeyRequest, nil)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+
+		r.logger.V(debugLevel).Info("removed lingering api keys and requeuing")
+		return ctrl.Result{RequeueAfter: 15 * time.Second}, nil
 	}
 
 	var apiKeyValue *string = nil

@@ -38,7 +38,13 @@ func (r *TypesenseKeyRequestReconciler) updateKeyRequestReadyStatus(ctx context.
 func (r *TypesenseKeyRequestReconciler) updateKeyRequestKeyIdStatus(ctx context.Context, apiKeyRequest *tsv1alpha1.TypesenseKeyRequest, apiKeyResponse *CreateApiKeySuccessHttpResponse,
 ) (ctrl.Result, error) {
 	newStatus := apiKeyRequest.Status
-	newStatus.KeyId = ptr.To(uint32(apiKeyResponse.Id))
+
+	if apiKeyResponse != nil {
+		newStatus.KeyId = ptr.To(uint32(apiKeyResponse.Id))
+	} else {
+		newStatus.KeyId = nil
+		newStatus.Ready = false
+	}
 
 	return r.updateKeyRequestStatus(ctx, apiKeyRequest, newStatus)
 }
