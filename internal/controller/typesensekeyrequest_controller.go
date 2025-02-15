@@ -72,7 +72,6 @@ var (
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.19.0/pkg/reconcile
 func (r *TypesenseKeyRequestReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	r.logger = log.Log.WithName("TypesenseKeyRequest").WithValues("namespace", req.Namespace, "apiKeyRequest", req.Name)
-	r.logger.Info("reconciling api key request")
 
 	var apiKeyRequest tsv1alpha1.TypesenseKeyRequest
 	if err := r.Get(ctx, req.NamespacedName, &apiKeyRequest); err != nil {
@@ -80,6 +79,7 @@ func (r *TypesenseKeyRequestReconciler) Reconcile(ctx context.Context, req ctrl.
 	}
 
 	r.logger = r.logger.WithValues("cluster", apiKeyRequest.Spec.Cluster.Name)
+	r.logger.Info("reconciling api key request")
 
 	// Check if the TypesenseKeyRequest instance is marked to be deleted, which is
 	// indicated by the deletion timestamp being set.
@@ -102,6 +102,8 @@ func (r *TypesenseKeyRequestReconciler) Reconcile(ctx context.Context, req ctrl.
 				return ctrl.Result{}, err
 			}
 		}
+
+		r.logger.Info("reconciling api key request completed")
 		return ctrl.Result{}, nil
 	}
 
@@ -132,7 +134,9 @@ func (r *TypesenseKeyRequestReconciler) Reconcile(ctx context.Context, req ctrl.
 	clusterCondition := cluster.Status.Conditions[0]
 	if clusterCondition.Type == ConditionTypeReady && clusterCondition.Status != metav1.ConditionTrue {
 		err := fmt.Errorf("cluster %s is not ready", clusterObjectKey.String())
-		return ctrl.Result{RequeueAfter: 1 * time.Minute}, err
+		r.logger.Error(err, "reconciling api key request postponed")
+
+		return ctrl.Result{RequeueAfter: 1 * time.Minute}, nil
 	}
 
 	adminKeySecretObjectKey := client.ObjectKey{Namespace: apiKeyRequest.Namespace, Name: cluster.Spec.AdminApiKey.Name}
@@ -195,7 +199,7 @@ func (r *TypesenseKeyRequestReconciler) Reconcile(ctx context.Context, req ctrl.
 }
 
 func (r *TypesenseKeyRequestReconciler) finalizeKeyRequest(ctx context.Context, apiKeyRequest *tsv1alpha1.TypesenseKeyRequest) error {
-	r.logger.Info("finalizing api key request")
+	r.logger.Info("starting finalizer on api key request")
 
 	apiKeyID := apiKeyRequest.Status.KeyId
 	if apiKeyID == nil {
@@ -237,7 +241,7 @@ func (r *TypesenseKeyRequestReconciler) finalizeKeyRequest(ctx context.Context, 
 		return err
 	}
 
-	r.logger.Info("finalizing api key request completed", "finalizer", TypesenseKeyRequestFinalizer)
+	r.logger.Info("completed finalizer on api key request", "finalizer", TypesenseKeyRequestFinalizer)
 	return nil
 }
 
