@@ -107,6 +107,8 @@ func (r *TypesenseClusterReconciler) updateStatefulSet(ctx context.Context, sts 
 	patch := client.MergeFrom(sts.DeepCopy())
 	sts.Spec = desired.Spec
 
+	// TODO: Add statefulSet.Spec.Template.Annotations["kubectl.kubernetes.io/restartedAt"] = time.Now().Format(time.RFC3339) to restart the StatefulSet
+
 	if err := r.Patch(ctx, sts, patch); err != nil {
 		return nil, err
 	}

@@ -143,6 +143,8 @@ func (r *TypesenseClusterReconciler) ReconcileIngress(ctx context.Context, ts ts
 		}
 	}
 
+	// TODO: Add deployment.Spec.Template.Annotations["kubectl.kubernetes.io/restartedAt"] = time.Now().Format(time.RFC3339) to restart the Deployment
+
 	serviceName := fmt.Sprintf(ClusterReverseProxyService, ts.Name)
 	serviceExists := true
 	serviceNameObjectKey := client.ObjectKey{Namespace: ts.Namespace, Name: serviceName}
