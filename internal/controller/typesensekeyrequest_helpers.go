@@ -48,3 +48,13 @@ func (r *TypesenseKeyRequestReconciler) updateKeyRequestKeyIdStatus(ctx context.
 
 	return r.updateKeyRequestStatus(ctx, apiKeyRequest, newStatus)
 }
+
+func (r *TypesenseKeyRequestReconciler) updateKeyRequestStatus(ctx context.Context, apiKeyRequest *tsv1alpha1.TypesenseKeyRequest, newStatus tsv1alpha1.TypesenseKeyRequestStatus) (ctrl.Result, error) {
+	apiKeyRequest.Status = newStatus
+	if err := r.Status().Update(ctx, apiKeyRequest); err != nil {
+		r.logger.Error(err, "updating api key request status failed")
+		return ctrl.Result{}, err
+	}
+
+	return ctrl.Result{}, nil
+}

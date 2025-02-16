@@ -9,9 +9,23 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-//func (r *TypesenseClusterReconciler) ReconcileApiKeySecret(ctx context.Context) error {
-//
-//}
+func (r *TypesenseKeyRequestReconciler) ReconcileApiKeySecret(
+	ctx context.Context,
+	apiKeyRequest *tsv1alpha1.TypesenseKeyRequest,
+	apiKeyResponse *CreateApiKeySuccessHttpResponse,
+	cluster *tsv1alpha1.TypesenseCluster,
+) error {
+	r.logger.Info("creating api key secret")
+
+	apiKeySecretObjectKey := client.ObjectKey{Namespace: apiKeyRequest.Namespace, Name: apiKeyRequest.Name}
+	_, err := r.createApiKeySecret(ctx, apiKeySecretObjectKey, apiKeyRequest, apiKeyResponse, cluster)
+	if err != nil {
+		r.logger.Error(err, "creating api key secret failed", "secret", apiKeySecretObjectKey.Name)
+		return err
+	}
+
+	return nil
+}
 
 func (r *TypesenseKeyRequestReconciler) createApiKeySecret(
 	ctx context.Context,

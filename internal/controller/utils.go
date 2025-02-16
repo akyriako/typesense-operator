@@ -121,7 +121,7 @@ func getApiKeysUrl(cluster *tsv1alpha1.TypesenseCluster) string {
 
 func getClusterServiceUrl(cluster *tsv1alpha1.TypesenseCluster) string {
 	if inCluster() {
-		return fmt.Sprintf("http://%s:%d", fmt.Sprintf(ClusterRestService, cluster.Name), cluster.Spec.ApiPort)
+		return fmt.Sprintf("http://%s.%s:%d", fmt.Sprintf(ClusterRestService, cluster.Name), cluster.Namespace, cluster.Spec.ApiPort)
 	}
 
 	return fmt.Sprintf("http://%s:%d", "localhost", cluster.Spec.ApiPort)

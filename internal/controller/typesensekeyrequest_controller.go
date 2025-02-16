@@ -21,8 +21,6 @@ import (
 	"fmt"
 	tsv1alpha1 "github.com/akyriako/typesense-operator/api/v1alpha1"
 	"github.com/go-logr/logr"
-	v1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -36,7 +34,7 @@ import (
 	"time"
 )
 
-const TypesenseKeyRequestFinalizer = "typesensekeyrequest.ts.opentelekomcloud.com/finalizer"
+const TypesenseKeyRequestFinalizer = "finalizers.ts.opentelekomcloud.com/typesensekeyrequest"
 
 // TypesenseKeyRequestReconciler reconciles a TypesenseKeyRequest object
 type TypesenseKeyRequestReconciler struct {
@@ -185,74 +183,14 @@ func (r *TypesenseKeyRequestReconciler) Reconcile(ctx context.Context, req ctrl.
 	}
 
 	if apiKeyRequest.Spec.ApiKeySecret == nil {
-		r.logger.Info("creating api key secret")
-
-		apiKeySecretObjectKey := client.ObjectKey{Namespace: apiKeyRequest.Namespace, Name: apiKeyRequest.Name}
-		_, err = r.createApiKeySecret(ctx, apiKeySecretObjectKey, &apiKeyRequest, apiKeyResponse, &cluster)
+		err := r.ReconcileApiKeySecret(ctx, &apiKeyRequest, apiKeyResponse, &cluster)
 		if err != nil {
-			r.logger.Error(err, "creating api key secret failed", "secret", apiKeySecretObjectKey.Name)
+			return ctrl.Result{}, err
 		}
 	}
 
 	r.logger.Info("reconciling api key request completed")
 	return r.updateKeyRequestReadyStatus(ctx, &apiKeyRequest, true)
-}
-
-func (r *TypesenseKeyRequestReconciler) finalizeKeyRequest(ctx context.Context, apiKeyRequest *tsv1alpha1.TypesenseKeyRequest) error {
-	r.logger.Info("starting finalizer on api key request")
-
-	apiKeyID := apiKeyRequest.Status.KeyId
-	if apiKeyID == nil {
-		return nil
-	}
-
-	clusterObjectKey := client.ObjectKey{Namespace: apiKeyRequest.Namespace, Name: apiKeyRequest.Spec.Cluster.Name}
-	var cluster tsv1alpha1.TypesenseCluster
-	if err := r.Get(ctx, clusterObjectKey, &cluster); err != nil {
-		if apierrors.IsNotFound(err) {
-			return nil
-		} else {
-			r.logger.Error(err, "unable to fetch cluster in finalizer", "finalizer", TypesenseKeyRequestFinalizer)
-			return err
-		}
-	}
-
-	var adminKeySecret v1.Secret
-	adminKeySecretObjectKey := client.ObjectKey{Namespace: apiKeyRequest.Namespace, Name: cluster.Spec.AdminApiKey.Name}
-	if err := r.Get(ctx, adminKeySecretObjectKey, &adminKeySecret); err != nil {
-		if apierrors.IsNotFound(err) {
-			return nil
-		} else {
-			r.logger.Error(err, "unable to fetch admin secret in finalizer", "finalizer", TypesenseKeyRequestFinalizer)
-			return err
-		}
-	}
-
-	adminApiKeyBytes, exists := adminKeySecret.Data[ClusterAdminApiKeySecretKeyName]
-	if !exists {
-		return nil
-	}
-	adminApiKey := string(adminApiKeyBytes)
-
-	r.logger.Info("deleting api key")
-	err := r.deleteApiKeyHttpRequest(ctx, &cluster, adminApiKey, strconv.Itoa(int(*apiKeyID)))
-	if err != nil {
-		r.logger.Error(err, "deleting api key failed", "finalizer", TypesenseKeyRequestFinalizer)
-		return err
-	}
-
-	r.logger.Info("completed finalizer on api key request", "finalizer", TypesenseKeyRequestFinalizer)
-	return nil
-}
-
-func (r *TypesenseKeyRequestReconciler) updateKeyRequestStatus(ctx context.Context, apiKeyRequest *tsv1alpha1.TypesenseKeyRequest, newStatus tsv1alpha1.TypesenseKeyRequestStatus) (ctrl.Result, error) {
-	apiKeyRequest.Status = newStatus
-	if err := r.Status().Update(ctx, apiKeyRequest); err != nil {
-		r.logger.Error(err, "updating api key request status failed")
-		return ctrl.Result{}, err
-	}
-
-	return ctrl.Result{}, nil
 }
 
 // SetupWithManager sets up the controller with the Manager.
