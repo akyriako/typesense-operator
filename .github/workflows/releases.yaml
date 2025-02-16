@@ -1,8 +1,11 @@
 name: Release Charts
 on:
   push:
-    branches:
-      - main
+    #    branches:
+    #      - main
+#    tags:
+#      - "v*.*.*"
+    workflow_dispatch:
     paths-ignore:
       - '**/README.md'
       - "**/.github/workflows/**"
