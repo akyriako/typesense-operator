@@ -49,6 +49,7 @@ const (
 		  }
 		}`
 
+
 	referer = `valid_referers server_names %s;   
 					if ($invalid_referer) {  
 				  		return 403;     

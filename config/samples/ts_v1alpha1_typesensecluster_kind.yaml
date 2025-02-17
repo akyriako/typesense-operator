@@ -42,7 +42,7 @@ spec:
       directio 4m;
     locationDirectives: |
       disable_symlinks off;
-    referer: referer.example.de
+    referer: referer.example.com
     host: host.example.com
     ingressClassName: nginx
     clusterIssuer: lets-encrypt-prod
