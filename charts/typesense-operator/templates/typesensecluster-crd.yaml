@@ -113,10 +113,16 @@ spec:
                   host:
                     pattern: ^([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])(\.([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]{0,61}[a-zA-Z0-9]))*$
                     type: string
+                  httpDirectives:
+                    type: string
                   ingressClassName:
+                    type: string
+                  locationDirectives:
                     type: string
                   referer:
                     pattern: ^([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])(\.([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]{0,61}[a-zA-Z0-9]))*$
+                    type: string
+                  serverDirectives:
                     type: string
                 required:
                 - clusterIssuer
