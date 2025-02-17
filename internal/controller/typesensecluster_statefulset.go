@@ -54,7 +54,9 @@ func (r *TypesenseClusterReconciler) ReconcileStatefulSet(ctx context.Context, t
 			string(ConditionReasonQuorumDowngraded),
 			string(ConditionReasonQuorumUpgraded),
 			string(ConditionReasonQuorumNeedsAttention),
-			ConditionReasonStatefulSetNotReady}
+			string(ConditionReasonQuorumNotReady),
+			ConditionReasonStatefulSetNotReady,
+		}
 
 		if !contains(skipConditions, r.getConditionReady(&ts).Reason) {
 			desiredSts := r.buildStatefulSet(stsObjectKey, &ts)
@@ -307,7 +309,11 @@ func (r *TypesenseClusterReconciler) shouldUpdateStatefulSet(sts *appsv1.Statefu
 		return true
 	}
 
-	if !reflect.DeepEqual(sts.Spec.Template.Spec.Containers[0].EnvFrom, ts.Spec.GetAdditionalServerConfiguration()) {
+	envFrom := ts.Spec.GetAdditionalServerConfiguration()
+	if len(envFrom) == 0 {
+		envFrom = nil
+	}
+	if !reflect.DeepEqual(sts.Spec.Template.Spec.Containers[0].EnvFrom, envFrom) {
 		return true
 	}
 
