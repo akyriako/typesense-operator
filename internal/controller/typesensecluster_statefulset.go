@@ -263,7 +263,7 @@ func (r *TypesenseClusterReconciler) buildStatefulSet(key client.ObjectKey, ts *
 }
 
 func (r *TypesenseClusterReconciler) shouldUpdateStatefulSet(sts *appsv1.StatefulSet, ts *tsv1alpha1.TypesenseCluster) bool {
-	if *sts.Spec.Replicas != ts.Spec.Replicas {
+	if *sts.Spec.Replicas != ts.Spec.Replicas && r.getConditionReady(ts).Reason != string(ConditionReasonQuorumDowngraded) {
 		return true
 	}
 

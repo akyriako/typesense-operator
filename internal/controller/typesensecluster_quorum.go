@@ -134,10 +134,6 @@ func (r *TypesenseClusterReconciler) getQuorumHealth(ctx context.Context, ts *ts
 		return ConditionReasonQuorumNotReady, healthyNodes, fmt.Errorf("quorum has %d healthy nodes, minimum required %d", healthyNodes, minRequiredNodes)
 	}
 
-	if int32(healthyNodes) == sts.Status.ReadyReplicas {
-		return ConditionReasonQuorumReady, healthyNodes, nil
-	}
-
 	if sts.Status.ReadyReplicas < ts.Spec.Replicas {
 		if sts.Status.ReadyReplicas < ts.Spec.Replicas {
 			r.logger.Info("upgrading quorum")
@@ -153,6 +149,10 @@ func (r *TypesenseClusterReconciler) getQuorumHealth(ctx context.Context, ts *ts
 			}
 
 			return ConditionReasonQuorumUpgraded, size, nil
+		}
+	} else {
+		if int32(healthyNodes) == sts.Status.ReadyReplicas {
+			return ConditionReasonQuorumReady, healthyNodes, nil
 		}
 	}
 
