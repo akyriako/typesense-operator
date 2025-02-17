@@ -49,6 +49,21 @@ func (in *IngressSpec) DeepCopyInto(out *IngressSpec) {
 		*out = new(string)
 		**out = **in
 	}
+	if in.HttpDirectives != nil {
+		in, out := &in.HttpDirectives, &out.HttpDirectives
+		*out = new(string)
+		**out = **in
+	}
+	if in.ServerDirectives != nil {
+		in, out := &in.ServerDirectives, &out.ServerDirectives
+		*out = new(string)
+		**out = **in
+	}
+	if in.LocationDirectives != nil {
+		in, out := &in.LocationDirectives, &out.LocationDirectives
+		*out = new(string)
+		**out = **in
+	}
 	if in.Annotations != nil {
 		in, out := &in.Annotations, &out.Annotations
 		*out = make(map[string]string, len(*in))

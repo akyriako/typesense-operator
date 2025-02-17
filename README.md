@@ -211,13 +211,16 @@ introducing `TypesenseCluster`, a new Custom Resource Definition:
 
 **IngressSpec** (optional)
 
-| Name             | Description                          | Optional | Default |
-|------------------|--------------------------------------|----------|---------|
-| referer          | FQDN allowed to access reverse proxy | X        |         |
-| host             | Ingress Host                         |          |         |
-| clusterIssuer    | cert-manager `ClusterIssuer`         |          |         |
-| ingressClassName | Ingress to be used                   |          |         |
-| annotations      | User-Defined annotations             | X        |         |
+| Name              | Description                          | Optional | Default |
+|-------------------|--------------------------------------|----------|---------|
+| referer           | FQDN allowed to access reverse proxy | X        |         |
+| HttpDirectives    | Nginx Proxy HttpDirectives           | X        |         |
+| serverDirectives  | Nginx Proxy serverDirectives         | X        |         |
+| locationDirectives| Nginx Proxy locationDirectives       | X        |         |
+| host              | Ingress Host                         |          |         |
+| clusterIssuer     | cert-manager `ClusterIssuer`         |          |         |
+| ingressClassName  | Ingress to be used                   |          |         |
+| annotations       | User-Defined annotations             | X        |         |
 
 > [!IMPORTANT]
 > This feature requires the existence of [cert-manager](https://cert-manager.io/) in the cluster, but **does not** actively enforce it with an error.

@@ -3,6 +3,9 @@ package controller
 import (
 	"context"
 	"fmt"
+	"maps"
+	"strings"
+
 	tsv1alpha1 "github.com/akyriako/typesense-operator/api/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -11,7 +14,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/ptr"
-	"maps"
 	"reflect"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -20,17 +22,21 @@ import (
 var (
 	conf = `events {}
 				http {
+              %s
 				  server {
 					listen 80;
 
 					%s
-					
+					%s 
+
 					location / {
-					  proxy_pass http://%s-svc:8108/;
-					  proxy_pass_request_headers on;
+					proxy_pass http://%s-svc:8108/;
+					proxy_pass_request_headers on;
+
+				%s
 					}
-				  }
-				}`
+				}
+			}`
 
 	referer = `valid_referers server_names %s;   
 					if ($invalid_referer) {  
@@ -319,7 +325,22 @@ func (r *TypesenseClusterReconciler) getIngressNginxConf(ts *tsv1alpha1.Typesens
 		ref = fmt.Sprintf(referer, *ts.Spec.Ingress.Referer)
 	}
 
-	return fmt.Sprintf(conf, ref, ts.Name)
+	httpDirectives := ""
+	if ts.Spec.Ingress != nil && ts.Spec.Ingress.HttpDirectives != nil {
+		httpDirectives = strings.ReplaceAll(*ts.Spec.Ingress.HttpDirectives, ";", ";\n")
+	}
+
+	serverDirectives := ""
+	if ts.Spec.Ingress != nil && ts.Spec.Ingress.ServerDirectives != nil {
+		serverDirectives = strings.ReplaceAll(*ts.Spec.Ingress.ServerDirectives, ";", ";\n")
+	}
+
+	locationDirectives := ""
+	if ts.Spec.Ingress != nil && ts.Spec.Ingress.LocationDirectives != nil {
+		locationDirectives = strings.ReplaceAll(*ts.Spec.Ingress.LocationDirectives, ";", ";\n")
+	}
+
+	return fmt.Sprintf(conf, httpDirectives, ref, serverDirectives, ts.Name, locationDirectives)
 }
 
 func (r *TypesenseClusterReconciler) createIngressDeployment(ctx context.Context, key client.ObjectKey, ts *tsv1alpha1.TypesenseCluster, ig *networkingv1.Ingress) (*appsv1.Deployment, error) {
