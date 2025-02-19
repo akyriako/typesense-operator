@@ -91,6 +91,9 @@ type TypesenseClusterSpec struct {
 	Scrapers []DocSearchScraperSpec `json:"scrapers,omitempty"`
 
 	Metrics *MetricsExporterSpec `json:"metrics,omitempty"`
+
+	// +kubebuilder:validation:Optional
+	TopologySpreadConstraints []corev1.TopologySpreadConstraint `json:"topologySpreadConstraints,omitempty"`
 }
 
 type StorageSpec struct {

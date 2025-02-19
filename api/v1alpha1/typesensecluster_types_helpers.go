@@ -3,6 +3,7 @@ package v1alpha1
 import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func (s *TypesenseClusterSpec) GetResources() corev1.ResourceRequirements {
@@ -52,4 +53,18 @@ func (s *TypesenseClusterSpec) GetStorage() StorageSpec {
 		Size:             resource.MustParse("100Mi"),
 		StorageClassName: "standard",
 	}
+}
+
+func (s *TypesenseClusterSpec) GetTopologySpreadConstraints(labels map[string]string) []corev1.TopologySpreadConstraint {
+	tscs := make([]corev1.TopologySpreadConstraint, 0)
+
+	for _, tsc := range s.TopologySpreadConstraints {
+		if tsc.LabelSelector == nil {
+			tsc.LabelSelector = &metav1.LabelSelector{
+				MatchLabels: labels,
+			}
+		}
+		tscs = append(tscs, tsc)
+	}
+	return tscs
 }

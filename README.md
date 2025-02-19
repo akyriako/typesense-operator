@@ -194,6 +194,7 @@ introducing `TypesenseCluster`, a new Custom Resource Definition:
 | ingress                       | check `IngressSpec` below                                | X        |               |
 | scrapers                      | array of `DocSearchScraperSpec`; check below             | X        |               |
 | metrics                       | check `MetricsSpec` below                                | X        |               |
+| topologySpreadConstraints     | how to spread a  group of pods across topology domains   | X        |               |
 
 > [!IMPORTANT]
 > * Any Typesense server configuration variable that is defined in Spec is overriding any additional reference of
