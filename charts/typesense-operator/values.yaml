@@ -10,9 +10,11 @@ controllerManager:
       capabilities:
         drop:
         - ALL
+    annotations: {}
     image:
       repository: akyriako78/typesense-operator
       tag: 0.2.13-rc.5
+      pullPolicy: IfNotPresent
     resources:
       limits:
         cpu: 500m
