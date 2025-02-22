@@ -159,7 +159,7 @@ func (r *TypesenseClusterReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	}
 
 	// Update strategy: Update the Deployment if image changed. Drop the existing ServiceMonitor and recreate it, if changes are identified
-	err = r.ReconcileMetricsExporter(ctx, ts)
+	err = r.ReconcilePodMonitor(ctx, ts)
 	if err != nil {
 		cerr := r.setConditionNotReady(ctx, &ts, ConditionReasonMetricsExporterNotReady, err)
 		if cerr != nil {

@@ -212,6 +212,54 @@ func (r *TypesenseClusterReconciler) buildStatefulSet(key client.ObjectKey, ts *
 								},
 							},
 						},
+						{
+							Name:            "metrics-exporter",
+							Image:           ts.Spec.Metrics.Image,
+							ImagePullPolicy: corev1.PullIfNotPresent,
+							Ports: []corev1.ContainerPort{
+								{
+									Name:          "metrics",
+									ContainerPort: 9100,
+								},
+							},
+							Env: []corev1.EnvVar{
+								{
+									Name: "TYPESENSE_API_KEY",
+									ValueFrom: &corev1.EnvVarSource{
+										SecretKeyRef: &corev1.SecretKeySelector{
+											Key: ClusterAdminApiKeySecretKeyName,
+											LocalObjectReference: corev1.LocalObjectReference{
+												Name: r.getAdminApiKeyObjectKey(ts).Name,
+											},
+										},
+									},
+								},
+								{
+									Name:  "LOG_LEVEL",
+									Value: strconv.Itoa(-4),
+								},
+								{
+									Name:  "TYPESENSE_PROTOCOL",
+									Value: "http",
+								},
+								{
+									Name:  "TYPESENSE_HOST",
+									Value: "localhost",
+								},
+								{
+									Name:  "TYPESENSE_PORT",
+									Value: strconv.Itoa(ts.Spec.ApiPort),
+								},
+								{
+									Name:  "METRICS_PORT",
+									Value: strconv.Itoa(9100),
+								},
+								{
+									Name:  "TYPESENSE_CLUSTER",
+									Value: fmt.Sprintf("%s/%s", ts.Namespace, ts.Name),
+								},
+							},
+						},
 					},
 					NodeSelector: ts.Spec.NodeSelector,
 					Tolerations:  ts.Spec.Tolerations,
