@@ -24,7 +24,7 @@ func (r *TypesenseClusterReconciler) ReconcilePodMonitor(ctx context.Context, ts
 		}
 	}
 
-	podMonitorName := fmt.Sprintf(ClusterPrometheusExporterPodMonitor, ts.Name)
+	podMonitorName := fmt.Sprintf(ClusterMetricsPodMonitor, ts.Name)
 	podMonitorExists := true
 	podMonitorObjectKey := client.ObjectKey{Namespace: ts.Namespace, Name: podMonitorName}
 
@@ -88,7 +88,6 @@ func (r *TypesenseClusterReconciler) createMetricsExporterPodMonitor(ctx context
 					Scheme:   "http",
 				},
 			},
-			JobLabel: "app",
 		},
 	}
 

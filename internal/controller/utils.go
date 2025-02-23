@@ -78,7 +78,7 @@ func getReverseProxyObjectMeta(ts *tsv1alpha1.TypesenseCluster, name *string, an
 
 func getPodMonitorLabels(ts *tsv1alpha1.TypesenseCluster) map[string]string {
 	return map[string]string{
-		"app": fmt.Sprintf(ClusterPrometheusExporterAppLabel, ts.Name),
+		"app": fmt.Sprintf(ClusterMetricsPodMonitorAppLabel, ts.Name),
 	}
 }
 

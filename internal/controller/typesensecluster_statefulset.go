@@ -16,6 +16,10 @@ import (
 	"strconv"
 )
 
+const (
+	metricsPort = 9100
+)
+
 func (r *TypesenseClusterReconciler) ReconcileStatefulSet(ctx context.Context, ts tsv1alpha1.TypesenseCluster) (*appsv1.StatefulSet, error) {
 	r.logger.V(debugLevel).Info("reconciling statefulset")
 
@@ -219,7 +223,7 @@ func (r *TypesenseClusterReconciler) buildStatefulSet(key client.ObjectKey, ts *
 							Ports: []corev1.ContainerPort{
 								{
 									Name:          "metrics",
-									ContainerPort: 9100,
+									ContainerPort: metricsPort,
 								},
 							},
 							Env: []corev1.EnvVar{
@@ -252,11 +256,11 @@ func (r *TypesenseClusterReconciler) buildStatefulSet(key client.ObjectKey, ts *
 								},
 								{
 									Name:  "METRICS_PORT",
-									Value: strconv.Itoa(9100),
+									Value: strconv.Itoa(metricsPort),
 								},
 								{
 									Name:  "TYPESENSE_CLUSTER",
-									Value: fmt.Sprintf("%s/%s", ts.Namespace, ts.Name),
+									Value: ts.Name,
 								},
 							},
 						},
