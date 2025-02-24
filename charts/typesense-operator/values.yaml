@@ -12,7 +12,7 @@ controllerManager:
         - ALL
     image:
       repository: akyriako78/typesense-operator
-      tag: 0.2.13-rc.5
+      tag: 0.2.14
     resources:
       limits:
         cpu: 500m

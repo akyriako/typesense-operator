@@ -240,7 +240,7 @@ func (r *TypesenseClusterReconciler) buildStatefulSet(key client.ObjectKey, ts *
 								},
 								{
 									Name:  "LOG_LEVEL",
-									Value: strconv.Itoa(-4),
+									Value: strconv.Itoa(0),
 								},
 								{
 									Name:  "TYPESENSE_PROTOCOL",

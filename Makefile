@@ -50,9 +50,9 @@ endif
 # This is useful for CI or a project to utilize a specific version of the operator-sdk toolkit.
 OPERATOR_SDK_VERSION ?= v1.38.0
 # Image URL to use all building/pushing image targets
-DOCKER_HUB_NAME ?= akyriako78#$(shell docker info | sed '/Username:/!d;s/.* //')
+DOCKER_HUB_NAME ?= $(shell docker info | sed '/Username:/!d;s/.* //')
 IMG_NAME ?= typesense-operator
-IMG_TAG ?= 0.2.14-dev.2
+IMG_TAG ?= 0.2.14
 IMG ?= $(DOCKER_HUB_NAME)/$(IMG_NAME):$(IMG_TAG)
 
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
