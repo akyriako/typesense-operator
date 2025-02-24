@@ -107,7 +107,7 @@ The Typesense Kubernetes Operator manages the entire lifecycle of Typesense Clus
 6. Optionally, one or more instances of **DocSearch** are deployed as distinct `CronJobs` (one per scraping target URL),
    which based on user-defined schedules, periodically scrape the target sites and store the results in Typesense.
 
-![image](https://github.com/user-attachments/assets/bec0d5dc-4db5-40da-a4fa-c8e0226b4d33)
+![Untitled-2025-02-24-0826](https://github.com/user-attachments/assets/6e6d67cf-4bab-4eac-ada0-8e4c6f46537d)
 
 > [!NOTE]
 > The interval between reconciliation loops depends on the number of nodes. This approach ensures raft has sufficient
