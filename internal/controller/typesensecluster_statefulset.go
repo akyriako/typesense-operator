@@ -16,6 +16,10 @@ import (
 	"strconv"
 )
 
+const (
+	metricsPort = 9100
+)
+
 func (r *TypesenseClusterReconciler) ReconcileStatefulSet(ctx context.Context, ts tsv1alpha1.TypesenseCluster) (*appsv1.StatefulSet, error) {
 	r.logger.V(debugLevel).Info("reconciling statefulset")
 
@@ -209,6 +213,54 @@ func (r *TypesenseClusterReconciler) buildStatefulSet(key client.ObjectKey, ts *
 								{
 									MountPath: "/usr/share/typesense/data",
 									Name:      "data",
+								},
+							},
+						},
+						{
+							Name:            "metrics-exporter",
+							Image:           ts.Spec.Metrics.Image,
+							ImagePullPolicy: corev1.PullIfNotPresent,
+							Ports: []corev1.ContainerPort{
+								{
+									Name:          "metrics",
+									ContainerPort: metricsPort,
+								},
+							},
+							Env: []corev1.EnvVar{
+								{
+									Name: "TYPESENSE_API_KEY",
+									ValueFrom: &corev1.EnvVarSource{
+										SecretKeyRef: &corev1.SecretKeySelector{
+											Key: ClusterAdminApiKeySecretKeyName,
+											LocalObjectReference: corev1.LocalObjectReference{
+												Name: r.getAdminApiKeyObjectKey(ts).Name,
+											},
+										},
+									},
+								},
+								{
+									Name:  "LOG_LEVEL",
+									Value: strconv.Itoa(0),
+								},
+								{
+									Name:  "TYPESENSE_PROTOCOL",
+									Value: "http",
+								},
+								{
+									Name:  "TYPESENSE_HOST",
+									Value: "localhost",
+								},
+								{
+									Name:  "TYPESENSE_PORT",
+									Value: strconv.Itoa(ts.Spec.ApiPort),
+								},
+								{
+									Name:  "METRICS_PORT",
+									Value: strconv.Itoa(metricsPort),
+								},
+								{
+									Name:  "TYPESENSE_CLUSTER",
+									Value: ts.Name,
 								},
 							},
 						},

@@ -76,13 +76,13 @@ func getReverseProxyObjectMeta(ts *tsv1alpha1.TypesenseCluster, name *string, an
 	}
 }
 
-func getMetricsExporterLabels(ts *tsv1alpha1.TypesenseCluster) map[string]string {
+func getPodMonitorLabels(ts *tsv1alpha1.TypesenseCluster) map[string]string {
 	return map[string]string{
-		"app": fmt.Sprintf(ClusterPrometheusExporterAppLabel, ts.Name),
+		"app": fmt.Sprintf(ClusterMetricsPodMonitorAppLabel, ts.Name),
 	}
 }
 
-func getMetricsExporterObjectMeta(ts *tsv1alpha1.TypesenseCluster, name *string, annotations map[string]string) metav1.ObjectMeta {
+func getPodMonitorObjectMeta(ts *tsv1alpha1.TypesenseCluster, name *string, annotations map[string]string) metav1.ObjectMeta {
 	if name == nil {
 		name = &ts.Name
 	}
@@ -90,7 +90,7 @@ func getMetricsExporterObjectMeta(ts *tsv1alpha1.TypesenseCluster, name *string,
 	return metav1.ObjectMeta{
 		Name:        *name,
 		Namespace:   ts.Namespace,
-		Labels:      getMetricsExporterLabels(ts),
+		Labels:      getPodMonitorLabels(ts),
 		Annotations: annotations,
 	}
 }
