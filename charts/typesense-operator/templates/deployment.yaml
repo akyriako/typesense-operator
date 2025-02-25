@@ -5,7 +5,6 @@ metadata:
   labels:
     control-plane: controller-manager
   {{- include "typesense-operator.labels" . | nindent 4 }}
-  annotations: {{- toYaml .Values.controllerManager.manager.annotations | nindent 4 }}
 spec:
   replicas: {{ .Values.controllerManager.replicas }}
   selector:
@@ -29,7 +28,7 @@ spec:
           value: {{ quote .Values.kubernetesClusterDomain }}
         image: {{ .Values.controllerManager.manager.image.repository }}:{{ .Values.controllerManager.manager.image.tag
           | default .Chart.AppVersion }}
-        imagePullPolicy: {{ .Values.controllerManager.manager.image.pullPolicy }}
+        imagePullPolicy: {{ .Values.controllerManager.manager.imagePullPolicy }}
         livenessProbe:
           httpGet:
             path: /healthz

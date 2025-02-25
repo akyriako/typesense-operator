@@ -65,6 +65,7 @@ spec:
           - --health-probe-bind-address=:8081
           - --zap-log-level=debug
         image: controller:latest
+        imagePullPolicy: IfNotPresent
         name: manager
         securityContext:
           allowPrivilegeEscalation: false
