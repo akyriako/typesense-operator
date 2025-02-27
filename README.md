@@ -1,5 +1,6 @@
 # Typesense Kubernetes Operator
-![Status Badge](https://img.shields.io/badge/status-beta-orange) ![27_1](https://img.shields.io/badge/typesense-27.1-lightgreen?logoColor=black&link=https%3A%2F%2Ftypesense.org%2Fdocs%2F27.1%2Fapi%2F)
+![Status Badge](https://img.shields.io/badge/status-beta-orange) ![28_0](https://img.shields.io/badge/typesense-28.0-lightgreen?logoColor=black&link=https%3A%2F%2Ftypesense.org%2Fdocs%2F28.0%2Fapi%2F)
+![27_1](https://img.shields.io/badge/typesense-27.1-lightgreen?logoColor=black&link=https%3A%2F%2Ftypesense.org%2Fdocs%2F27.1%2Fapi%2F)
 ![27_0](https://img.shields.io/badge/typesense-27.0-lightgreen?logoColor=black&link=https%3A%2F%2Ftypesense.org%2Fdocs%2F27.0%2Fapi%2F)
 ![26_0](https://img.shields.io/badge/typesense-26.0-lightgreen?logoColor=black&link=https%3A%2F%2Ftypesense.org%2Fdocs%2F26.0%2Fapi%2F)
 ![Kubernetes](https://img.shields.io/badge/kubernetes-1.26+-lightgreen?labelColor=blue&link=https%3A%2F%2Ftypesense.org%2Fdocs%2F27.0%2Fapi%2F)
