@@ -11,7 +11,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func (r *TypesenseClusterReconciler) ReconcileSecret(ctx context.Context, ts tsv1alpha1.TypesenseCluster) error {
+func (r *TypesenseClusterReconciler) ReconcileSecret(ctx context.Context, ts tsv1alpha1.TypesenseCluster) (*v1.Secret, error) {
 	r.logger.V(debugLevel).Info("reconciling secret")
 
 	secretExists := true
@@ -23,21 +23,21 @@ func (r *TypesenseClusterReconciler) ReconcileSecret(ctx context.Context, ts tsv
 			secretExists = false
 		} else {
 			r.logger.Error(err, fmt.Sprintf("unable to fetch secret: %s", secretObjectKey))
-			return err
+			return secret, err
 		}
 	}
 
 	if !secretExists {
 		r.logger.V(debugLevel).Info("creating admin api key", "secret", secretObjectKey)
 
-		_, err := r.createAdminApiKey(ctx, secretObjectKey, &ts)
+		secret, err := r.createAdminApiKey(ctx, secretObjectKey, &ts)
 		if err != nil {
 			r.logger.Error(err, "creating admin api key failed", "secret", secretObjectKey)
-			return err
+			return nil, err
 		}
-		return nil
+		return secret, nil
 	}
-	return nil
+	return secret, nil
 }
 
 func (r *TypesenseClusterReconciler) createAdminApiKey(
