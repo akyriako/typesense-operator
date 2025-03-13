@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	tsv1alpha1 "github.com/akyriako/typesense-operator/api/v1alpha1"
-	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/utils/ptr"
 	"net/http"
@@ -30,8 +29,6 @@ func (r *TypesenseClusterReconciler) ReconcileQuorum(ctx context.Context, ts *ts
 		return ConditionReasonQuorumNotReady, 0, err
 	}
 
-	r.logger.V(debugLevel).Info("calculating quorum", "MinRequiredNodes", quorum.MinRequiredNodes, "AvailableNodes", quorum.AvailableNodes)
-
 	nodesStatus := make(map[string]NodeStatus)
 	httpClient := &http.Client{
 		Timeout: 500 * time.Millisecond,
@@ -41,18 +38,27 @@ func (r *TypesenseClusterReconciler) ReconcileQuorum(ctx context.Context, ts *ts
 		status, err := r.getNodeStatus(ctx, httpClient, node, ts, secret)
 		if err != nil {
 			r.logger.Error(err, "fetching node status failed", "node", r.getShortName(node))
-			status = NodeStatus{
-				State: NotReadyState,
-			}
 		}
 
+		r.logger.V(debugLevel).Info(
+			"reporting node status",
+			"node",
+			r.getShortName(node),
+			"state",
+			status.State,
+			"queued_writes",
+			status.QueuedWrites,
+			"commited_index",
+			status.CommittedIndex,
+		)
 		nodesStatus[node] = status
 	}
 
 	clusterStatus := r.getClusterStatus(nodesStatus)
+	r.logger.V(debugLevel).Info("reporting cluster status", "status", clusterStatus)
 
 	if clusterStatus == ClusterStatusSplitBrain {
-		return r.downgradeQuorum(ctx, ts, quorum.NodesListConfigMap, sts, sts.Status.ReadyReplicas, int32(quorum.MinRequiredNodes))
+		return r.downgradeQuorum(ctx, ts, quorum.NodesListConfigMap, stsObjectKey, sts.Status.ReadyReplicas, int32(quorum.MinRequiredNodes))
 	}
 
 	clusterNeedsAttention := false
@@ -84,12 +90,6 @@ func (r *TypesenseClusterReconciler) ReconcileQuorum(ctx context.Context, ts *ts
 		return ConditionReasonQuorumNeedsAttention, 0, fmt.Errorf("cluster needs administrative attention")
 	}
 
-	// refresh statefulset because it has been updated through the process
-	sts, err = r.GetFreshStatefulSet(ctx, stsObjectKey)
-	if err != nil {
-		return ConditionReasonQuorumNotReady, 0, err
-	}
-
 	minRequiredNodes := quorum.MinRequiredNodes
 	availableNodes := quorum.AvailableNodes
 	healthyNodes := availableNodes
@@ -100,14 +100,34 @@ func (r *TypesenseClusterReconciler) ReconcileQuorum(ctx context.Context, ts *ts
 		}
 	}
 
-	// TODO && !clusterIsLagging {
-	// BUG LEADER+healthy == false skips this loop and return a healthy cluster
-	if clusterStatus == ClusterStatusNotReady && healthyNodes < minRequiredNodes {
-		return r.downgradeQuorum(ctx, ts, quorum.NodesListConfigMap, sts, int32(healthyNodes), int32(minRequiredNodes))
+	r.logger.Info("calculating quorum", "minRequiredNodes", minRequiredNodes, "availableNodes", availableNodes, "healthyNodes", healthyNodes)
+
+	if clusterStatus == ClusterStatusElectionDeadlock {
+		return r.downgradeQuorum(ctx, ts, quorum.NodesListConfigMap, stsObjectKey, int32(healthyNodes), int32(minRequiredNodes))
 	}
 
+	if clusterStatus == ClusterStatusNotReady {
+		if availableNodes == 1 {
+			return ConditionReasonQuorumNotReadyWaitATerm, 0, nil
+		}
+
+		if minRequiredNodes > healthyNodes {
+			return ConditionReasonQuorumNotReadyWaitATerm, 0, nil
+		}
+	}
+
+	//// TODO && !clusterIsLagging {
+	//// BUG LEADER+healthy == false skips this loop and return a healthy cluster
+	//if clusterStatus == ClusterStatusNotReady && healthyNodes < minRequiredNodes {
+	//	return r.downgradeQuorum(ctx, ts, quorum.NodesListConfigMap, sts, int32(healthyNodes), int32(minRequiredNodes))
+	//}
+
 	if clusterStatus == ClusterStatusOK && *sts.Spec.Replicas < ts.Spec.Replicas {
-		return r.upgradeQuorum(ctx, ts, quorum.NodesListConfigMap, sts)
+		return r.upgradeQuorum(ctx, ts, quorum.NodesListConfigMap, stsObjectKey)
+	}
+
+	if healthyNodes < minRequiredNodes {
+		return ConditionReasonQuorumNotReady, 0, nil
 	}
 
 	//if sts.Status.ReadyReplicas != sts.Status.Replicas && (sts.Status.ReadyReplicas < int32(quorum.MinRequiredNodes) && quorum.MinRequiredNodes > 1) {
@@ -124,9 +144,16 @@ func (r *TypesenseClusterReconciler) downgradeQuorum(
 	ctx context.Context,
 	ts *tsv1alpha1.TypesenseCluster,
 	cm *v1.ConfigMap,
-	sts *appsv1.StatefulSet,
+	stsObjectKey client.ObjectKey,
 	healthyNodes, minRequiredNodes int32,
 ) (ConditionQuorum, int, error) {
+	r.logger.Info("downgrading quorum")
+
+	sts, err := r.GetFreshStatefulSet(ctx, stsObjectKey)
+	if err != nil {
+		return ConditionReasonQuorumNotReady, 0, err
+	}
+
 	if healthyNodes == 0 && minRequiredNodes == 1 {
 		r.logger.Info("purging quorum")
 		err := r.PurgeStatefulSetPods(ctx, sts)
@@ -137,7 +164,6 @@ func (r *TypesenseClusterReconciler) downgradeQuorum(
 		return ConditionReasonQuorumNotReady, 0, nil
 	}
 
-	r.logger.Info("downgrading quorum")
 	desiredReplicas := int32(1)
 
 	_, size, err := r.updateConfigMap(ctx, ts, cm, ptr.To[int32](desiredReplicas))
@@ -157,11 +183,16 @@ func (r *TypesenseClusterReconciler) upgradeQuorum(
 	ctx context.Context,
 	ts *tsv1alpha1.TypesenseCluster,
 	cm *v1.ConfigMap,
-	sts *appsv1.StatefulSet,
+	stsObjectKey client.ObjectKey,
 ) (ConditionQuorum, int, error) {
 	r.logger.Info("upgrading quorum")
 
-	_, _, err := r.updateConfigMap(ctx, ts, cm, &ts.Spec.Replicas)
+	sts, err := r.GetFreshStatefulSet(ctx, stsObjectKey)
+	if err != nil {
+		return ConditionReasonQuorumNotReady, 0, err
+	}
+
+	_, _, err = r.updateConfigMap(ctx, ts, cm, &ts.Spec.Replicas)
 	if err != nil {
 		return ConditionReasonQuorumNotReady, 0, err
 	}
@@ -210,6 +241,7 @@ func (r *TypesenseClusterReconciler) calculatePodReadinessGate(ctx context.Conte
 		}
 	}
 
+	r.logger.V(debugLevel).Info("reporting node health", "node", r.getShortName(node), "healthy", health.Ok)
 	condition := &v1.PodCondition{
 		Type:    PodReadinessGateCondition,
 		Status:  conditionStatus,
@@ -230,7 +262,7 @@ func (r *TypesenseClusterReconciler) updatePodReadinessGate(ctx context.Context,
 	}
 
 	patch := client.MergeFrom(pod.DeepCopy())
-	r.logger.V(debugLevel).Info("updating pod readiness gate condition", "pod", pod.Name, "condition", condition.Type, "status", condition.Status)
+	//r.logger.V(debugLevel).Info("updating pod readiness gate condition", "pod", pod.Name, "condition", condition.Type, "status", condition.Status)
 
 	updated := false
 	for i, c := range pod.Status.Conditions {

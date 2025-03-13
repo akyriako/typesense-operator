@@ -14,7 +14,7 @@ import (
 )
 
 func (r *TypesenseClusterReconciler) getNodeStatus(ctx context.Context, httpClient *http.Client, node string, ts *tsv1alpha1.TypesenseCluster, secret *v1.Secret) (NodeStatus, error) {
-	r.logger.V(debugLevel).Info("requesting node status", "node", r.getShortName(node))
+	//r.logger.V(debugLevel).Info("requesting node status", "node", r.getShortName(node))
 
 	fqdn := r.getNodeFullyQualifiedDomainName(ts, node)
 	url := fmt.Sprintf("http://%s:%d/status", fqdn, ts.Spec.ApiPort)
@@ -22,7 +22,7 @@ func (r *TypesenseClusterReconciler) getNodeStatus(ctx context.Context, httpClie
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		r.logger.Error(err, "creating request failed")
-		return NodeStatus{State: NotReadyState}, err
+		return NodeStatus{State: NotReadyState}, nil
 	}
 
 	apiKey := secret.Data[ClusterAdminApiKeySecretKeyName]
@@ -30,8 +30,8 @@ func (r *TypesenseClusterReconciler) getNodeStatus(ctx context.Context, httpClie
 
 	resp, err := httpClient.Do(req)
 	if err != nil {
-		r.logger.Error(err, "executing request failed")
-		return NodeStatus{State: NotReadyState}, err
+		//r.logger.Error(err, "executing request failed")
+		return NodeStatus{State: NotReadyState}, nil
 	}
 	defer resp.Body.Close()
 
@@ -41,26 +41,15 @@ func (r *TypesenseClusterReconciler) getNodeStatus(ctx context.Context, httpClie
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return NodeStatus{State: NotReadyState}, err
+		return NodeStatus{State: NotReadyState}, nil
 	}
 
 	var nodeStatus NodeStatus
 	err = json.Unmarshal(body, &nodeStatus)
 	if err != nil {
-		return NodeStatus{State: NotReadyState}, err
+		return NodeStatus{State: NotReadyState}, nil
 	}
 
-	r.logger.V(debugLevel).Info(
-		"reporting node status",
-		"node",
-		r.getShortName(node),
-		"commited_index",
-		nodeStatus.CommittedIndex,
-		"queued_writes",
-		nodeStatus.QueuedWrites,
-		"state",
-		nodeStatus.State,
-	)
 	return nodeStatus, nil
 }
 
@@ -82,7 +71,16 @@ func (r *TypesenseClusterReconciler) getClusterStatus(nodesStatus map[string]Nod
 
 	if leaderNodes > 1 {
 		return ClusterStatusSplitBrain
-	} else if leaderNodes == 1 {
+	}
+
+	if leaderNodes == 0 {
+		if availableNodes == 1 {
+			return ClusterStatusNotReady
+		}
+		return ClusterStatusElectionDeadlock
+	}
+
+	if leaderNodes == 1 {
 		if minRequiredNodes > (availableNodes - notReadyNodes) {
 			return ClusterStatusNotReady
 		}
@@ -93,7 +91,7 @@ func (r *TypesenseClusterReconciler) getClusterStatus(nodesStatus map[string]Nod
 }
 
 func (r *TypesenseClusterReconciler) getNodeHealth(ctx context.Context, httpClient *http.Client, node string, ts *tsv1alpha1.TypesenseCluster) (NodeHealth, error) {
-	r.logger.V(debugLevel).Info("requesting node health", "node", r.getShortName(node))
+	//r.logger.V(debugLevel).Info("requesting node health", "node", r.getShortName(node))
 
 	fqdn := r.getNodeFullyQualifiedDomainName(ts, node)
 	url := fmt.Sprintf("http://%s:%d/health", fqdn, ts.Spec.ApiPort)
@@ -101,28 +99,27 @@ func (r *TypesenseClusterReconciler) getNodeHealth(ctx context.Context, httpClie
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		r.logger.Error(err, "creating request failed")
-		return NodeHealth{Ok: false}, err
+		return NodeHealth{Ok: false}, nil
 	}
 
 	resp, err := httpClient.Do(req)
 	if err != nil {
-		r.logger.Error(err, "executing request failed")
-		return NodeHealth{Ok: false}, err
+		//r.logger.Error(err, "executing request failed")
+		return NodeHealth{Ok: false}, nil
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return NodeHealth{Ok: false}, err
+		return NodeHealth{Ok: false}, nil
 	}
 
 	var nodeHealth NodeHealth
 	err = json.Unmarshal(body, &nodeHealth)
 	if err != nil {
-		return NodeHealth{Ok: false}, err
+		return NodeHealth{Ok: false}, nil
 	}
 
-	r.logger.V(debugLevel).Info("reporting node health", "node", r.getShortName(node), "healthy", nodeHealth.Ok)
 	return nodeHealth, nil
 }
 

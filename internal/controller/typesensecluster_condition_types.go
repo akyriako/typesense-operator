@@ -23,6 +23,7 @@ const (
 	ConditionReasonQuorumStateUnknown       ConditionQuorum = "QuorumStateUnknown"
 	ConditionReasonQuorumReady              ConditionQuorum = "QuorumReady"
 	ConditionReasonQuorumNotReady           ConditionQuorum = "QuorumNotReady"
+	ConditionReasonQuorumNotReadyWaitATerm  ConditionQuorum = "QuorumNotReadyWaitATerm"
 	ConditionReasonQuorumDowngraded         ConditionQuorum = "QuorumDowngraded"
 	ConditionReasonQuorumUpgraded           ConditionQuorum = "QuorumUpgraded"
 	ConditionReasonQuorumNeedsAttention     ConditionQuorum = "QuorumNeedsAttention"

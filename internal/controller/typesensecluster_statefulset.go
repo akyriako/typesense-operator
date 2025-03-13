@@ -63,6 +63,7 @@ func (r *TypesenseClusterReconciler) ReconcileStatefulSet(ctx context.Context, t
 			string(ConditionReasonQuorumNotReady),
 			ConditionReasonStatefulSetNotReady,
 			ConditionReasonReconciliationInProgress,
+			string(ConditionReasonQuorumNotReadyWaitATerm),
 		}
 
 		if !contains(skipConditions, r.getConditionReady(&ts).Reason) {
