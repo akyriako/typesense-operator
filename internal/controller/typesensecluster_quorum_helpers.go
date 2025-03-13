@@ -50,11 +50,21 @@ func (r *TypesenseClusterReconciler) getNodeStatus(ctx context.Context, httpClie
 		return NodeStatus{State: NotReadyState}, err
 	}
 
-	r.logger.V(debugLevel).Info("reporting node status", "node", r.getShortName(node), "status", nodeStatus)
+	r.logger.V(debugLevel).Info(
+		"reporting node status",
+		"node",
+		r.getShortName(node),
+		"commited_index",
+		nodeStatus.CommittedIndex,
+		"queued_writes",
+		nodeStatus.QueuedWrites,
+		"state",
+		nodeStatus.State,
+	)
 	return nodeStatus, nil
 }
 
-func (r *TypesenseClusterReconciler) getClusterStatus(quorum *Quorum, nodesStatus map[string]NodeStatus) ClusterStatus {
+func (r *TypesenseClusterReconciler) getClusterStatus(nodesStatus map[string]NodeStatus) ClusterStatus {
 	leaderNodes := 0
 	notReadyNodes := 0
 	availableNodes := len(nodesStatus)
@@ -66,16 +76,14 @@ func (r *TypesenseClusterReconciler) getClusterStatus(quorum *Quorum, nodesStatu
 		}
 
 		if nodeStatus.State == NotReadyState {
-			quorum.HealthyNodes--
 			notReadyNodes++
 		}
 	}
 
 	if leaderNodes > 1 {
-		quorum.HealthyNodes = 0
 		return ClusterStatusSplitBrain
 	} else if leaderNodes == 1 {
-		if minRequiredNodes < (availableNodes - notReadyNodes) {
+		if minRequiredNodes > (availableNodes - notReadyNodes) {
 			return ClusterStatusNotReady
 		}
 		return ClusterStatusOK
@@ -114,7 +122,7 @@ func (r *TypesenseClusterReconciler) getNodeHealth(ctx context.Context, httpClie
 		return NodeHealth{Ok: false}, err
 	}
 
-	r.logger.V(debugLevel).Info("reporting node health", "node", r.getShortName(node), "health", nodeHealth)
+	r.logger.V(debugLevel).Info("reporting node health", "node", r.getShortName(node), "healthy", nodeHealth.Ok)
 	return nodeHealth, nil
 }
 
@@ -132,7 +140,7 @@ func (r *TypesenseClusterReconciler) getQuorum(ctx context.Context, ts *tsv1alph
 	availableNodes := len(nodes)
 	minRequiredNodes := getMinimumRequiredNodes(availableNodes)
 
-	return &Quorum{minRequiredNodes, availableNodes, availableNodes, nodes, cm, sts}, nil
+	return &Quorum{minRequiredNodes, availableNodes, nodes, cm}, nil
 }
 
 func getMinimumRequiredNodes(availableNodes int) int {

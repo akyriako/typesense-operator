@@ -1,7 +1,6 @@
 package controller
 
 import (
-	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 )
 
@@ -43,8 +42,6 @@ type NodeHealth struct {
 type Quorum struct {
 	MinRequiredNodes   int
 	AvailableNodes     int
-	HealthyNodes       int
 	Nodes              []string
 	NodesListConfigMap *v1.ConfigMap
-	StatefulSet        *appsv1.StatefulSet
 }

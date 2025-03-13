@@ -188,8 +188,9 @@ func (r *TypesenseClusterReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		return cases.Title(language.Und, cases.NoLower).String(s)
 	}
 
+	cond := ConditionReasonQuorumStateUnknown
 	if *updated {
-		condition, size, err := r.ReconcileQuorum(ctx, &ts, sts, secret)
+		condition, size, err := r.ReconcileQuorum(ctx, &ts, secret, client.ObjectKeyFromObject(sts))
 		if err != nil {
 			r.logger.Error(err, "reconciling quorum failed")
 		}
@@ -236,6 +237,8 @@ func (r *TypesenseClusterReconciler) Reconcile(ctx context.Context, req ctrl.Req
 				delayPerReplicaFactor = minDelayPerReplicaFactor
 			}
 		}
+
+		cond = condition
 	}
 
 	lastAction := "bootstrapping"
@@ -243,7 +246,8 @@ func (r *TypesenseClusterReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		lastAction = "reconciling"
 	}
 	requeueAfter = time.Duration(delayPerReplicaFactor*60+terminationGracePeriodSeconds) * time.Second
-	r.logger.Info(fmt.Sprintf("%s cluster completed", lastAction), "requeueAfter", requeueAfter)
+
+	r.logger.Info(fmt.Sprintf("%s cluster completed", lastAction), "condition", cond, "requeueAfter", requeueAfter)
 
 	return ctrl.Result{RequeueAfter: requeueAfter}, nil
 }

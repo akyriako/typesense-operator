@@ -62,6 +62,7 @@ func (r *TypesenseClusterReconciler) ReconcileStatefulSet(ctx context.Context, t
 			string(ConditionReasonQuorumNeedsAttention),
 			string(ConditionReasonQuorumNotReady),
 			ConditionReasonStatefulSetNotReady,
+			ConditionReasonReconciliationInProgress,
 		}
 
 		if !contains(skipConditions, r.getConditionReady(&ts).Reason) {
@@ -447,4 +448,14 @@ func (r *TypesenseClusterReconciler) PurgeStatefulSetPods(ctx context.Context, s
 	}
 
 	return nil
+}
+
+func (r *TypesenseClusterReconciler) GetFreshStatefulSet(ctx context.Context, stsObjectKey client.ObjectKey) (*appsv1.StatefulSet, error) {
+	sts := &appsv1.StatefulSet{}
+	if err := r.Get(ctx, stsObjectKey, sts); err != nil {
+		r.logger.Error(err, fmt.Sprintf("unable to fetch statefulset: %s", stsObjectKey.Name))
+		return nil, err
+	}
+
+	return sts, nil
 }
