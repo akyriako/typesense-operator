@@ -14,8 +14,6 @@ import (
 )
 
 func (r *TypesenseClusterReconciler) getNodeStatus(ctx context.Context, httpClient *http.Client, node string, ts *tsv1alpha1.TypesenseCluster, secret *v1.Secret) (NodeStatus, error) {
-	//r.logger.V(debugLevel).Info("requesting node status", "node", r.getShortName(node))
-
 	fqdn := r.getNodeFullyQualifiedDomainName(ts, node)
 	url := fmt.Sprintf("http://%s:%d/status", fqdn, ts.Spec.ApiPort)
 
@@ -30,7 +28,6 @@ func (r *TypesenseClusterReconciler) getNodeStatus(ctx context.Context, httpClie
 
 	resp, err := httpClient.Do(req)
 	if err != nil {
-		//r.logger.Error(err, "executing request failed")
 		return NodeStatus{State: NotReadyState}, nil
 	}
 	defer resp.Body.Close()
@@ -91,8 +88,6 @@ func (r *TypesenseClusterReconciler) getClusterStatus(nodesStatus map[string]Nod
 }
 
 func (r *TypesenseClusterReconciler) getNodeHealth(ctx context.Context, httpClient *http.Client, node string, ts *tsv1alpha1.TypesenseCluster) (NodeHealth, error) {
-	//r.logger.V(debugLevel).Info("requesting node health", "node", r.getShortName(node))
-
 	fqdn := r.getNodeFullyQualifiedDomainName(ts, node)
 	url := fmt.Sprintf("http://%s:%d/health", fqdn, ts.Spec.ApiPort)
 
@@ -104,7 +99,6 @@ func (r *TypesenseClusterReconciler) getNodeHealth(ctx context.Context, httpClie
 
 	resp, err := httpClient.Do(req)
 	if err != nil {
-		//r.logger.Error(err, "executing request failed")
 		return NodeHealth{Ok: false}, nil
 	}
 	defer resp.Body.Close()

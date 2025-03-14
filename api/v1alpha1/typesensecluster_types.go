@@ -94,6 +94,11 @@ type TypesenseClusterSpec struct {
 
 	// +kubebuilder:validation:Optional
 	TopologySpreadConstraints []corev1.TopologySpreadConstraint `json:"topologySpreadConstraints,omitempty"`
+
+	// +optional
+	// +kubebuilder:default=false
+	// +kubebuilder:validation:Type=boolean
+	IncrementalQuorumRecovery bool `json:"incrementalQuorumRecovery,omitempty"`
 }
 
 type StorageSpec struct {

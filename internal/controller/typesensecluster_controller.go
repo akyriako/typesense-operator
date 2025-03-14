@@ -182,22 +182,20 @@ func (r *TypesenseClusterReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	}
 
 	terminationGracePeriodSeconds := *sts.Spec.Template.Spec.TerminationGracePeriodSeconds
-	delayPerReplicaFactor := getDelayPerReplicaFactor(int(ts.Spec.Replicas))
-
 	toTitle := func(s string) string {
 		return cases.Title(language.Und, cases.NoLower).String(s)
 	}
 
 	cond := ConditionReasonQuorumStateUnknown
 	if *updated {
-		condition, size, err := r.ReconcileQuorum(ctx, &ts, secret, client.ObjectKeyFromObject(sts))
+		condition, _, err := r.ReconcileQuorum(ctx, &ts, secret, client.ObjectKeyFromObject(sts))
 		if err != nil {
-			r.logger.Error(err, "reconciling quorum failed")
+			r.logger.Error(err, "reconciling quorum health failed")
 		}
 
 		if condition == ConditionReasonQuorumNeedsAttention {
 			if err == nil {
-				err = errors.New("quorum is not ready")
+				err = errors.New("quorum is needs manual intervention")
 			}
 			cerr := r.setConditionNotReady(ctx, &ts, string(condition), err)
 			if cerr != nil {
@@ -206,8 +204,7 @@ func (r *TypesenseClusterReconciler) Reconcile(ctx context.Context, req ctrl.Req
 
 			r.Recorder.Eventf(&ts, "Warning", string(condition), toTitle(err.Error()))
 
-			delayPerReplicaFactor = getDelayPerReplicaFactor(size)
-			requeueAfter = time.Duration(delayPerReplicaFactor*60+terminationGracePeriodSeconds) * time.Second
+			requeueAfter = time.Duration((60+terminationGracePeriodSeconds)*3) * time.Second
 			return ctrl.Result{RequeueAfter: requeueAfter}, err
 		} else {
 			if condition != ConditionReasonQuorumReady {
@@ -220,8 +217,6 @@ func (r *TypesenseClusterReconciler) Reconcile(ctx context.Context, req ctrl.Req
 				}
 
 				r.Recorder.Eventf(&ts, "Warning", string(condition), toTitle(err.Error()))
-
-				delayPerReplicaFactor = getDelayPerReplicaFactor(size)
 			} else {
 				report := ts.Status.Conditions[0].Status != metav1.ConditionTrue
 
@@ -233,11 +228,8 @@ func (r *TypesenseClusterReconciler) Reconcile(ctx context.Context, req ctrl.Req
 				if report {
 					r.Recorder.Eventf(&ts, "Normal", string(condition), toTitle("quorum is ready"))
 				}
-
-				delayPerReplicaFactor = minDelayPerReplicaFactor
 			}
 		}
-
 		cond = condition
 	}
 
@@ -245,8 +237,7 @@ func (r *TypesenseClusterReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	if *updated {
 		lastAction = "reconciling"
 	}
-	requeueAfter = time.Duration(delayPerReplicaFactor*60+terminationGracePeriodSeconds) * time.Second
-
+	requeueAfter = time.Duration(60+terminationGracePeriodSeconds) * time.Second
 	r.logger.Info(fmt.Sprintf("%s cluster completed", lastAction), "condition", cond, "requeueAfter", requeueAfter)
 
 	return ctrl.Result{RequeueAfter: requeueAfter}, nil

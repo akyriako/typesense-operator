@@ -17,7 +17,7 @@ const (
 )
 
 func (r *TypesenseClusterReconciler) ReconcileQuorum(ctx context.Context, ts *tsv1alpha1.TypesenseCluster, secret *v1.Secret, stsObjectKey client.ObjectKey) (ConditionQuorum, int, error) {
-	r.logger.Info("reconciling quorum")
+	r.logger.Info("reconciling quorum health")
 
 	sts, err := r.GetFreshStatefulSet(ctx, stsObjectKey)
 	if err != nil {
@@ -28,6 +28,8 @@ func (r *TypesenseClusterReconciler) ReconcileQuorum(ctx context.Context, ts *ts
 	if err != nil {
 		return ConditionReasonQuorumNotReady, 0, err
 	}
+
+	r.logger.Info("calculated quorum", "minRequiredNodes", quorum.MinRequiredNodes, "availableNodes", quorum.AvailableNodes)
 
 	nodesStatus := make(map[string]NodeStatus)
 	httpClient := &http.Client{
@@ -100,7 +102,7 @@ func (r *TypesenseClusterReconciler) ReconcileQuorum(ctx context.Context, ts *ts
 		}
 	}
 
-	r.logger.Info("calculating quorum", "minRequiredNodes", minRequiredNodes, "availableNodes", availableNodes, "healthyNodes", healthyNodes)
+	r.logger.Info("evaluated quorum", "minRequiredNodes", minRequiredNodes, "availableNodes", availableNodes, "healthyNodes", healthyNodes)
 
 	if clusterStatus == ClusterStatusElectionDeadlock {
 		return r.downgradeQuorum(ctx, ts, quorum.NodesListConfigMap, stsObjectKey, int32(healthyNodes), int32(minRequiredNodes))
@@ -185,25 +187,28 @@ func (r *TypesenseClusterReconciler) upgradeQuorum(
 	cm *v1.ConfigMap,
 	stsObjectKey client.ObjectKey,
 ) (ConditionQuorum, int, error) {
-	r.logger.Info("upgrading quorum")
+	r.logger.Info("upgrading quorum", "incremental", ts.Spec.IncrementalQuorumRecovery)
 
 	sts, err := r.GetFreshStatefulSet(ctx, stsObjectKey)
 	if err != nil {
 		return ConditionReasonQuorumNotReady, 0, err
 	}
+	size := ts.Spec.Replicas
+	if ts.Spec.IncrementalQuorumRecovery {
+		size = sts.Status.Replicas + 1
+	}
 
-	_, _, err = r.updateConfigMap(ctx, ts, cm, &ts.Spec.Replicas)
+	_, _, err = r.updateConfigMap(ctx, ts, cm, &size)
 	if err != nil {
 		return ConditionReasonQuorumNotReady, 0, err
 	}
 
-	err = r.ScaleStatefulSet(ctx, sts, ts.Spec.Replicas)
+	err = r.ScaleStatefulSet(ctx, sts, size)
 	if err != nil {
 		return ConditionReasonQuorumNotReady, 0, err
 	}
 
-	//return ConditionReasonQuorumUpgraded, size, nil
-	return ConditionReasonQuorumUpgraded, 0, nil
+	return ConditionReasonQuorumUpgraded, int(size), nil
 }
 
 type readinessGateReason string
