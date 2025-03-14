@@ -132,44 +132,59 @@ of manual intervention in order to recover a cluster that has lost quorum.
 ![image](https://github.com/user-attachments/assets/007852ba-e173-43a4-babf-d250f8a34ad1)
 
 > [!IMPORTANT]
-> Scaling the `StatefulSet` down and subsequently up, would typically be the manual intervention needed to recover a cluster that has lost its quorum.
+> [Scaling the StatefulSet down and subsequently (gradually) up](https://typesense.org/docs/guide/high-availability.html#recovering-a-cluster-that-has-lost-quorum), 
+> would typically be the manual intervention needed to recover a cluster that has lost its quorum.
 > **However**, the controller automates this process, as long as is not a memory or disk capacity issue, ensuring no service
 > interruption and **eliminating the need for any administration action**.
 
-![image](https://github.com/user-attachments/assets/55fda493-d35a-405c-8a58-a6f9436a28db)
 
-**Left Path:**
+0. The quorum reconciler probes each cluster node **status** endpoint: `http://{nodeUrl}:{api-port}/status`. The response 
+    looks like this:
+    ```json
+    {"committed_index":1,"queued_writes":0,"state":"LEADER"}
+    ```
+   `state` can be one of the following values: `LEADER`, `FOLLOWER`, `NOT_READY`. Based on the values retrieved for each node,
+    the controller will evaluate the status of the whole cluster which can be:
 
-1. The quorum reconciler probes each cluster node at `http://{nodeUrl}:{api-port}/health`. If every node responds with `{ ok: true }`,
-   the `ConditionReady` status of the `TypesenseCluster` custom resource is updated to `QuorumReady`, indicating that the cluster is fully healthy and operational.
-2.
-    - If the cluster size matches the desired size defined in the `TypesenseCluster` custom resource (and was not downgraded
-      during a previous loop—this scenario will be discussed later), the quorum reconciliation loop sets the `ConditionReady`
-      status of the `TypesenseCluster` custom resource to `QuorumReady`, exits, and hands control back to the main controller loop.
-    - If the cluster was downgraded to a single instance during a previous reconciliation loop, the quorum reconciliation loop
-      sets the `ConditionReady` status of the `TypesenseCluster` custom resource to `QuorumUpgraded`. It then returns control
-      to the main controller loop, which will attempt to restore the cluster to the desired size defined in the `TypesenseCluster`
-      custom resource during the next reconciliation loop. Raft will then identify the new quorum configuration and elect a new leader.
-    - If a node runs out of memory or disk, the health endpoint response will include an additional `resource_error` field,
-      set to either `OUT_OF_MEMORY` or `OUT_OF_DISK`, depending on the issue. In this case, the quorum reconciler marks the
-      `ConditionReady` status of the `TypesenseCluster` as `QuorumNeedsIntervention`, triggers a Kubernetes `Event`, and
-      returns control to the main controller loop. **In this scenario, manual intervention is required**. You must adjust the
-      resources in the `PodSpec` or the storage in the `PersistentVolumeClaim` of the `StatefulSet` to provide new memory limits
-      or increased storage size. This can be done by modifying and re-applying the corresponding `TypesenseCluster` manifest.
+    | Status            | Description                                                    |
+    |-------------------|----------------------------------------------------------------|
+    | OK                | A single `LEADER` node was found                               |
+    | SPLIT_BRAIN       | More than one `LEADER`s were found                             |
+    | NOT_READY         | More than the minimum required nodes were in `NOT_READY` state |
+    | ELECTION_DEADLOCK | No `LEADER` node was found                                     |
 
-**Right Path:**
+> [!IMPORTANT]
+> The evaluated cluster status is guarantying neither the aggregated health/availability of the cluster nor
+> of its individual nodes. It is just an indication of what's going on internally in the pods/nodes.
 
-1. The quorum reconciler probes each node of the cluster at http://{nodeUrl}:{api-port}/health.
-    - If the required number of Nodes (at least `(N-1)/2`) return `{ ok: true }`, the `ConditionReady` status of the
-      `TypesenseCluster` custom resource is set to `QuorumReady`, indicating that the cluster is healthy and operational,
-      **even if** some Nodes are unavailable. Control is then returned to the main controller loop.
-    - If the required number of Nodes (at least `(N-1)/2`) return `{ ok: false }`, the `ConditionReady` status of the
-      `TypesenseCluster` custom resource is set to `QuorumDowngrade`, marking the cluster as unhealthy. As part of the
-      mitigation plan, the cluster is scheduled for a downgrade to a single instance, with the intent to allow raft to automatically recover the quorum.
-      The quorum reconciliation loop then returns control to the main controller loop.
-    - In the next quorum reconciliation, the process will take the **Left Path**, that will eventually discover a healthy quorum,
-      nevertheless with the wrong amount of Nodes; thing that will lead to setting the `ConditionReady` condition of the `TypesenseCluster` as `QuorumUpgraded`.
-      What happens next is already described in the **Left Path**.
+1. If the cluster status is evaluated as `SPLIT_BRAIN`, it is instantly downgraded to a single node cluster
+    giving Typesense the chance to try recover a healthy quorum fast and reliable. 
+
+2. For any other cluster status outcome, the quorum reconciler, proceeds to probe each cluster node health endpoint: 
+`http://{nodeUrl}:{api-port}/health`. The various response values of this request can be:
+
+    | Response                                             | HTTP Status Code | Description                                         |
+    |------------------------------------------------------|:----------------:|-----------------------------------------------------|
+    | `{ok: true}`                                         |      `200`       | The node is healthy and active member of the quorum |
+    | `{ok: false}`                                        |      `503`       | The node is unhealthy (various reasons)             |
+    | `{ok: false, resource_error: "OUT_OF_{MEMORY/DISK}}` |      `503`       | The node requires manual intervention               |
+
+   If every single node returns `{ok: true}` then the cluster is marked as **ready and fully operational**.
+3. If the cluster status is evaluated as `ELECTION_DEADLOCK`, it is instantly downgraded to a single node cluster
+      giving Typesense the chance to try recover a healthy quorum fast and reliable.
+4.  - If the cluster status is evaluated as `NOT_READY` and it's either a single node cluster or the healthy evaluated 
+      nodes are less than the minimum required nodes (at least `(N-1)/2`) then the cluster is instantly downgraded to a 
+      single node cluster giving Typesense the chance to try recover a healthy quorum fast and reliable and waits a term 
+      before starting the reconciliation again. If nothing of the above conditions are met, then the reconciler proceeds 
+      to the next check point:
+    - If the cluster status is evaluated as `OK` but the number of actual `StatefulSet` replicas is less than the desired 
+      number of replicas specified in the `typesense.specs.replicas`, it is upgraded (either instantly or gradually; 
+      depends on the value of `typesense.specs.incrementalQuorumRecovery`) and restarts the reconciliation after 
+      approximately a minute. If none of the conditions above are met, the reconciler proceeds to the next check point:
+    - If the healthy evaluated nodes are less than the minimum required nodes (at least `(N-1)/2`), then the cluster is
+      marked as not ready and returns the control back to the reconciler waiting a term till it restarts the reconciliation loop,
+    - If none of these checkpoints led to a restart of the reconciliation loop without a quorum recovery, then 
+      the then the cluster is marked as **ready and fully operational**. 
 
 ## Custom Resource Definitions
 
@@ -182,25 +197,26 @@ introducing `TypesenseCluster`, a new Custom Resource Definition:
 
 **Spec**
 
-| Name                          | Description                                              | Optional | Default       |
-|-------------------------------|----------------------------------------------------------|----------|---------------|
-| image                         | Typesense image                                          |          |               |
-| adminApiKey                   | Reference to the `Secret` to be used for bootstrap       | X        |               |
-| replicas                      | Size of the cluster (allowed 1, 3, 5 or 7)               |          | 3             |
-| apiPort                       | REST/API port                                            |          | 8108          |
-| peeringPort                   | Peering port                                             |          | 8107          |
-| resetPeersOnError             | automatic reset of peers on error                        |          | true          |
-| enableCors                    | enables CORS                                             | X        | false         |
-| corsDomains                   | comma separated list of domains allowed for CORS         | X        |               |
-| resources                     | resource request & limit                                 | X        | _check specs_ |
-| nodeSelector                  | node selection constraint                                | X        |               |
-| tolerations                   | schedule pods with matching taints                       | X        |               |
+| Name                          | Description                                                       | Optional | Default       |
+|-------------------------------|-------------------------------------------------------------------|----------|---------------|
+| image                         | Typesense image                                                   |          |               |
+| adminApiKey                   | Reference to the `Secret` to be used for bootstrap                | X        |               |
+| replicas                      | Size of the cluster (allowed 1, 3, 5 or 7)                        |          | 3             |
+| apiPort                       | REST/API port                                                     |          | 8108          |
+| peeringPort                   | Peering port                                                      |          | 8107          |
+| resetPeersOnError             | automatic reset of peers on error                                 |          | true          |
+| enableCors                    | enables CORS                                                      | X        | false         |
+| corsDomains                   | comma separated list of domains allowed for CORS                  | X        |               |
+| resources                     | resource request & limit                                          | X        | _check specs_ |
+| nodeSelector                  | node selection constraint                                         | X        |               |
+| tolerations                   | schedule pods with matching taints                                | X        |               |
 | additionalServerConfiguration | a reference to a `NodesListConfigMap` holding extra configuration | X        |               |
-| storage                       | check `StorageSpec` below                                |          |               |
-| ingress                       | check `IngressSpec` below                                | X        |               |
-| scrapers                      | array of `DocSearchScraperSpec`; check below             | X        |               |
-| metrics                       | check `MetricsSpec` below                                | X        |               |
-| topologySpreadConstraints     | how to spread a  group of pods across topology domains   | X        |               |
+| storage                       | check `StorageSpec` below                                         |          |               |
+| ingress                       | check `IngressSpec` below                                         | X        |               |
+| scrapers                      | array of `DocSearchScraperSpec`; check below                      | X        |               |
+| metrics                       | check `MetricsSpec` below                                         | X        |               |
+| topologySpreadConstraints     | how to spread a  group of pods across topology domains            | X        |               |
+| incrementalQuorumRecovery     | add nodes gradually to the statefulset while recovering           | X        | false         |
 
 > [!IMPORTANT]
 > * Any Typesense server configuration variable that is defined in Spec is overriding any additional reference of
@@ -208,6 +224,8 @@ introducing `TypesenseCluster`, a new Custom Resource Definition:
 >   in: **config/samples/ts_v1alpha1_typesensecluster_kind.yaml**
 > * Add additional Typesense server configuration variables in `NodesListConfigMap` as described in:
 >   https://typesense.org/docs/27.1/api/server-configuration.html#using-environment-variables
+> * In heavy datasets is advised to set `incrementalQuorumRecovery` to `true` and let the controller reconstruct the quorum
+>   node by node. That will smooth the leader election process while new nodes are joining but it will make recovery process last longer.
 
 **StorageSpec** (optional)
 
