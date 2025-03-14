@@ -102,6 +102,9 @@ spec:
                 type: boolean
               image:
                 type: string
+              incrementalQuorumRecovery:
+                default: false
+                type: boolean
               ingress:
                 properties:
                   annotations:
