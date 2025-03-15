@@ -15,8 +15,6 @@ import (
 const prometheusApiGroup = "monitoring.coreos.com"
 
 func (r *TypesenseClusterReconciler) ReconcilePodMonitor(ctx context.Context, ts tsv1alpha1.TypesenseCluster) error {
-	r.logger.V(debugLevel).Info("reconciling podmonitor")
-
 	// TODO Remove in future version 0.2.15+
 	r.deleteMetricsExporterServiceMonitor(ctx, ts)
 
@@ -27,6 +25,8 @@ func (r *TypesenseClusterReconciler) ReconcilePodMonitor(ctx context.Context, ts
 		}
 		return nil
 	}
+
+	r.logger.V(debugLevel).Info("reconciling podmonitor")
 
 	podMonitorName := fmt.Sprintf(ClusterMetricsPodMonitor, ts.Name)
 	podMonitorExists := true

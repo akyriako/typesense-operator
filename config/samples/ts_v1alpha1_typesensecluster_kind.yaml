@@ -108,6 +108,3 @@ spec:
     host: host.example.com
     ingressClassName: nginx
     clusterIssuer: lets-encrypt-prod
-  metrics:
-    release: promstack
-#---

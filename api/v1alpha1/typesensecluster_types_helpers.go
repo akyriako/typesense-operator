@@ -68,3 +68,15 @@ func (s *TypesenseClusterSpec) GetTopologySpreadConstraints(labels map[string]st
 	}
 	return tscs
 }
+
+func (s *TypesenseClusterSpec) GetMetricsExporterSpecs() MetricsExporterSpec {
+	if s.Metrics != nil {
+		return *s.Metrics
+	}
+
+	return MetricsExporterSpec{
+		Release:           "promstack",
+		Image:             "akyriako78/typesense-prometheus-exporter:0.1.7",
+		IntervalInSeconds: 15,
+	}
+}

@@ -171,7 +171,8 @@ of manual intervention in order to recover a cluster that has lost quorum.
 
    If every single node returns `{ok: true}` then the cluster is marked as **ready and fully operational**.
 3. If the cluster status is evaluated as `ELECTION_DEADLOCK`, it is instantly downgraded to a single node cluster
-      giving Typesense the chance to try recover a healthy quorum fast and reliable.
+   giving Typesense the chance to try recover a healthy quorum fast and reliable.
+
 4.  - If the cluster status is evaluated as `NOT_READY` and it's either a single node cluster or the healthy evaluated 
       nodes are less than the minimum required nodes (at least `(N-1)/2`) then the cluster is instantly downgraded to a 
       single node cluster giving Typesense the chance to try recover a healthy quorum fast and reliable and waits a term 
