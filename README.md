@@ -443,7 +443,7 @@ More information can be found via the [Kubebuilder Documentation](https://book.k
 
 ### Debugging
 
-When debugging (or running the controller out-of-cluster with `make run`) all requests to individual pods
+When debugging (or running the controller out-of-cluster with `make run`) all **health** and **status** requests to individual pods
 will fail as the node endpoints are not available to your development machine. For that matter you will need to deploy
 on your environment [KubeVPN](https://github.com/KubeNetworks/kubevpn). KubeVPN, offers a Cloud Native Dev Environment 
 that connects to your Kubernetes cluster network. It facilitate the interception of inbound traffic from a remote 
