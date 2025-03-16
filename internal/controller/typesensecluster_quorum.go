@@ -118,11 +118,9 @@ func (r *TypesenseClusterReconciler) ReconcileQuorum(ctx context.Context, ts *ts
 		}
 	}
 
-	//// TODO && !clusterIsLagging {
-	//// BUG LEADER+healthy == false skips this loop and return a healthy cluster
-	//if clusterStatus == ClusterStatusNotReady && healthyNodes < minRequiredNodes {
-	//	return r.downgradeQuorum(ctx, ts, quorum.NodesListConfigMap, sts, int32(healthyNodes), int32(minRequiredNodes))
-	//}
+	// TODO && !clusterIsLagging
+	// dynamic adjustment of the requeue interval based on lagging metrics
+	// remove size from return arguments if will not be eventually combined with termination grace period
 
 	if clusterStatus == ClusterStatusOK && *sts.Spec.Replicas < ts.Spec.Replicas {
 		return r.upgradeQuorum(ctx, ts, quorum.NodesListConfigMap, stsObjectKey)
@@ -132,13 +130,6 @@ func (r *TypesenseClusterReconciler) ReconcileQuorum(ctx context.Context, ts *ts
 		return ConditionReasonQuorumNotReady, 0, nil
 	}
 
-	//if sts.Status.ReadyReplicas != sts.Status.Replicas && (sts.Status.ReadyReplicas < int32(quorum.MinRequiredNodes) && quorum.MinRequiredNodes > 1) {
-	//	return ConditionReasonStatefulSetNotReady, 0, fmt.Errorf("statefulset not ready: %d/%d replicas ready", sts.Status.ReadyReplicas, sts.Status.Replicas)
-	//}
-	//
-	//condition, size, err := r.getQuorumHealth(ctx, &ts, &sts, quorum)
-	//r.logger.Info("reconciling quorum completed", "condition", condition)
-	//return condition, size, err
 	return ConditionReasonQuorumReady, 0, nil
 }
 

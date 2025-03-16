@@ -248,7 +248,7 @@ func (r *TypesenseClusterReconciler) buildStatefulSet(key client.ObjectKey, ts *
 						},
 						{
 							Name:            "metrics-exporter",
-							Image:           ts.Spec.Metrics.Image,
+							Image:           ts.Spec.GetMetricsExporterSpecs().Image,
 							ImagePullPolicy: corev1.PullIfNotPresent,
 							Ports: []corev1.ContainerPort{
 								{

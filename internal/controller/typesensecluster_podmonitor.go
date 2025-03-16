@@ -15,18 +15,18 @@ import (
 const prometheusApiGroup = "monitoring.coreos.com"
 
 func (r *TypesenseClusterReconciler) ReconcilePodMonitor(ctx context.Context, ts tsv1alpha1.TypesenseCluster) error {
-	r.logger.V(debugLevel).Info("reconciling podmonitor")
-
-	// TODO Remove in future version 0.2.15
+	// TODO Remove in future version 0.2.15+
 	r.deleteMetricsExporterServiceMonitor(ctx, ts)
 
-	if ts.Spec.Metrics != nil {
-		if deployed, err := r.IsPrometheusDeployed(); err != nil || !deployed {
+	if deployed, err := r.IsPrometheusDeployed(); err != nil || !deployed {
+		if ts.Spec.Metrics != nil {
 			err := fmt.Errorf("prometheus api group %s was not found in cluster", prometheusApiGroup)
 			r.logger.Error(err, "reconciling podmonitor skipped")
-			return nil
 		}
+		return nil
 	}
+
+	r.logger.V(debugLevel).Info("reconciling podmonitor")
 
 	podMonitorName := fmt.Sprintf(ClusterMetricsPodMonitor, ts.Name)
 	podMonitorExists := true
@@ -143,7 +143,7 @@ func (r *TypesenseClusterReconciler) IsPrometheusDeployed() (bool, error) {
 	return false, nil
 }
 
-// TODO Remove in future version 0.2.15
+// TODO Remove in future version 0.2.15+
 func (r *TypesenseClusterReconciler) deleteMetricsExporterServiceMonitor(ctx context.Context, ts tsv1alpha1.TypesenseCluster) {
 	deploymentName := fmt.Sprintf(ClusterPrometheusExporterDeployment, ts.Name)
 	deploymentExists := true
@@ -166,7 +166,7 @@ func (r *TypesenseClusterReconciler) deleteMetricsExporterServiceMonitor(ctx con
 	}
 }
 
-// TODO Remove in future version 0.2.15
+// TODO Remove in future version 0.2.15+
 func (r *TypesenseClusterReconciler) deleteMetricsExporterDeployment(ctx context.Context, deployment *appsv1.Deployment) error {
 	err := r.Delete(ctx, deployment)
 	if err != nil {
