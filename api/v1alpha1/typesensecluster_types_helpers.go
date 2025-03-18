@@ -13,11 +13,11 @@ func (s *TypesenseClusterSpec) GetResources() corev1.ResourceRequirements {
 
 	return corev1.ResourceRequirements{
 		Limits: corev1.ResourceList{
-			corev1.ResourceCPU:    resource.MustParse("1024m"),
+			corev1.ResourceCPU:    resource.MustParse("1000m"),
 			corev1.ResourceMemory: resource.MustParse("512Mi"),
 		},
 		Requests: corev1.ResourceList{
-			corev1.ResourceCPU:    resource.MustParse("128m"),
+			corev1.ResourceCPU:    resource.MustParse("100m"),
 			corev1.ResourceMemory: resource.MustParse("256Mi"),
 		},
 	}
@@ -78,5 +78,22 @@ func (s *TypesenseClusterSpec) GetMetricsExporterSpecs() MetricsExporterSpec {
 		Release:           "promstack",
 		Image:             "akyriako78/typesense-prometheus-exporter:0.1.7",
 		IntervalInSeconds: 15,
+	}
+}
+
+func (s *TypesenseClusterSpec) GetMetricsExporterResources() corev1.ResourceRequirements {
+	if s.Metrics.Resources != nil {
+		return *s.Metrics.Resources
+	}
+
+	return corev1.ResourceRequirements{
+		Limits: corev1.ResourceList{
+			corev1.ResourceCPU:    resource.MustParse("100m"),
+			corev1.ResourceMemory: resource.MustParse("96Mi"),
+		},
+		Requests: corev1.ResourceList{
+			corev1.ResourceCPU:    resource.MustParse("100m"),
+			corev1.ResourceMemory: resource.MustParse("96Mi"),
+		},
 	}
 }

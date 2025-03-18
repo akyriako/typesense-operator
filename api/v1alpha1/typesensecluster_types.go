@@ -155,6 +155,9 @@ type MetricsExporterSpec struct {
 	// +kubebuilder:validation:ExclusiveMaximum=false
 	// +kubebuilder:validation:Type=integer
 	IntervalInSeconds int `json:"interval,omitempty"`
+
+	// +kubebuilder:validation:Optional
+	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
 }
 
 // TypesenseClusterStatus defines the observed state of TypesenseCluster

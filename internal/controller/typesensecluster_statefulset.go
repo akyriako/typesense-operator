@@ -293,6 +293,7 @@ func (r *TypesenseClusterReconciler) buildStatefulSet(key client.ObjectKey, ts *
 									Value: ts.Name,
 								},
 							},
+							Resources: ts.Spec.GetMetricsExporterResources(),
 						},
 					},
 					NodeSelector:              ts.Spec.NodeSelector,
