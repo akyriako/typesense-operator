@@ -27,7 +27,7 @@ metadata:
   name: c-kind-1
 spec:
   image: typesense/typesense:27.1
-  replicas: 3
+  replicas: 5
   corsDomains: "http://localhost,https://www.example.de"
   storage:
     size: 10Mi
@@ -41,6 +41,13 @@ spec:
     clusterIssuer: lets-encrypt-prod
   metrics:
     release: promstack
+  resources:
+    requests:
+      cpu: "500m"
+      memory: "256Mi"
+    limits:
+      cpu: "1000m"
+      memory: "512Mi"
 #---
 #apiVersion: v1
 #kind: ConfigMap

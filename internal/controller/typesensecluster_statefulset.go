@@ -59,7 +59,6 @@ func (r *TypesenseClusterReconciler) ReconcileStatefulSet(ctx context.Context, t
 		skipConditions := []string{
 			string(ConditionReasonQuorumDowngraded),
 			string(ConditionReasonQuorumUpgraded),
-			string(ConditionReasonQuorumNeedsAttention),
 			string(ConditionReasonQuorumNotReady),
 			ConditionReasonStatefulSetNotReady,
 			ConditionReasonReconciliationInProgress,
@@ -123,7 +122,11 @@ func (r *TypesenseClusterReconciler) updateStatefulSet(ctx context.Context, sts 
 		return nil, err
 	}
 
-	return sts, nil
+	updatedSts, err := r.GetFreshStatefulSet(ctx, client.ObjectKeyFromObject(sts))
+	if err != nil {
+		return nil, err
+	}
+	return updatedSts, nil
 }
 
 func (r *TypesenseClusterReconciler) buildStatefulSet(key client.ObjectKey, ts *tsv1alpha1.TypesenseCluster) *appsv1.StatefulSet {
