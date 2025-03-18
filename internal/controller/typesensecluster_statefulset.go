@@ -153,7 +153,7 @@ func (r *TypesenseClusterReconciler) buildStatefulSet(key client.ObjectKey, ts *
 					TerminationGracePeriodSeconds: ptr.To[int64](5),
 					ReadinessGates: []corev1.PodReadinessGate{
 						{
-							ConditionType: PodReadinessGateCondition,
+							ConditionType: QuorumReadinessGateCondition,
 						},
 					},
 					Containers: []corev1.Container{

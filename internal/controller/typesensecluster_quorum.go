@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	PodReadinessGateCondition = "RaftQuorumReady"
+	QuorumReadinessGateCondition = "RaftQuorumReady"
 )
 
 func (r *TypesenseClusterReconciler) ReconcileQuorum(ctx context.Context, ts *tsv1alpha1.TypesenseCluster, secret *v1.Secret, stsObjectKey client.ObjectKey) (ConditionQuorum, int, error) {
@@ -239,7 +239,7 @@ func (r *TypesenseClusterReconciler) calculatePodReadinessGate(ctx context.Conte
 
 	r.logger.V(debugLevel).Info("reporting node health", "node", r.getShortName(node), "healthy", health.Ok)
 	condition := &v1.PodCondition{
-		Type:    PodReadinessGateCondition,
+		Type:    QuorumReadinessGateCondition,
 		Status:  conditionStatus,
 		Reason:  string(conditionReason),
 		Message: conditionMessage,
@@ -258,19 +258,24 @@ func (r *TypesenseClusterReconciler) updatePodReadinessGate(ctx context.Context,
 	}
 
 	patch := client.MergeFrom(pod.DeepCopy())
-	//r.logger.V(debugLevel).Info("updating pod readiness gate condition", "pod", pod.Name, "condition", condition.Type, "status", condition.Status)
 
-	updated := false
-	for i, c := range pod.Status.Conditions {
-		if c.Type == PodReadinessGateCondition && pod.Status.Conditions[i] != *condition {
-			pod.Status.Conditions[i] = *condition
-			updated = true
-			break
+	found := false
+	var updatedConditions []v1.PodCondition
+	for _, c := range pod.Status.Conditions {
+		if c.Type == condition.Type {
+			if !found {
+				updatedConditions = append(updatedConditions, *condition)
+				found = true
+			}
+		} else {
+			updatedConditions = append(updatedConditions, c)
 		}
 	}
-	if !updated {
-		pod.Status.Conditions = append(pod.Status.Conditions, *condition)
+	if !found {
+		updatedConditions = append(updatedConditions, *condition)
 	}
+
+	pod.Status.Conditions = updatedConditions
 
 	if err := r.Status().Patch(ctx, pod, patch); err != nil {
 		r.logger.Error(err, "updating pod readiness gate condition failed", "pod", pod.Name)

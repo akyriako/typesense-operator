@@ -30,15 +30,10 @@ spec:
   replicas: 5
   corsDomains: "http://localhost,https://www.example.de"
   storage:
-    size: 10Mi
+    size: 150Mi
     storageClassName: typesense-local-path
   adminApiKey:
     name: typesense-common-bootstrap-key
-  ingress:
-    referer: referer.example.com
-    host: host.example.com
-    ingressClassName: nginx
-    clusterIssuer: lets-encrypt-prod
   metrics:
     release: promstack
   resources:

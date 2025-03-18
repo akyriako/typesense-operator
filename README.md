@@ -429,8 +429,6 @@ make install
 make run
 ```
 
-**NOTE:** You can also run this in one step by running: `make install run`
-
 ### Modifying the API definitions
 If you are editing the API definitions, generate the manifests such as CRs or CRDs using:
 
@@ -438,9 +436,20 @@ If you are editing the API definitions, generate the manifests such as CRs or CR
 make generate && make manifests
 ```
 
-**NOTE:** Run `make --help` for more information on all potential `make` targets
+> [!NOTE] 
+> Run `make --help` for more information on all potential `make` targets
 
 More information can be found via the [Kubebuilder Documentation](https://book.kubebuilder.io/introduction.html)
+
+### Debugging
+
+When debugging (or running the controller out-of-cluster with `make run`) all **health** and **status** requests to individual pods
+will fail as the node endpoints are not available to your development machine. For that matter you will need to deploy
+on your environment [KubeVPN](https://github.com/KubeNetworks/kubevpn). KubeVPN, offers a Cloud Native Dev Environment 
+that connects to your Kubernetes cluster network. It facilitates the interception of inbound traffic from remote 
+Kubernetes cluster services or pods to your local PC so you can access them using either their FQDN or their IP address.
+
+Follow the [official installation instructions](https://github.com/KubeNetworks/kubevpn?tab=readme-ov-file#quickstart) to install and configure KubeVPN.
 
 ## License
 
