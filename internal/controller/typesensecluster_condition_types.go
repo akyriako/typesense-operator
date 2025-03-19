@@ -28,6 +28,8 @@ const (
 	ConditionReasonQuorumUpgraded           ConditionQuorum = "QuorumUpgraded"
 	ConditionReasonQuorumNeedsAttention     ConditionQuorum = "QuorumNeedsAttention"
 	ConditionReasonStatefulSetNotReady                      = "StatefulSetNotReady"
+	ConditionReasonStatefulSetPausing                       = "StatefulSetPausing"
+	ConditionReasonStatefulSetPaused                        = "StatefulSetPaused"
 
 	InitReconciliationMessage = "Starting reconciliation"
 	UpdateStatusMessageFailed = "failed to update typesense cluster status"

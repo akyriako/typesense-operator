@@ -218,6 +218,7 @@ introducing `TypesenseCluster`, a new Custom Resource Definition:
 | metrics                       | check `MetricsSpec` below                                         | X        |               |
 | topologySpreadConstraints     | how to spread a  group of pods across topology domains            | X        |               |
 | incrementalQuorumRecovery     | add nodes gradually to the statefulset while recovering           | X        | false         |
+| pause                         | Pause the cluster                                                 | X        | false         |
 
 > [!IMPORTANT]
 > * Any Typesense server configuration variable that is defined in Spec is overriding any additional reference of
@@ -225,8 +226,9 @@ introducing `TypesenseCluster`, a new Custom Resource Definition:
 >   in: **config/samples/ts_v1alpha1_typesensecluster_kind.yaml**
 > * Add additional Typesense server configuration variables in `NodesListConfigMap` as described in:
 >   https://typesense.org/docs/27.1/api/server-configuration.html#using-environment-variables
-> * In heavy datasets is advised to set `incrementalQuorumRecovery` to `true` and let the controller reconstruct the quorum
->   node by node. That will smooth the leader election process while new nodes are joining but it will make recovery process last longer.
+> * In heavy datasets, or if you are planning to pause the cluster it is advised to set `incrementalQuorumRecovery` to `true` and
+>   let the controller reconstruct the quorum node by node. That will smooth the leader election process while new nodes are 
+>   joining but it will make recovery process last longer.
 
 **StorageSpec** (optional)
 
