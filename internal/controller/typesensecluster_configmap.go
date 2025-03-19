@@ -104,7 +104,14 @@ func (r *TypesenseClusterReconciler) updateConfigMap(ctx context.Context, ts *ts
 	}
 
 	if replicas == nil {
-		replicas = sts.Spec.Replicas
+		r.logger.V(debugLevel).Info("replicas is nil")
+		if *sts.Spec.Replicas == 0 {
+			replicas = ptr.To[int32](1)
+			r.logger.V(debugLevel).Info("StatefulSet has been paused, update replicas to 1")
+		} else {
+			replicas = sts.Spec.Replicas
+			r.logger.V(debugLevel).Info(fmt.Sprintf("setting replias to sts.Spec.Replicas: %d", *sts.Spec.Replicas))
+		}
 	}
 
 	nodes, err := r.getNodes(ts, *replicas)
@@ -114,6 +121,9 @@ func (r *TypesenseClusterReconciler) updateConfigMap(ctx context.Context, ts *ts
 
 	availableNodes := len(nodes)
 	if availableNodes == 0 {
+		if ts.Spec.Pause {
+			return nil, 0, nil
+		}
 		r.logger.V(debugLevel).Info("empty quorum configuration")
 		return nil, 0, fmt.Errorf("empty quorum configuration")
 	}
