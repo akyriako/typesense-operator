@@ -100,6 +100,8 @@ func (r *TypesenseClusterReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	r.logger = log.Log.WithValues("namespace", req.Namespace, "cluster", req.Name)
 	r.logger.Info("reconciling cluster")
 
+	lastAction := "bootstrapping"
+
 	var ts tsv1alpha1.TypesenseCluster
 	if err := r.Get(ctx, req.NamespacedName, &ts); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
@@ -186,8 +188,25 @@ func (r *TypesenseClusterReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		return cases.Title(language.Und, cases.NoLower).String(s)
 	}
 
-	cond := ConditionReasonQuorumStateUnknown
-	if *updated {
+	cond := string(ConditionReasonQuorumStateUnknown)
+	if ts.Spec.Pause {
+		var err error
+		var condition string
+		if sts.Status.ReadyReplicas > 0 {
+			err = errors.New("cluster is pausing")
+			condition = string(ConditionReasonStatefulSetPausing)
+		} else {
+			err = errors.New("cluster is paused")
+			condition = string(ConditionReasonStatefulSetPaused)
+		}
+		cerr := r.setConditionNotReady(ctx, &ts, condition, err)
+		if cerr != nil {
+			return ctrl.Result{}, cerr
+		}
+		r.Recorder.Eventf(&ts, "Normal", condition, err.Error())
+		cond = condition
+		lastAction = "pausing"
+	} else if *updated {
 		condition, _, err := r.ReconcileQuorum(ctx, &ts, secret, client.ObjectKeyFromObject(sts))
 		if err != nil {
 			r.logger.Error(err, "reconciling quorum health failed")
@@ -230,13 +249,10 @@ func (r *TypesenseClusterReconciler) Reconcile(ctx context.Context, req ctrl.Req
 				}
 			}
 		}
-		cond = condition
-	}
-
-	lastAction := "bootstrapping"
-	if *updated {
+		cond = string(condition)
 		lastAction = "reconciling"
 	}
+
 	requeueAfter = time.Duration(60+terminationGracePeriodSeconds) * time.Second
 	r.logger.Info(fmt.Sprintf("%s cluster completed", lastAction), "condition", cond, "requeueAfter", requeueAfter)
 
