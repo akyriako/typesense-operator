@@ -120,7 +120,7 @@ func (r *TypesenseClusterReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		return ctrl.Result{}, err
 	}
 
-	// Update strategy: Update the existing object, if changes are identified in the desired.Data["Nodes"]
+	// Update strategy: Update the existing object, if changes are identified in the desired.Data["nodes"]
 	updated, err := r.ReconcileConfigMap(ctx, ts)
 	if err != nil {
 		cerr := r.setConditionNotReady(ctx, &ts, ConditionReasonConfigMapNotReady, err)

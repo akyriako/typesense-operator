@@ -127,7 +127,7 @@ func (r *TypesenseClusterReconciler) getQuorum(ctx context.Context, ts *tsv1alph
 		return &Quorum{}, err
 	}
 
-	nodes := strings.Split(cm.Data["Nodes"], ",")
+	nodes := strings.Split(cm.Data["nodes"], ",")
 	availableNodes := len(nodes)
 	minRequiredNodes := getMinimumRequiredNodes(availableNodes)
 

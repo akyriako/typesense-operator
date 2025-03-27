@@ -19,7 +19,7 @@ Key features of Typesense Kubernetes Operator include:
       1. the _Typesense node_ itself based on the image provided in the `specs`
       2. the _Typesense node metrics exporter_ (as a sidecar), based on the image provided in the `spec.metricsSpec`
     - provision Typesense services (headless & discovery `Services`),
-    - actively discover and update Typesense's Nodes list (quorum configuration mounted as `NodesListConfigMap`),
+    - actively discover and update Typesense's nodes list (quorum configuration mounted as `NodesListConfigMap`),
     - place claims for Typesense `PersistentVolumes`
     - _optionally_ expose Typesense API endpoint via an `Ingress`
     - _optionally_ provision one or multiple instances (one per target URL) of DocSearch as `Cronjobs`
@@ -33,27 +33,27 @@ Key features of Typesense Kubernetes Operator include:
 Typesense is using raft in the background to establish its clusters. Raft is a consensus algorithm based on the
 paper "[Raft: In Search of an Understandable Consensus Algorithm](https://raft.github.io/raft.pdf)".
 
-Raft Nodes operate in one of three possible states: _follower_, _candidate_, or _leader_. Every new node always joins the
+Raft nodes operate in one of three possible states: _follower_, _candidate_, or _leader_. Every new node always joins the
 quorum as a follower. Followers can receive log entries from the leader and participate in voting for electing a leader. If no
 log entries are received for a specified period of time, a follower transitions to the candidate state. As a candidate, the node
-can accept votes from its peers Nodes. Upon receiving a majority of votes, the candidate is becoming the leader of the quorum.
-The leader’s responsibilities include handling new log entries and replicating them to other Nodes.
+can accept votes from its peers nodes. Upon receiving a majority of votes, the candidate is becoming the leader of the quorum.
+The leader’s responsibilities include handling new log entries and replicating them to other nodes.
 
-Another thing to consider is what happens when the node set changes, when Nodes join or leave the cluster.
-If a quorum of Nodes is **available**, raft can dynamically modify the node set without any issue (this happens every 30sec).
-But if the cluster cannot form a quorum, then problems start to appear or better to pile up. A cluster with `N` Nodes can tolerate
-a failure of at most `(N-1)/2` Nodes without losing its quorum. If the available Nodes go below this threshold then two events
+Another thing to consider is what happens when the node set changes, when nodes join or leave the cluster.
+If a quorum of nodes is **available**, raft can dynamically modify the node set without any issue (this happens every 30sec).
+But if the cluster cannot form a quorum, then problems start to appear or better to pile up. A cluster with `N` nodes can tolerate
+a failure of at most `(N-1)/2` nodes without losing its quorum. If the available nodes go below this threshold then two events
 are taking place:
 
 - raft declares the whole cluster as **unavailable** (no leader can be elected, no more log entries can be processed)
-- the remaining Nodes are restarted in bootstrap mode
+- the remaining nodes are restarted in bootstrap mode
 
-In a Kubernetes environment, the Nodes are actually `Pods` which are rather volatile by nature and their lifetime is quite ephemeral and subjects
+In a Kubernetes environment, the nodes are actually `Pods` which are rather volatile by nature and their lifetime is quite ephemeral and subjects
 to potential restarts, and that puts the whole concept of raft protocol consensus under a tough spot. As we can read in the official
 documentation of Typesense when it comes to [recovering a cluster that has lost quorum](https://typesense.org/docs/guide/high-availability.html#recovering-a-cluster-that-has-lost-quorum),
 it is explicitly stated:
 
-> If a Typesense cluster loses more than `(N-1)/2` Nodes at the same time, the cluster becomes unstable because it loses quorum
+> If a Typesense cluster loses more than `(N-1)/2` nodes at the same time, the cluster becomes unstable because it loses quorum
 > and the remaining node(s) cannot safely build consensus on which node is the leader. To avoid a potential split brain issue,
 > Typesense then stops accepting writes and reads **until some manual verification and intervention is done**.
 
@@ -85,7 +85,7 @@ The Typesense Kubernetes Operator manages the entire lifecycle of Typesense Clus
 >  typesense-api-key: SXdpVG9CcnFYTHZYeTJNMG1TS1hPaGt0dlFUY3VWUloxc1M5REtsRUNtMFFwQU93R1hoanVIVWJLQnE2ejdlSQ==
 > ``` 
 
-2. A `NodesListConfigMap` is created, containing the endpoints of the cluster Nodes as a single concatenated string in its `data` field.
+2. A `NodesListConfigMap` is created, containing the endpoints of the cluster nodes as a single concatenated string in its `data` field.
    During each reconciliation loop, the operator identifies any changes in endpoints and updates the `NodesListConfigMap`. This `NodesListConfigMap`
    is mounted in every `Pod` at the path where raft expects the quorum configuration, ensuring quorum configuration stays always updated.
    The endpoint of each `Pod` the headless service adheres to the following naming convention:
@@ -114,7 +114,7 @@ The Typesense Kubernetes Operator manages the entire lifecycle of Typesense Clus
 ![Untitled-2025-02-24-0826](https://github.com/user-attachments/assets/6e6d67cf-4bab-4eac-ada0-8e4c6f46537d)
 
 > [!NOTE]
-> The interval between reconciliation loops depends on the number of Nodes. This approach ensures raft has sufficient
+> The interval between reconciliation loops depends on the number of nodes. This approach ensures raft has sufficient
 > "breathing room" to carry out its operations—such as leader election, log replication, and bootstrapping—before the
 > next quorum health reconciliation begins.
 
@@ -126,7 +126,7 @@ The Typesense Kubernetes Operator manages the entire lifecycle of Typesense Clus
 During configuration changes, we cannot switch directly from the old configuration to the next, because conflicting
 majorities could arise. When that happens, no leader can be elected and eventually raft declares the whole cluster
 as unavailable which leaves it in a hot loop. One way to solve it, is to force the cluster downgrade to a single instance
-cluster and then gradually introduce new Nodes (by scaling up the `StatefulSet`). With that approach we avoid the need
+cluster and then gradually introduce new nodes (by scaling up the `StatefulSet`). With that approach we avoid the need
 of manual intervention in order to recover a cluster that has lost quorum.
 
 ![image](https://github.com/user-attachments/assets/007852ba-e173-43a4-babf-d250f8a34ad1)

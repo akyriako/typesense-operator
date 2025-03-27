@@ -199,7 +199,7 @@ func (r *TypesenseClusterReconciler) buildStatefulSet(key client.ObjectKey, ts *
 								},
 								{
 									Name:  "TYPESENSE_NODES",
-									Value: "/usr/share/typesense/Nodes",
+									Value: "/usr/share/typesense/nodes",
 								},
 								{
 									Name:  "TYPESENSE_DATA_DIR",
