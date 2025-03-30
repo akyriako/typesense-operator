@@ -14,6 +14,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -21,7 +22,7 @@ const (
 	metricsPort                        = 9100
 	startupProbeFailureThreshold int32 = 30
 	startupProbePeriodSeconds    int32 = 10
-	hashAnnotationKey                  = "ts.opentelekomcloud.com/podTemplateHash"
+	hashAnnotationKey                  = "ts.opentelekomcloud.com/pod-template-hash"
 )
 
 func (r *TypesenseClusterReconciler) ReconcileStatefulSet(ctx context.Context, ts tsv1alpha1.TypesenseCluster) (*appsv1.StatefulSet, error) {
@@ -69,7 +70,7 @@ func (r *TypesenseClusterReconciler) ReconcileStatefulSet(ctx context.Context, t
 		}
 
 		if !contains(skipConditions, r.getConditionReady(&ts).Reason) {
-			desiredSts, err := r.buildStatefulSet(stsObjectKey, &ts)
+			desiredSts, err := r.buildStatefulSet(ctx, stsObjectKey, &ts)
 			if err != nil {
 				r.logger.Error(err, "building statefulset failed", "sts", stsObjectKey.Name)
 			}
@@ -105,7 +106,7 @@ func (r *TypesenseClusterReconciler) ReconcileStatefulSet(ctx context.Context, t
 }
 
 func (r *TypesenseClusterReconciler) createStatefulSet(ctx context.Context, key client.ObjectKey, ts *tsv1alpha1.TypesenseCluster) (*appsv1.StatefulSet, error) {
-	sts, err := r.buildStatefulSet(key, ts)
+	sts, err := r.buildStatefulSet(ctx, key, ts)
 	if err != nil {
 		return nil, err
 	}
@@ -140,7 +141,7 @@ func (r *TypesenseClusterReconciler) updateStatefulSet(ctx context.Context, sts 
 	return sts, nil
 }
 
-func (r *TypesenseClusterReconciler) buildStatefulSet(key client.ObjectKey, ts *tsv1alpha1.TypesenseCluster) (*appsv1.StatefulSet, error) {
+func (r *TypesenseClusterReconciler) buildStatefulSet(ctx context.Context, key client.ObjectKey, ts *tsv1alpha1.TypesenseCluster) (*appsv1.StatefulSet, error) {
 	clusterName := ts.Name
 	sts := &appsv1.StatefulSet{
 		TypeMeta:   metav1.TypeMeta{},
@@ -177,27 +178,6 @@ func (r *TypesenseClusterReconciler) buildStatefulSet(key client.ObjectKey, ts *
 									ContainerPort: int32(ts.Spec.ApiPort),
 								},
 							},
-							//StartupProbe: &corev1.Probe{
-							//	ProbeHandler: corev1.ProbeHandler{
-							//		HTTPGet: &corev1.HTTPGetAction{
-							//			Path: "/health",
-							//			Port: intstr.FromInt32(int32(ts.Spec.ApiPort)),
-							//		},
-							//	},
-							//	InitialDelaySeconds: 5,
-							//	FailureThreshold:    startupProbeFailureThreshold,
-							//	PeriodSeconds:       startupProbePeriodSeconds,
-							//},
-							//LivenessProbe: &corev1.Probe{
-							//	ProbeHandler: corev1.ProbeHandler{
-							//		HTTPGet: &corev1.HTTPGetAction{
-							//			Path: "/health",
-							//			Port: intstr.FromInt32(int32(ts.Spec.ApiPort)),
-							//		},
-							//	},
-							//	InitialDelaySeconds: 5,
-							//	PeriodSeconds:       15,
-							//},
 							Env: []corev1.EnvVar{
 								{
 									Name: "TYPESENSE_API_KEY",
@@ -355,13 +335,34 @@ func (r *TypesenseClusterReconciler) buildStatefulSet(key client.ObjectKey, ts *
 		},
 	}
 
-	hash, err := hashstructure.Hash(sts.Spec.Template.Spec, hashstructure.FormatV2, nil)
+	podTemplateHash, err := hashstructure.Hash(sts.Spec.Template.Spec, hashstructure.FormatV2, nil)
 	if err != nil {
 		return nil, err
 	}
+	base16Hash := fmt.Sprintf("%x", podTemplateHash)
 
-	base16Hash := fmt.Sprintf("%x", hash)
-	r.logger.V(debugLevel).Info("calculated spec template hash", "hash", base16Hash)
+	if additionalConfiguration := ts.Spec.GetAdditionalServerConfiguration(); additionalConfiguration != nil {
+		for _, ac := range additionalConfiguration {
+			if ac.ConfigMapRef != nil {
+				configMapObjectKey := client.ObjectKey{Namespace: ts.Namespace, Name: ac.ConfigMapRef.Name}
+				var cm = &corev1.ConfigMap{}
+				if err = r.Get(ctx, configMapObjectKey, cm); err != nil {
+					return nil, err
+				}
+
+				if strings.TrimSpace(cm.Data["data"]) != "" {
+					dataHash, err := hashstructure.Hash(cm.Data["data"], hashstructure.FormatV2, nil)
+					if err != nil {
+						return nil, err
+					}
+
+					base16Hash = fmt.Sprintf("%s%x", base16Hash, dataHash)
+				}
+			}
+		}
+	}
+
+	r.logger.V(debugLevel).Info("calculated hash", "hash", base16Hash)
 
 	if sts.Spec.Template.Annotations == nil {
 		sts.Spec.Template.Annotations = map[string]string{}
