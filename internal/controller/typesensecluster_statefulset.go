@@ -4,22 +4,24 @@ import (
 	"context"
 	"fmt"
 	tsv1alpha1 "github.com/akyriako/typesense-operator/api/v1alpha1"
+	"github.com/mitchellh/hashstructure/v2"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/utils/ptr"
-	"reflect"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"strconv"
+	"time"
 )
 
 const (
 	metricsPort                        = 9100
 	startupProbeFailureThreshold int32 = 30
 	startupProbePeriodSeconds    int32 = 10
+	hashAnnotationKey                  = "ts.opentelekomcloud.com/podTemplateHash"
 )
 
 func (r *TypesenseClusterReconciler) ReconcileStatefulSet(ctx context.Context, ts tsv1alpha1.TypesenseCluster) (*appsv1.StatefulSet, error) {
@@ -67,9 +69,13 @@ func (r *TypesenseClusterReconciler) ReconcileStatefulSet(ctx context.Context, t
 		}
 
 		if !contains(skipConditions, r.getConditionReady(&ts).Reason) {
-			desiredSts := r.buildStatefulSet(stsObjectKey, &ts)
-			if r.shouldUpdateStatefulSet(sts, &ts) {
-				r.logger.V(debugLevel).Info("updating statefulset", "sts", stsObjectKey.Name)
+			desiredSts, err := r.buildStatefulSet(stsObjectKey, &ts)
+			if err != nil {
+				r.logger.Error(err, "building statefulset failed", "sts", stsObjectKey.Name)
+			}
+
+			if r.shouldUpdateStatefulSet(sts, desiredSts, &ts) {
+				r.logger.V(debugLevel).Info("updating statefulset", "sts", sts.Name)
 
 				updatedSts, err := r.updateStatefulSet(ctx, sts, desiredSts)
 				if err != nil {
@@ -99,8 +105,12 @@ func (r *TypesenseClusterReconciler) ReconcileStatefulSet(ctx context.Context, t
 }
 
 func (r *TypesenseClusterReconciler) createStatefulSet(ctx context.Context, key client.ObjectKey, ts *tsv1alpha1.TypesenseCluster) (*appsv1.StatefulSet, error) {
-	sts := r.buildStatefulSet(key, ts)
-	err := ctrl.SetControllerReference(ts, sts, r.Scheme)
+	sts, err := r.buildStatefulSet(key, ts)
+	if err != nil {
+		return nil, err
+	}
+
+	err = ctrl.SetControllerReference(ts, sts, r.Scheme)
 	if err != nil {
 		return nil, err
 	}
@@ -117,7 +127,11 @@ func (r *TypesenseClusterReconciler) updateStatefulSet(ctx context.Context, sts 
 	patch := client.MergeFrom(sts.DeepCopy())
 	sts.Spec = desired.Spec
 
-	// TODO: Add statefulSet.Spec.Template.Annotations["kubectl.kubernetes.io/restartedAt"] = time.Now().Format(time.RFC3339) to restart the StatefulSet
+	if sts.Spec.Template.Annotations == nil {
+		sts.Spec.Template.Annotations = map[string]string{}
+	}
+	sts.Spec.Template.Annotations["kubectl.kubernetes.io/restartedAt"] = time.Now().Format(time.RFC3339)
+	sts.Spec.Template.Annotations[hashAnnotationKey] = desired.Spec.Template.Annotations[hashAnnotationKey]
 
 	if err := r.Patch(ctx, sts, patch); err != nil {
 		return nil, err
@@ -126,8 +140,7 @@ func (r *TypesenseClusterReconciler) updateStatefulSet(ctx context.Context, sts 
 	return sts, nil
 }
 
-func (r *TypesenseClusterReconciler) buildStatefulSet(key client.ObjectKey, ts *tsv1alpha1.TypesenseCluster) *appsv1.StatefulSet {
-
+func (r *TypesenseClusterReconciler) buildStatefulSet(key client.ObjectKey, ts *tsv1alpha1.TypesenseCluster) (*appsv1.StatefulSet, error) {
 	clusterName := ts.Name
 	sts := &appsv1.StatefulSet{
 		TypeMeta:   metav1.TypeMeta{},
@@ -342,72 +355,30 @@ func (r *TypesenseClusterReconciler) buildStatefulSet(key client.ObjectKey, ts *
 		},
 	}
 
-	return sts
+	hash, err := hashstructure.Hash(sts.Spec.Template.Spec, hashstructure.FormatV2, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	base16Hash := fmt.Sprintf("%x", hash)
+	r.logger.V(debugLevel).Info("calculated spec template hash", "hash", base16Hash)
+
+	if sts.Spec.Template.Annotations == nil {
+		sts.Spec.Template.Annotations = map[string]string{}
+	}
+	sts.Spec.Template.Annotations[hashAnnotationKey] = base16Hash
+
+	return sts, nil
 }
 
-func (r *TypesenseClusterReconciler) shouldUpdateStatefulSet(sts *appsv1.StatefulSet, ts *tsv1alpha1.TypesenseCluster) bool {
+func (r *TypesenseClusterReconciler) shouldUpdateStatefulSet(sts *appsv1.StatefulSet, desired *appsv1.StatefulSet, ts *tsv1alpha1.TypesenseCluster) bool {
 	if *sts.Spec.Replicas != ts.Spec.Replicas && r.getConditionReady(ts).Reason != string(ConditionReasonQuorumDowngraded) {
 		return true
 	}
 
-	if sts.Spec.Template.Spec.Containers[0].Ports[0].ContainerPort != int32(ts.Spec.ApiPort) {
+	if sts.Spec.Template.Annotations[hashAnnotationKey] != desired.Spec.Template.Annotations[hashAnnotationKey] {
 		return true
 	}
-
-	checkEnvVar := func(key string, value string) bool {
-		for _, e := range sts.Spec.Template.Spec.Containers[0].Env {
-			if e.Name == key && e.Value == value {
-				return true
-			}
-		}
-
-		return false
-	}
-
-	if !checkEnvVar("TYPESENSE_PEERING_PORT", strconv.Itoa(ts.Spec.PeeringPort)) {
-		return true
-	}
-
-	if !checkEnvVar("TYPESENSE_RESET_PEERS_ON_ERROR", strconv.FormatBool(ts.Spec.ResetPeersOnError)) {
-		return true
-	}
-
-	if !checkEnvVar("TYPESENSE_ENABLE_CORS", strconv.FormatBool(ts.Spec.EnableCors)) {
-		return true
-	}
-
-	if !checkEnvVar("TYPESENSE_CORS_DOMAINS", ts.Spec.GetCorsDomains()) {
-		return true
-	}
-
-	if !reflect.DeepEqual(sts.Spec.Template.Spec.Containers[0].Resources, ts.Spec.GetResources()) {
-		return true
-	}
-
-	if !reflect.DeepEqual(sts.Spec.Template.Spec.NodeSelector, ts.Spec.NodeSelector) {
-		return true
-	}
-
-	if !reflect.DeepEqual(sts.Spec.Template.Spec.Tolerations, ts.Spec.Tolerations) {
-		return true
-	}
-
-	if !reflect.DeepEqual(sts.Spec.Template.Spec.TopologySpreadConstraints, ts.Spec.GetTopologySpreadConstraints(getLabels(ts))) {
-		return true
-	}
-
-	envFrom := ts.Spec.GetAdditionalServerConfiguration()
-	if len(envFrom) == 0 {
-		envFrom = nil
-	}
-	if !reflect.DeepEqual(sts.Spec.Template.Spec.Containers[0].EnvFrom, envFrom) {
-		return true
-	}
-
-	//if &ts.Spec.Storage.Size != sts.Spec.VolumeClaimTemplates[0].Spec.Resources.Requests.Storage() ||
-	//	&ts.Spec.Storage.StorageClassName != sts.Spec.VolumeClaimTemplates[0].Spec.StorageClassName {
-	//	return true
-	//}
 
 	return false
 }

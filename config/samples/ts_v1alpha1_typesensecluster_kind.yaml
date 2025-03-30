@@ -27,7 +27,7 @@ metadata:
   name: c-kind-1
 spec:
   image: typesense/typesense:27.1
-  replicas: 5
+  replicas: 3
   corsDomains: "http://localhost,https://www.example.de"
   storage:
     size: 150Mi
@@ -79,27 +79,27 @@ spec:
 #    interval: 15
 #    release: promstack
 ---
-apiVersion: ts.opentelekomcloud.com/v1alpha1
-kind: TypesenseCluster
-metadata:
-  labels:
-    app.kubernetes.io/name: typesense-operator
-    app.kubernetes.io/managed-by: kustomize
-  name: c-kind-3
-spec:
-  image: typesense/typesense:27.1
-  replicas: 1
-  apiPort: 18108
-  peeringPort: 18107
-  enableCors: true
-  corsDomains: "http://localhost,https://www.example.de"
-  storage:
-    size: 10Mi
-    storageClassName: typesense-local-path
-  adminApiKey:
-    name: typesense-common-bootstrap-key
-  ingress:
-    referer: referer.example.com
-    host: host.example.com
-    ingressClassName: nginx
-    clusterIssuer: lets-encrypt-prod
+#apiVersion: ts.opentelekomcloud.com/v1alpha1
+#kind: TypesenseCluster
+#metadata:
+#  labels:
+#    app.kubernetes.io/name: typesense-operator
+#    app.kubernetes.io/managed-by: kustomize
+#  name: c-kind-3
+#spec:
+#  image: typesense/typesense:27.1
+#  replicas: 1
+#  apiPort: 18108
+#  peeringPort: 18107
+#  enableCors: true
+#  corsDomains: "http://localhost,https://www.example.de"
+#  storage:
+#    size: 10Mi
+#    storageClassName: typesense-local-path
+#  adminApiKey:
+#    name: typesense-common-bootstrap-key
+#  ingress:
+#    referer: referer.example.com
+#    host: host.example.com
+#    ingressClassName: nginx
+#    clusterIssuer: lets-encrypt-prod

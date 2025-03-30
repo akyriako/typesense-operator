@@ -110,7 +110,14 @@ func (r *TypesenseClusterReconciler) ReconcileQuorum(ctx context.Context, ts *ts
 
 	if clusterStatus == ClusterStatusNotReady {
 		if availableNodes == 1 {
-			return ConditionReasonQuorumNotReadyWaitATerm, 0, nil
+			r.logger.Info("purging quorum")
+			err := r.PurgeStatefulSetPods(ctx, sts)
+			if err != nil {
+				return ConditionReasonQuorumNotReady, 0, err
+			}
+
+			return ConditionReasonQuorumNotReady, 0, nil
+			//return ConditionReasonQuorumNotReadyWaitATerm, 0, nil
 		}
 
 		if minRequiredNodes > healthyNodes {
