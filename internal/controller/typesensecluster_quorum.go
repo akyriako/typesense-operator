@@ -36,10 +36,16 @@ func (r *TypesenseClusterReconciler) ReconcileQuorum(ctx context.Context, ts *ts
 		Timeout: 500 * time.Millisecond,
 	}
 
+	clusterHasQueuedWrites := false
+
 	for _, node := range quorum.Nodes {
 		status, err := r.getNodeStatus(ctx, httpClient, node, ts, secret)
 		if err != nil {
 			r.logger.Error(err, "fetching node status failed", "node", r.getShortName(node))
+		}
+
+		if status.QueuedWrites > 0 {
+			clusterHasQueuedWrites = true
 		}
 
 		r.logger.V(debugLevel).Info(
@@ -110,6 +116,23 @@ func (r *TypesenseClusterReconciler) ReconcileQuorum(ctx context.Context, ts *ts
 
 	if clusterStatus == ClusterStatusNotReady {
 		if availableNodes == 1 {
+
+			node := quorum.Nodes[0]
+			nodeStatus := nodesStatus[node]
+
+			state := nodeStatus.State
+			queuedWrites := nodeStatus.QueuedWrites
+
+			if state == ErrorState || queuedWrites != 0 {
+				r.logger.Info("purging quorum")
+				err := r.PurgeStatefulSetPods(ctx, sts)
+				if err != nil {
+					return ConditionReasonQuorumNotReady, 0, err
+				}
+
+				return ConditionReasonQuorumNotReady, 0, nil
+			}
+
 			return ConditionReasonQuorumNotReadyWaitATerm, 0, nil
 		}
 
@@ -123,6 +146,10 @@ func (r *TypesenseClusterReconciler) ReconcileQuorum(ctx context.Context, ts *ts
 	// remove size from return arguments if will not be eventually combined with termination grace period
 
 	if clusterStatus == ClusterStatusOK && *sts.Spec.Replicas < ts.Spec.Replicas {
+		if clusterHasQueuedWrites {
+			return ConditionReasonQuorumQueuedWrites, 0, nil
+		}
+
 		return r.upgradeQuorum(ctx, ts, quorum.NodesListConfigMap, stsObjectKey)
 	}
 

@@ -350,8 +350,9 @@ func (r *TypesenseClusterReconciler) buildStatefulSet(ctx context.Context, key c
 					return nil, err
 				}
 
-				if strings.TrimSpace(cm.Data["data"]) != "" {
-					dataHash, err := hashstructure.Hash(cm.Data["data"], hashstructure.FormatV2, nil)
+				data := fmt.Sprintf("%v", cm.Data)
+				if strings.TrimSpace(data) != "" {
+					dataHash, err := hashstructure.Hash(data, hashstructure.FormatV2, nil)
 					if err != nil {
 						return nil, err
 					}
@@ -373,7 +374,10 @@ func (r *TypesenseClusterReconciler) buildStatefulSet(ctx context.Context, key c
 }
 
 func (r *TypesenseClusterReconciler) shouldUpdateStatefulSet(sts *appsv1.StatefulSet, desired *appsv1.StatefulSet, ts *tsv1alpha1.TypesenseCluster) bool {
-	if *sts.Spec.Replicas != ts.Spec.Replicas && r.getConditionReady(ts).Reason != string(ConditionReasonQuorumDowngraded) {
+	//return false
+
+	if *sts.Spec.Replicas != ts.Spec.Replicas &&
+		(r.getConditionReady(ts).Reason != string(ConditionReasonQuorumDowngraded) || r.getConditionReady(ts).Reason != string(ConditionReasonQuorumQueuedWrites)) {
 		return true
 	}
 

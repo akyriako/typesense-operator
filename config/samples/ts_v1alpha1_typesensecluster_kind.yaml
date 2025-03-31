@@ -18,6 +18,14 @@ type: Opaque
 data:
   typesense-api-key: SXdpVG9CcnFYTHZYeTJNMG1TS1hPaGt0dlFUY3VWUloxc1M5REtsRUNtMFFwQU93R1hoanVIVWJLQnE2ejdlSQ==
 ---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: c-kind-1-server-configuration
+data:
+  TYPESENSE_HEALTHY_READ_LAG: "1000"
+  TYPESENSE_HEALTHY_WRITE_LAG: "500"
+---
 apiVersion: ts.opentelekomcloud.com/v1alpha1
 kind: TypesenseCluster
 metadata:
@@ -36,6 +44,8 @@ spec:
     name: typesense-common-bootstrap-key
   metrics:
     release: promstack
+  additionalServerConfiguration:
+    name: c-kind-1-server-configuration
 #---
 #apiVersion: v1
 #kind: ConfigMap

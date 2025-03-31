@@ -27,6 +27,7 @@ const (
 	ConditionReasonQuorumDowngraded         ConditionQuorum = "QuorumDowngraded"
 	ConditionReasonQuorumUpgraded           ConditionQuorum = "QuorumUpgraded"
 	ConditionReasonQuorumNeedsAttention     ConditionQuorum = "QuorumNeedsAttention"
+	ConditionReasonQuorumQueuedWrites       ConditionQuorum = "QuorumQueuedWrites"
 	ConditionReasonStatefulSetNotReady                      = "StatefulSetNotReady"
 
 	InitReconciliationMessage = "Starting reconciliation"
