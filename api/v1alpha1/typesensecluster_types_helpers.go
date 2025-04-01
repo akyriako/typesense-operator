@@ -82,7 +82,7 @@ func (s *TypesenseClusterSpec) GetMetricsExporterSpecs() MetricsExporterSpec {
 }
 
 func (s *TypesenseClusterSpec) GetMetricsExporterResources() corev1.ResourceRequirements {
-	if s.Metrics.Resources != nil {
+	if s.Metrics != nil && s.Metrics.Resources != nil {
 		return *s.Metrics.Resources
 	}
 
