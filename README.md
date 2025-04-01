@@ -198,26 +198,27 @@ introducing `TypesenseCluster`, a new Custom Resource Definition:
 
 **Spec**
 
-| Name                          | Description                                                       | Optional | Default       |
-|-------------------------------|-------------------------------------------------------------------|----------|---------------|
-| image                         | Typesense image                                                   |          |               |
-| adminApiKey                   | Reference to the `Secret` to be used for bootstrap                | X        |               |
-| replicas                      | Size of the cluster (allowed 1, 3, 5 or 7)                        |          | 3             |
-| apiPort                       | REST/API port                                                     |          | 8108          |
-| peeringPort                   | Peering port                                                      |          | 8107          |
-| resetPeersOnError             | automatic reset of peers on error                                 |          | true          |
-| enableCors                    | enables CORS                                                      | X        | false         |
-| corsDomains                   | comma separated list of domains allowed for CORS                  | X        |               |
-| resources                     | resource request & limit                                          | X        | _check specs_ |
-| nodeSelector                  | node selection constraint                                         | X        |               |
-| tolerations                   | schedule pods with matching taints                                | X        |               |
-| additionalServerConfiguration | a reference to a `NodesListConfigMap` holding extra configuration | X        |               |
-| storage                       | check `StorageSpec` below                                         |          |               |
-| ingress                       | check `IngressSpec` below                                         | X        |               |
-| scrapers                      | array of `DocSearchScraperSpec`; check below                      | X        |               |
-| metrics                       | check `MetricsSpec` below                                         | X        |               |
-| topologySpreadConstraints     | how to spread a  group of pods across topology domains            | X        |               |
-| incrementalQuorumRecovery     | add nodes gradually to the statefulset while recovering           | X        | false         |
+| Name                          | Description                                                            | Optional | Default       |
+|-------------------------------|------------------------------------------------------------------------|----------|---------------|
+| image                         | Typesense image                                                        |          |               |
+| adminApiKey                   | Reference to the `Secret` to be used for bootstrap                     | X        |               |
+| replicas                      | Size of the cluster (allowed 1, 3, 5 or 7)                             |          | 3             |
+| apiPort                       | REST/API port                                                          |          | 8108          |
+| peeringPort                   | Peering port                                                           |          | 8107          |
+| resetPeersOnError             | automatic reset of peers on error                                      |          | true          |
+| enableCors                    | enables CORS                                                           | X        | false         |
+| corsDomains                   | comma separated list of domains allowed for CORS                       | X        |               |
+| resources                     | resource request & limit                                               | X        | _check specs_ |
+| affinity                      | group of affinity scheduling rules                                     | X        |               |
+| nodeSelector                  | node selection constraint                                              | X        |               |
+| tolerations                   | schedule pods with matching taints                                     | X        |               |
+| additionalServerConfiguration | a reference to a `NodesListConfigMap` holding extra configuration      | X        |               |
+| storage                       | check `StorageSpec` below                                              |          |               |
+| ingress                       | check `IngressSpec` below                                              | X        |               |
+| scrapers                      | array of `DocSearchScraperSpec`; check below                           | X        |               |
+| metrics                       | check `MetricsSpec` below                                              | X        |               |
+| topologySpreadConstraints     | how to spread a  group of pods across topology domains                 | X        |               |
+| incrementalQuorumRecovery     | add nodes gradually to the statefulset while recovering                | X        | false         |
 
 > [!IMPORTANT]
 > * Any Typesense server configuration variable that is defined in Spec is overriding any additional reference of
