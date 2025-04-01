@@ -33,6 +33,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
+	"strings"
 	"time"
 
 	tsv1alpha1 "github.com/akyriako/typesense-operator/api/v1alpha1"
@@ -193,19 +194,24 @@ func (r *TypesenseClusterReconciler) Reconcile(ctx context.Context, req ctrl.Req
 			r.logger.Error(err, "reconciling quorum health failed")
 		}
 
-		if condition == ConditionReasonQuorumNeedsAttention {
-			if err == nil {
-				err = errors.New("quorum is needs manual intervention")
+		if strings.Contains(string(condition), "QuorumNeedsAttention") {
+			eram := "cluster needs manual administrative attention: "
+
+			if condition == ConditionReasonQuorumNeedsAttentionClusterIsLagging {
+				eram += "queued_writes > healthyWriteLagThreshold"
 			}
-			cerr := r.setConditionNotReady(ctx, &ts, string(condition), err)
+
+			if condition == ConditionReasonQuorumNeedsAttentionMemoryOrDiskIssue {
+				eram += "out of memory or disk"
+			}
+
+			erram := errors.New(eram)
+			cerr := r.setConditionNotReady(ctx, &ts, string(condition), erram)
 			if cerr != nil {
 				return ctrl.Result{}, cerr
 			}
+			r.Recorder.Eventf(&ts, "Warning", string(condition), toTitle(erram.Error()))
 
-			r.Recorder.Eventf(&ts, "Warning", string(condition), toTitle(err.Error()))
-
-			requeueAfter = time.Duration((60+terminationGracePeriodSeconds)*3) * time.Second
-			return ctrl.Result{RequeueAfter: requeueAfter}, err
 		} else {
 			if condition != ConditionReasonQuorumReady {
 				if err == nil {

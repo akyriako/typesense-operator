@@ -62,7 +62,8 @@ func (r *TypesenseClusterReconciler) ReconcileStatefulSet(ctx context.Context, t
 		skipConditions := []string{
 			string(ConditionReasonQuorumDowngraded),
 			string(ConditionReasonQuorumUpgraded),
-			string(ConditionReasonQuorumNeedsAttention),
+			string(ConditionReasonQuorumNeedsAttentionMemoryOrDiskIssue),
+			//string(ConditionReasonQuorumNeedsAttentionClusterIsLagging),
 			string(ConditionReasonQuorumNotReady),
 			ConditionReasonStatefulSetNotReady,
 			ConditionReasonReconciliationInProgress,
