@@ -273,11 +273,12 @@ introducing `TypesenseCluster`, a new Custom Resource Definition:
 
 **MetricsSpec** (optional)
 
-| Name     | Description                               | Optional | Default                                        |
-|----------|-------------------------------------------|----------|------------------------------------------------|
-| image    | container image to use                    | X        | akyriako78/typesense-prometheus-exporter:0.1.7 |
-| release  | Prometheus release to become a target of  |          |                                                |
-| interval | interval in _seconds_ between two scrapes | X        | 15                                             |
+| Name      | Description                               | Optional | Default                                        |
+|-----------|-------------------------------------------|----------|------------------------------------------------|
+| image     | container image to use                    | X        | akyriako78/typesense-prometheus-exporter:0.1.7 |
+| release   | Prometheus release to become a target of  |          |                                                |
+| interval  | interval in _seconds_ between two scrapes | X        | 15                                             |
+| resources | resource request & limit                  | X        | _check specs_                                  |
 
 > [!TIP]
 > If you've provisioned Prometheus via [kube-prometheus-stack](https://github.com/prometheus-community/helm-charts/blob/main/charts/kube-prometheus-stack/README.md), 
@@ -306,13 +307,15 @@ introducing `TypesenseCluster`, a new Custom Resource Definition:
 
 **Status**
 
-| Condition      | Value | Reason                  | Description                                                |
-|----------------|-------|-------------------------|------------------------------------------------------------|
-| ConditionReady | true  | QuorumReady             | Cluster is Operational                                     |
-|                | false | QuorumNotReady          | Cluster is not Operational                                 |
-|                | false | QuorumDegraded          | Cluster is not Operational; Scheduled to Single-Instance   |
-|                | false | QuorumUpgraded          | Cluster is Operational; Scheduled to Original Size         |
-|                | false | QuorumNeedsIntervention | Cluster is not Operational; Administrative Action Required |
+| Condition      | Value | Reason                     | Description                                                |
+|----------------|-------|----------------------------|------------------------------------------------------------|
+| ConditionReady | true  | QuorumReady                | Cluster is Operational                                     |
+|                | false | QuorumNotReady             | Cluster is not Operational                                 |
+|                | false | QuorumNotReadyWaitATerm    | Cluster is not Operational; Waits a Terms                  |
+|                | false | QuorumDegraded             | Cluster is not Operational; Scheduled to Single-Instance   |
+|                | false | QuorumUpgraded             | Cluster is Operational; Scheduled to Original Size         |
+|                | true  | QuorumQueuedWrites         | Cluster is Operational but `queued_writes` > 0             |
+|                | false | QuorumNeedsInterventionXXX | Cluster is not Operational; Administrative Action Required |
 
 ## Getting Started
 You’ll need a Kubernetes cluster to run against. You can use [KIND](https://sigs.k8s.io/kind) to get a local cluster for testing, or run against a remote cluster.
