@@ -13,7 +13,9 @@ import (
 )
 
 const (
-	PodReadinessGateCondition = "RaftQuorumReady"
+	QuorumReadinessGateCondition = "RaftQuorumReady"
+	HealthyWriteLagKey           = "TYPESENSE_HEALTHY_WRITE_LAG"
+	HealthyWriteLagDefaultValue  = 500
 )
 
 func (r *TypesenseClusterReconciler) ReconcileQuorum(ctx context.Context, ts *tsv1alpha1.TypesenseCluster, secret *v1.Secret, stsObjectKey client.ObjectKey) (ConditionQuorum, int, error) {
@@ -36,10 +38,17 @@ func (r *TypesenseClusterReconciler) ReconcileQuorum(ctx context.Context, ts *ts
 		Timeout: 500 * time.Millisecond,
 	}
 
+	queuedWrites := 0
+	healthyWriteLagThreshold := r.getHealthyWriteLagThreshold(ctx, ts)
+
 	for _, node := range quorum.Nodes {
 		status, err := r.getNodeStatus(ctx, httpClient, node, ts, secret)
 		if err != nil {
 			r.logger.Error(err, "fetching node status failed", "node", r.getShortName(node))
+		}
+
+		if status.QueuedWrites > 0 && queuedWrites < status.QueuedWrites {
+			queuedWrites = status.QueuedWrites
 		}
 
 		r.logger.V(debugLevel).Info(
@@ -81,7 +90,7 @@ func (r *TypesenseClusterReconciler) ReconcileQuorum(ctx context.Context, ts *ts
 		podName := fmt.Sprintf("%s-%d", fmt.Sprintf(ClusterStatefulSet, ts.Name), n)
 		podObjectKey := client.ObjectKey{Namespace: ts.Namespace, Name: podName}
 
-		err = r.updatePodReadinessGate(ctx, podObjectKey, condition, ts)
+		err = r.updatePodReadinessGate(ctx, podObjectKey, condition)
 		if err != nil {
 			r.logger.Error(err, fmt.Sprintf("unable to update statefulset pod: %s", podObjectKey.Name))
 			return ConditionReasonQuorumNotReady, 0, err
@@ -89,7 +98,7 @@ func (r *TypesenseClusterReconciler) ReconcileQuorum(ctx context.Context, ts *ts
 	}
 
 	if clusterNeedsAttention {
-		return ConditionReasonQuorumNeedsAttention, 0, fmt.Errorf("cluster needs administrative attention")
+		return ConditionReasonQuorumNeedsAttentionMemoryOrDiskIssue, 0, nil
 	}
 
 	minRequiredNodes := quorum.MinRequiredNodes
@@ -104,12 +113,33 @@ func (r *TypesenseClusterReconciler) ReconcileQuorum(ctx context.Context, ts *ts
 
 	r.logger.Info("evaluated quorum", "minRequiredNodes", minRequiredNodes, "availableNodes", availableNodes, "healthyNodes", healthyNodes)
 
+	if queuedWrites > healthyWriteLagThreshold {
+		return ConditionReasonQuorumNeedsAttentionClusterIsLagging, 0, nil
+	}
+
 	if clusterStatus == ClusterStatusElectionDeadlock {
 		return r.downgradeQuorum(ctx, ts, quorum.NodesListConfigMap, stsObjectKey, int32(healthyNodes), int32(minRequiredNodes))
 	}
 
 	if clusterStatus == ClusterStatusNotReady {
 		if availableNodes == 1 {
+
+			node := quorum.Nodes[0]
+			nodeStatus := nodesStatus[node]
+
+			state := nodeStatus.State
+			queuedWrites := nodeStatus.QueuedWrites
+
+			if state == ErrorState || queuedWrites != 0 {
+				r.logger.Info("purging quorum")
+				err := r.PurgeStatefulSetPods(ctx, sts)
+				if err != nil {
+					return ConditionReasonQuorumNotReady, 0, err
+				}
+
+				return ConditionReasonQuorumNotReady, 0, nil
+			}
+
 			return ConditionReasonQuorumNotReadyWaitATerm, 0, nil
 		}
 
@@ -118,11 +148,11 @@ func (r *TypesenseClusterReconciler) ReconcileQuorum(ctx context.Context, ts *ts
 		}
 	}
 
-	// TODO && !clusterIsLagging
-	// dynamic adjustment of the requeue interval based on lagging metrics
-	// remove size from return arguments if will not be eventually combined with termination grace period
-
 	if clusterStatus == ClusterStatusOK && *sts.Spec.Replicas < ts.Spec.Replicas {
+		if queuedWrites > 0 {
+			return ConditionReasonQuorumQueuedWrites, 0, nil
+		}
+
 		return r.upgradeQuorum(ctx, ts, quorum.NodesListConfigMap, stsObjectKey)
 	}
 
@@ -239,7 +269,7 @@ func (r *TypesenseClusterReconciler) calculatePodReadinessGate(ctx context.Conte
 
 	r.logger.V(debugLevel).Info("reporting node health", "node", r.getShortName(node), "healthy", health.Ok)
 	condition := &v1.PodCondition{
-		Type:    PodReadinessGateCondition,
+		Type:    QuorumReadinessGateCondition,
 		Status:  conditionStatus,
 		Reason:  string(conditionReason),
 		Message: conditionMessage,
@@ -248,7 +278,7 @@ func (r *TypesenseClusterReconciler) calculatePodReadinessGate(ctx context.Conte
 	return condition
 }
 
-func (r *TypesenseClusterReconciler) updatePodReadinessGate(ctx context.Context, podObjectKey client.ObjectKey, condition *v1.PodCondition, ts *tsv1alpha1.TypesenseCluster) error {
+func (r *TypesenseClusterReconciler) updatePodReadinessGate(ctx context.Context, podObjectKey client.ObjectKey, condition *v1.PodCondition) error {
 
 	pod := &v1.Pod{}
 	err := r.Get(ctx, podObjectKey, pod)
@@ -258,19 +288,24 @@ func (r *TypesenseClusterReconciler) updatePodReadinessGate(ctx context.Context,
 	}
 
 	patch := client.MergeFrom(pod.DeepCopy())
-	//r.logger.V(debugLevel).Info("updating pod readiness gate condition", "pod", pod.Name, "condition", condition.Type, "status", condition.Status)
 
-	updated := false
-	for i, c := range pod.Status.Conditions {
-		if c.Type == PodReadinessGateCondition && pod.Status.Conditions[i] != *condition {
-			pod.Status.Conditions[i] = *condition
-			updated = true
-			break
+	found := false
+	var updatedConditions []v1.PodCondition
+	for _, c := range pod.Status.Conditions {
+		if c.Type == condition.Type {
+			if !found {
+				updatedConditions = append(updatedConditions, *condition)
+				found = true
+			}
+		} else {
+			updatedConditions = append(updatedConditions, c)
 		}
 	}
-	if !updated {
-		pod.Status.Conditions = append(pod.Status.Conditions, *condition)
+	if !found {
+		updatedConditions = append(updatedConditions, *condition)
 	}
+
+	pod.Status.Conditions = updatedConditions
 
 	if err := r.Status().Patch(ctx, pod, patch); err != nil {
 		r.logger.Error(err, "updating pod readiness gate condition failed", "pod", pod.Name)
