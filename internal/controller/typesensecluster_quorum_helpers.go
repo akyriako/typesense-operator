@@ -10,6 +10,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"net/http"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"strconv"
 	"strings"
 )
 
@@ -73,7 +74,7 @@ func (r *TypesenseClusterReconciler) getClusterStatus(nodesStatus map[string]Nod
 	if leaderNodes == 0 {
 		if availableNodes == 1 {
 			return ClusterStatusNotReady
-		}
+		} // here is setting as not ready even if the single node returns state ERROR
 		return ClusterStatusElectionDeadlock
 	}
 
@@ -127,7 +128,7 @@ func (r *TypesenseClusterReconciler) getQuorum(ctx context.Context, ts *tsv1alph
 		return &Quorum{}, err
 	}
 
-	nodes := strings.Split(cm.Data["Nodes"], ",")
+	nodes := strings.Split(cm.Data["nodes"], ",")
 	availableNodes := len(nodes)
 	minRequiredNodes := getMinimumRequiredNodes(availableNodes)
 
@@ -136,4 +137,28 @@ func (r *TypesenseClusterReconciler) getQuorum(ctx context.Context, ts *tsv1alph
 
 func getMinimumRequiredNodes(availableNodes int) int {
 	return (availableNodes-1)/2 + 1
+}
+
+func (r *TypesenseClusterReconciler) getHealthyWriteLagThreshold(ctx context.Context, ts *tsv1alpha1.TypesenseCluster) int {
+	configMapName := ts.Spec.AdditionalServerConfiguration.Name
+	configMapObjectKey := client.ObjectKey{Namespace: ts.Namespace, Name: configMapName}
+
+	var cm = &v1.ConfigMap{}
+	if err := r.Get(ctx, configMapObjectKey, cm); err != nil {
+		r.logger.Error(err, "unable to additional server configuration config map", "configMap", configMapName)
+		return HealthyWriteLagDefaultValue
+	}
+
+	healthyWriteLagValue := cm.Data[HealthyWriteLagKey]
+	if healthyWriteLagValue == "" {
+		return HealthyWriteLagDefaultValue
+	}
+
+	healthyWriteLag, err := strconv.Atoi(healthyWriteLagValue)
+	if err != nil {
+		r.logger.Error(err, "unable to parse server configuration value", "configMap", configMapName, "key", HealthyWriteLagKey)
+		return HealthyWriteLagDefaultValue
+	}
+
+	return healthyWriteLag
 }

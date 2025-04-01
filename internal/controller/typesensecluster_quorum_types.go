@@ -11,6 +11,7 @@ const (
 	FollowerState  NodeState = "FOLLOWER"
 	CandidateState NodeState = "CANDIDATE"
 	NotReadyState  NodeState = "NOT_READY"
+	ErrorState     NodeState = "ERROR"
 )
 
 type NodeStatus struct {

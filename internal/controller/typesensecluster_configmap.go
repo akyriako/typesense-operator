@@ -47,9 +47,9 @@ func (r *TypesenseClusterReconciler) ReconcileConfigMap(ctx context.Context, ts 
 		}
 	}
 
-	//Nodes := strings.Split(NodesListConfigMap.Data["Nodes"], ",")
-	//for i := 0; i < len(Nodes); i++ {
-	//	Nodes[i] = strings.Replace(Nodes[i], fmt.Sprintf(":%d:%d", ts.Spec.PeeringPort, ts.Spec.ApiPort), "", 1)
+	//nodes := strings.Split(NodesListConfigMap.Data["nodes"], ",")
+	//for i := 0; i < len(nodes); i++ {
+	//	nodes[i] = strings.Replace(nodes[i], fmt.Sprintf(":%d:%d", ts.Spec.PeeringPort, ts.Spec.ApiPort), "", 1)
 	//}
 	return &configMapExists, nil
 }
@@ -65,7 +65,7 @@ func (r *TypesenseClusterReconciler) createConfigMap(ctx context.Context, key cl
 	cm := &v1.ConfigMap{
 		ObjectMeta: getObjectMeta(ts, &key.Name, nil),
 		Data: map[string]string{
-			"Nodes": strings.Join(nodes, ","),
+			"nodes": strings.Join(nodes, ","),
 		},
 	}
 
@@ -120,13 +120,13 @@ func (r *TypesenseClusterReconciler) updateConfigMap(ctx context.Context, ts *ts
 
 	desired := cm.DeepCopy()
 	desired.Data = map[string]string{
-		"Nodes": strings.Join(nodes, ","),
+		"nodes": strings.Join(nodes, ","),
 	}
 
-	r.logger.V(debugLevel).Info("current quorum configuration", "size", availableNodes, "Nodes", nodes)
+	r.logger.V(debugLevel).Info("current quorum configuration", "size", availableNodes, "nodes", nodes)
 
-	if cm.Data["Nodes"] != desired.Data["Nodes"] {
-		r.logger.Info("updating quorum configuration", "size", availableNodes, "Nodes", nodes)
+	if cm.Data["nodes"] != desired.Data["nodes"] {
+		r.logger.Info("updating quorum configuration", "size", availableNodes, "nodes", nodes)
 
 		err := r.Update(ctx, desired)
 		if err != nil {
