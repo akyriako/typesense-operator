@@ -76,6 +76,9 @@ type TypesenseClusterSpec struct {
 	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
 
 	// +kubebuilder:validation:Optional
+	Affinity *corev1.Affinity `json:"affinity,omitempty"`
+
+	// +kubebuilder:validation:Optional
 	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
 
 	// +kubebuilder:validation:Optional
@@ -160,6 +163,9 @@ type MetricsExporterSpec struct {
 	// +kubebuilder:validation:ExclusiveMaximum=false
 	// +kubebuilder:validation:Type=integer
 	IntervalInSeconds int `json:"interval,omitempty"`
+
+	// +kubebuilder:validation:Optional
+	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
 }
 
 // TypesenseClusterStatus defines the observed state of TypesenseCluster
