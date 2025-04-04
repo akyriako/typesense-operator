@@ -122,6 +122,7 @@ func (r *TypesenseClusterReconciler) updateConfigMap(ctx context.Context, ts *ts
 	availableNodes := len(nodes)
 	if availableNodes == 0 {
 		if ts.Spec.Pause {
+			r.logger.V(debugLevel).Info("skipping quorum configuration: cluster is paused")
 			return nil, 0, nil
 		}
 		r.logger.V(debugLevel).Info("empty quorum configuration")
