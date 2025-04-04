@@ -102,6 +102,11 @@ type TypesenseClusterSpec struct {
 	// +kubebuilder:default=false
 	// +kubebuilder:validation:Type=boolean
 	IncrementalQuorumRecovery bool `json:"incrementalQuorumRecovery,omitempty"`
+
+	// +optional
+	// +kubebuilder:default=false
+	// +kubebuilder:validation:Type=boolean
+	Pause bool `json:"pause,omitempty"`
 }
 
 type StorageSpec struct {
