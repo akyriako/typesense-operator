@@ -140,6 +140,10 @@ func getMinimumRequiredNodes(availableNodes int) int {
 }
 
 func (r *TypesenseClusterReconciler) getHealthyWriteLagThreshold(ctx context.Context, ts *tsv1alpha1.TypesenseCluster) int {
+	if ts.Spec.AdditionalServerConfiguration == nil {
+		return HealthyWriteLagDefaultValue
+	}
+
 	configMapName := ts.Spec.AdditionalServerConfiguration.Name
 	configMapObjectKey := client.ObjectKey{Namespace: ts.Namespace, Name: configMapName}
 
