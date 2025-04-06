@@ -144,13 +144,18 @@ func (r *TypesenseClusterReconciler) updateStatefulSet(ctx context.Context, sts 
 
 func (r *TypesenseClusterReconciler) buildStatefulSet(ctx context.Context, key client.ObjectKey, ts *tsv1alpha1.TypesenseCluster) (*appsv1.StatefulSet, error) {
 	clusterName := ts.Name
+	replicas := ptr.To[int32](ts.Spec.Replicas)
+	if ts.Spec.Pause {
+		replicas = ptr.To[int32](0)
+	}
+
 	sts := &appsv1.StatefulSet{
 		TypeMeta:   metav1.TypeMeta{},
 		ObjectMeta: getObjectMeta(ts, &key.Name, nil),
 		Spec: appsv1.StatefulSetSpec{
 			ServiceName:         fmt.Sprintf(ClusterHeadlessService, clusterName),
 			PodManagementPolicy: appsv1.ParallelPodManagement,
-			Replicas:            ptr.To[int32](ts.Spec.Replicas),
+			Replicas:            replicas,
 			Selector: &metav1.LabelSelector{
 				MatchLabels: getLabels(ts),
 			},
@@ -378,6 +383,10 @@ func (r *TypesenseClusterReconciler) buildStatefulSet(ctx context.Context, key c
 
 func (r *TypesenseClusterReconciler) shouldUpdateStatefulSet(sts *appsv1.StatefulSet, desired *appsv1.StatefulSet, ts *tsv1alpha1.TypesenseCluster) bool {
 	//return false
+
+	if *sts.Spec.Replicas > int32(0) && ts.Spec.Pause {
+		return true
+	}
 
 	if *sts.Spec.Replicas != ts.Spec.Replicas &&
 		(r.getConditionReady(ts).Reason != string(ConditionReasonQuorumDowngraded) || r.getConditionReady(ts).Reason != string(ConditionReasonQuorumQueuedWrites)) {

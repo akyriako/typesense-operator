@@ -1126,6 +1126,9 @@ spec:
                 additionalProperties:
                   type: string
                 type: object
+              pause:
+                default: false
+                type: boolean
               peeringPort:
                 default: 8107
                 exclusiveMinimum: true
