@@ -307,6 +307,15 @@ introducing `TypesenseCluster`, a new Custom Resource Definition:
 
 **Status**
 
+**Spec**
+
+| Name       | Description                                                                        |
+|------------|------------------------------------------------------------------------------------|
+| phase      | Typesense Cluster/Controller Operational Phase                                     |       
+| conditions | `metav1.Condition`s related to the outcome of the reconciliation (see table below) | 
+
+**Conditions Summary**
+
 | Condition      | Value | Reason                     | Description                                                |
 |----------------|-------|----------------------------|------------------------------------------------------------|
 | ConditionReady | true  | QuorumReady                | Cluster is Operational                                     |
