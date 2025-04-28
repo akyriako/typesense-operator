@@ -130,7 +130,7 @@ func (r *TypesenseClusterReconciler) ReconcileQuorum(ctx context.Context, ts *ts
 			state := nodeStatus.State
 			queuedWrites := nodeStatus.QueuedWrites
 
-			if state == ErrorState || queuedWrites != 0 {
+			if state == ErrorState || queuedWrites != 0 || (state == NotReadyState && queuedWrites == 0) {
 				r.logger.Info("purging quorum")
 				err := r.PurgeStatefulSetPods(ctx, sts)
 				if err != nil {
