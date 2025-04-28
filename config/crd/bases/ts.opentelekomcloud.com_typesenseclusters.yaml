@@ -27,6 +27,9 @@ spec:
     - jsonPath: .spec.peeringPort
       name: Peering Port
       type: integer
+    - jsonPath: .status.phase
+      name: Phase
+      type: string
     - jsonPath: .status.conditions[?(@.type=="Ready")].status
       name: Ready
       type: string
@@ -1527,6 +1530,8 @@ spec:
                   - type
                   type: object
                 type: array
+              phase:
+                type: string
             type: object
         type: object
     served: true

@@ -39,6 +39,7 @@ func (r *TypesenseClusterReconciler) initConditions(ctx context.Context, ts *tsv
 	if ts.Status.Conditions == nil || len(ts.Status.Conditions) == 0 {
 		if err := r.patchStatus(ctx, ts, func(status *tsv1alpha1.TypesenseClusterStatus) {
 			meta.SetStatusCondition(&ts.Status.Conditions, metav1.Condition{Type: ConditionTypeReady, Status: metav1.ConditionUnknown, Reason: ConditionReasonReconciliationInProgress, Message: InitReconciliationMessage})
+			status.Phase = "Bootstrapping"
 		}); err != nil {
 			r.logger.Error(err, UpdateStatusMessageFailed)
 			return err
@@ -50,6 +51,7 @@ func (r *TypesenseClusterReconciler) initConditions(ctx context.Context, ts *tsv
 func (r *TypesenseClusterReconciler) setConditionNotReady(ctx context.Context, ts *tsv1alpha1.TypesenseCluster, reason string, err error) error {
 	if err := r.patchStatus(ctx, ts, func(status *tsv1alpha1.TypesenseClusterStatus) {
 		meta.SetStatusCondition(&ts.Status.Conditions, metav1.Condition{Type: ConditionTypeReady, Status: metav1.ConditionFalse, Reason: reason, Message: err.Error()})
+		status.Phase = reason
 	}); err != nil {
 		return err
 	}
@@ -59,6 +61,7 @@ func (r *TypesenseClusterReconciler) setConditionNotReady(ctx context.Context, t
 func (r *TypesenseClusterReconciler) setConditionReady(ctx context.Context, ts *tsv1alpha1.TypesenseCluster, reason string) error {
 	if err := r.patchStatus(ctx, ts, func(status *tsv1alpha1.TypesenseClusterStatus) {
 		meta.SetStatusCondition(&ts.Status.Conditions, metav1.Condition{Type: ConditionTypeReady, Status: metav1.ConditionTrue, Reason: reason, Message: "Cluster is Ready"})
+		status.Phase = reason
 	}); err != nil {
 		return err
 	}
