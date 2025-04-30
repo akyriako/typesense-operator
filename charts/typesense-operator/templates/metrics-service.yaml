@@ -2,6 +2,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: {{ include "typesense-operator.fullname" . }}-controller-manager-metrics-service
+  namespace: {{ include "typesense-operator.namespace" . | quote }}
   labels:
     control-plane: controller-manager
   {{- include "typesense-operator.labels" . | nindent 4 }}
