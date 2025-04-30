@@ -1049,8 +1049,9 @@ spec:
                     type: string
                   serverDirectives:
                     type: string
+                  tlsSecretName:
+                    type: string
                 required:
-                - clusterIssuer
                 - host
                 - ingressClassName
                 type: object

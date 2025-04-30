@@ -245,12 +245,14 @@ introducing `TypesenseCluster`, a new Custom Resource Definition:
 | serverDirectives  | Nginx Proxy serverDirectives         | X        |         |
 | locationDirectives| Nginx Proxy locationDirectives       | X        |         |
 | host              | Ingress Host                         |          |         |
-| clusterIssuer     | cert-manager `ClusterIssuer`         |          |         |
+| clusterIssuer     | cert-manager `ClusterIssuer`         | X        |         |
+| tlsSecretName     | TLS secret name to use               | X        |         |
 | ingressClassName  | Ingress to be used                   |          |         |
 | annotations       | User-Defined annotations             | X        |         |
 
 > [!IMPORTANT]
-> This feature requires the existence of [cert-manager](https://cert-manager.io/) in the cluster, but **does not** actively enforce it with an error.
+> This feature makes use of the existence of [cert-manager](https://cert-manager.io/) in the cluster, but **does not** actively enforce it with an error.
+> If no clusterIssuer is specified a valid certificate must be stored in a secret and the secret name must be provided in the tlsSecretName config.
 > If you are targeting Open Telekom Cloud, you might be interested in provisioning additionally the designated DNS solver webhook
 > for Open Telekom Cloud. You can find it [here](https://github.com/akyriako/cert-manager-webhook-opentelekomcloud).
 
