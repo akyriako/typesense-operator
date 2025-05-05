@@ -46,6 +46,7 @@ spec:
           }}
         securityContext: {{- toYaml .Values.controllerManager.manager.containerSecurityContext
           | nindent 10 }}
+      imagePullSecrets: {{ .Values.imagePullSecrets | default list | toJson }}
       securityContext: {{- toYaml .Values.controllerManager.podSecurityContext | nindent
         8 }}
       serviceAccountName: {{ include "typesense-operator.fullname" . }}-controller-manager
