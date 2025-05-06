@@ -7,11 +7,12 @@ import (
 type NodeState string
 
 const (
-	LeaderState    NodeState = "LEADER"
-	FollowerState  NodeState = "FOLLOWER"
-	CandidateState NodeState = "CANDIDATE"
-	NotReadyState  NodeState = "NOT_READY"
-	ErrorState     NodeState = "ERROR"
+	LeaderState      NodeState = "LEADER"
+	FollowerState    NodeState = "FOLLOWER"
+	CandidateState   NodeState = "CANDIDATE"
+	NotReadyState    NodeState = "NOT_READY"
+	ErrorState       NodeState = "ERROR"
+	UnreachableState NodeState = "UNREACHABLE"
 )
 
 type NodeStatus struct {

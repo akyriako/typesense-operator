@@ -29,7 +29,8 @@ func (r *TypesenseClusterReconciler) getNodeStatus(ctx context.Context, httpClie
 
 	resp, err := httpClient.Do(req)
 	if err != nil {
-		return NodeStatus{State: NotReadyState}, nil
+		r.logger.Error(err, "request failed")
+		return NodeStatus{State: UnreachableState}, nil
 	}
 	defer resp.Body.Close()
 
@@ -62,7 +63,7 @@ func (r *TypesenseClusterReconciler) getClusterStatus(nodesStatus map[string]Nod
 			leaderNodes++
 		}
 
-		if nodeStatus.State == NotReadyState {
+		if nodeStatus.State == NotReadyState || nodeStatus.State == UnreachableState {
 			notReadyNodes++
 		}
 	}
@@ -100,6 +101,7 @@ func (r *TypesenseClusterReconciler) getNodeHealth(ctx context.Context, httpClie
 
 	resp, err := httpClient.Do(req)
 	if err != nil {
+		r.logger.Error(err, "request failed")
 		return NodeHealth{Ok: false}, nil
 	}
 	defer resp.Body.Close()
