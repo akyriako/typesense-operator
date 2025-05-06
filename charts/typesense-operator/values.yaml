@@ -12,12 +12,12 @@ controllerManager:
         - ALL
     image:
       repository: akyriako78/typesense-operator
-      tag: 0.2.20
+      tag: 0.2.21-dev.1
     imagePullPolicy: IfNotPresent
     resources:
       limits:
         cpu: 500m
-        memory: 128Mi
+        memory: 256Mi
       requests:
         cpu: 10m
         memory: 64Mi
