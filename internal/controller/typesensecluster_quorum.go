@@ -194,7 +194,7 @@ func (r *TypesenseClusterReconciler) downgradeQuorum(
 		return ConditionReasonQuorumNotReady, 0, err
 	}
 
-	err = r.ScaleStatefulSet(ctx, sts, desiredReplicas)
+	err = r.ScaleStatefulSet(ctx, stsObjectKey, desiredReplicas)
 	if err != nil {
 		return ConditionReasonQuorumNotReady, 0, err
 	}
@@ -224,7 +224,7 @@ func (r *TypesenseClusterReconciler) upgradeQuorum(
 		return ConditionReasonQuorumNotReady, 0, err
 	}
 
-	err = r.ScaleStatefulSet(ctx, sts, size)
+	err = r.ScaleStatefulSet(ctx, stsObjectKey, size)
 	if err != nil {
 		return ConditionReasonQuorumNotReady, 0, err
 	}

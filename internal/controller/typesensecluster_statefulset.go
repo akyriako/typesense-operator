@@ -391,7 +391,12 @@ func (r *TypesenseClusterReconciler) shouldUpdateStatefulSet(sts *appsv1.Statefu
 	return false
 }
 
-func (r *TypesenseClusterReconciler) ScaleStatefulSet(ctx context.Context, sts *appsv1.StatefulSet, desiredReplicas int32) error {
+func (r *TypesenseClusterReconciler) ScaleStatefulSet(ctx context.Context, stsObjectKey client.ObjectKey, desiredReplicas int32) error {
+	sts, err := r.GetFreshStatefulSet(ctx, stsObjectKey)
+	if err != nil {
+		return err
+	}
+
 	if sts.Spec.Replicas != nil && *sts.Spec.Replicas == desiredReplicas {
 		r.logger.V(debugLevel).Info("statefulset already scaled to desired replicas", "name", sts.Name, "replicas", desiredReplicas)
 		return nil
