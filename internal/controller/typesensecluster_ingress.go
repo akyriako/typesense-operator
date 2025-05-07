@@ -10,6 +10,8 @@ import (
 	"text/template"
 	"time"
 
+	"reflect"
+
 	tsv1alpha1 "github.com/akyriako/typesense-operator/api/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -18,7 +20,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/ptr"
-	"reflect"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -31,7 +32,7 @@ const (
 		  {{- end}}
 		  server {
 			listen 80;
-		
+
 			{{- if .Referer}}
 			{{.Referer}}
 			{{- end}}
@@ -41,7 +42,7 @@ const (
 			location / {
 			  proxy_pass http://{{.ServiceName}}-svc:{{.ServicePort}}/;
 			  proxy_pass_request_headers on;
-		
+
 			  {{- if .LocationDirectives}}
 			  {{.LocationDirectives}}
 			  {{- end}}
@@ -49,10 +50,9 @@ const (
 		  }
 		}`
 
-
-	referer = `valid_referers server_names %s;   
-					if ($invalid_referer) {  
-				  		return 403;     
+	referer = `valid_referers server_names %s;
+					if ($invalid_referer) {
+				  		return 403;
 					}`
 )
 
@@ -89,8 +89,9 @@ func (r *TypesenseClusterReconciler) ReconcileIngress(ctx context.Context, ts ts
 		}
 	} else {
 		if ts.Spec.Ingress.Host != ig.Spec.Rules[0].Host ||
-			ts.Spec.Ingress.ClusterIssuer != ig.Annotations["cert-manager.io/cluster-issuer"] ||
+			(ts.Spec.Ingress.ClusterIssuer != nil && *ts.Spec.Ingress.ClusterIssuer != ig.Annotations["cert-manager.io/cluster-issuer"]) ||
 			!reflect.DeepEqual(ts.Spec.Ingress.Annotations, r.getIngressAnnotations(ig)) ||
+			(ts.Spec.Ingress.TLSSecretName != nil && *ts.Spec.Ingress.TLSSecretName != ig.Spec.TLS[0].SecretName) ||
 			ts.Spec.Ingress.IngressClassName != *ig.Spec.IngressClassName {
 
 			r.logger.V(debugLevel).Info("updating ingress", "ingress", ingressObjectKey.Name)
@@ -211,11 +212,24 @@ func (r *TypesenseClusterReconciler) ReconcileIngress(ctx context.Context, ts ts
 }
 
 func (r *TypesenseClusterReconciler) createIngress(ctx context.Context, key client.ObjectKey, ts *tsv1alpha1.TypesenseCluster) (*networkingv1.Ingress, error) {
+	if ts.Spec.Ingress.ClusterIssuer == nil && ts.Spec.Ingress.TLSSecretName == nil {
+		return nil, fmt.Errorf("cluster issuer or tls secret name must be set, skipping ingress creation")
+	}
+
 	annotations := map[string]string{}
-	annotations["cert-manager.io/cluster-issuer"] = ts.Spec.Ingress.ClusterIssuer
+	var tlsSecretName string
+
+	if ts.Spec.Ingress.ClusterIssuer != nil {
+		annotations["cert-manager.io/cluster-issuer"] = *ts.Spec.Ingress.ClusterIssuer
+		tlsSecretName = fmt.Sprintf("%s-reverse-proxy-%s-certificate-tls", ts.Name, *ts.Spec.Ingress.ClusterIssuer)
+	}
 
 	if ts.Spec.Ingress.Annotations != nil {
 		maps.Copy(annotations, ts.Spec.Ingress.Annotations)
+	}
+
+	if ts.Spec.Ingress.TLSSecretName != nil {
+		tlsSecretName = *ts.Spec.Ingress.TLSSecretName
 	}
 
 	ingress := &networkingv1.Ingress{
@@ -225,7 +239,7 @@ func (r *TypesenseClusterReconciler) createIngress(ctx context.Context, key clie
 			TLS: []networkingv1.IngressTLS{
 				{
 					Hosts:      []string{ts.Spec.Ingress.Host},
-					SecretName: fmt.Sprintf("%s-reverse-proxy-%s-certificate-tls", ts.Name, ts.Spec.Ingress.ClusterIssuer),
+					SecretName: tlsSecretName,
 				},
 			},
 			Rules: []networkingv1.IngressRule{
@@ -268,18 +282,31 @@ func (r *TypesenseClusterReconciler) createIngress(ctx context.Context, key clie
 }
 
 func (r *TypesenseClusterReconciler) updateIngress(ctx context.Context, ig networkingv1.Ingress, ts *tsv1alpha1.TypesenseCluster) (*networkingv1.Ingress, error) {
+	if ts.Spec.Ingress.ClusterIssuer == nil && ts.Spec.Ingress.TLSSecretName == nil {
+		return nil, fmt.Errorf("cluster issuer or tls secret name must be set, keeping the current ingress in place")
+	}
 	patch := client.MergeFrom(ig.DeepCopy())
 
 	ig.Spec.Rules[0].Host = ts.Spec.Ingress.Host
 	ig.Spec.IngressClassName = ptr.To[string](ts.Spec.Ingress.IngressClassName)
 
 	annotations := map[string]string{}
-	annotations["cert-manager.io/cluster-issuer"] = ts.Spec.Ingress.ClusterIssuer
+	var tlsSecretName string
+
+	if ts.Spec.Ingress.ClusterIssuer != nil {
+		annotations["cert-manager.io/cluster-issuer"] = *ts.Spec.Ingress.ClusterIssuer
+		tlsSecretName = fmt.Sprintf("%s-reverse-proxy-%s-certificate-tls", ts.Name, *ts.Spec.Ingress.ClusterIssuer)
+	}
 
 	if ts.Spec.Ingress.Annotations != nil {
 		maps.Copy(annotations, ts.Spec.Ingress.Annotations)
 	}
 	ig.Annotations = annotations
+
+	if ts.Spec.Ingress.TLSSecretName != nil {
+		tlsSecretName = *ts.Spec.Ingress.TLSSecretName
+	}
+	ig.Spec.TLS[0].SecretName = tlsSecretName
 
 	if err := r.Patch(ctx, &ig, patch); err != nil {
 		return nil, err

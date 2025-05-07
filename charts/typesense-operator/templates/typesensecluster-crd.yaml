@@ -1034,6 +1034,7 @@ spec:
                       type: string
                     type: object
                   clusterIssuer:
+                    default: ""
                     type: string
                   host:
                     pattern: ^([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])(\.([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]{0,61}[a-zA-Z0-9]))*$
@@ -1049,8 +1050,10 @@ spec:
                     type: string
                   serverDirectives:
                     type: string
+                  tlsSecretName:
+                    default: ""
+                    type: string
                 required:
-                - clusterIssuer
                 - host
                 - ingressClassName
                 type: object
@@ -1074,12 +1077,12 @@ spec:
                         description: |-
                           Claims lists the names of resources, defined in spec.resourceClaims,
                           that are used by this container.
-  
-  
+
+
                           This is an alpha field and requires enabling the
                           DynamicResourceAllocation feature gate.
-  
-  
+
+
                           This field is immutable. It can only be set for containers.
                         items:
                           description: ResourceClaim references one entry in PodSpec.ResourceClaims.
@@ -1156,12 +1159,12 @@ spec:
                     description: |-
                       Claims lists the names of resources, defined in spec.resourceClaims,
                       that are used by this container.
-  
-  
+
+
                       This is an alpha field and requires enabling the
                       DynamicResourceAllocation feature gate.
-  
-  
+
+
                       This field is immutable. It can only be set for containers.
                     items:
                       description: ResourceClaim references one entry in PodSpec.ResourceClaims.
@@ -1339,8 +1342,8 @@ spec:
                         MatchLabelKeys cannot be set when LabelSelector isn't set.
                         Keys that don't exist in the incoming pod labels will
                         be ignored. A null or empty list means only match against labelSelector.
-  
-  
+
+
                         This is a beta field and requires the MatchLabelKeysInPodTopologySpread feature gate to be enabled (enabled by default).
                       items:
                         type: string
@@ -1379,8 +1382,8 @@ spec:
                         If value is nil, the constraint behaves as if MinDomains is equal to 1.
                         Valid values are integers greater than 0.
                         When value is not nil, WhenUnsatisfiable must be DoNotSchedule.
-  
-  
+
+
                         For example, in a 3-zone cluster, MaxSkew is set to 2, MinDomains is set to 5 and pods with the same
                         labelSelector spread as 2/2/2:
                         | zone1 | zone2 | zone3 |
@@ -1397,8 +1400,8 @@ spec:
                         when calculating pod topology spread skew. Options are:
                         - Honor: only nodes matching nodeAffinity/nodeSelector are included in the calculations.
                         - Ignore: nodeAffinity/nodeSelector are ignored. All nodes are included in the calculations.
-  
-  
+
+
                         If this value is nil, the behavior is equivalent to the Honor policy.
                         This is a beta-level feature default enabled by the NodeInclusionPolicyInPodTopologySpread feature flag.
                       type: string
@@ -1409,8 +1412,8 @@ spec:
                         - Honor: nodes without taints, along with tainted nodes for which the incoming pod
                         has a toleration, are included.
                         - Ignore: node taints are ignored. All nodes are included.
-  
-  
+
+
                         If this value is nil, the behavior is equivalent to the Ignore policy.
                         This is a beta-level feature default enabled by the NodeInclusionPolicyInPodTopologySpread feature flag.
                       type: string

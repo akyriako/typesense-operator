@@ -126,11 +126,15 @@ type IngressSpec struct {
 	ServerDirectives   *string `json:"serverDirectives,omitempty"`
 	LocationDirectives *string `json:"locationDirectives,omitempty"`
 
-	ClusterIssuer string `json:"clusterIssuer"`
+	// +optional
+	ClusterIssuer *string `json:"clusterIssuer,omitempty"`
 
 	IngressClassName string `json:"ingressClassName"`
 
 	Annotations map[string]string `json:"annotations,omitempty"`
+
+	// +optional
+	TLSSecretName *string `json:"tlsSecretName,omitempty"`
 }
 
 type DocSearchScraperSpec struct {
