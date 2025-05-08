@@ -37,6 +37,20 @@ func (s *TypesenseClusterSpec) GetAdditionalServerConfiguration() []corev1.EnvFr
 	return []corev1.EnvFromSource{}
 }
 
+func (s *DocSearchScraperSpec) GetScraperAuthConfiguration() []corev1.EnvFromSource {
+	if s.AuthConfiguration != nil {
+		return []corev1.EnvFromSource{
+			{
+				SecretRef: &corev1.SecretEnvSource{
+					LocalObjectReference: *s.AuthConfiguration,
+				},
+			},
+		}
+	}
+
+	return []corev1.EnvFromSource{}
+}
+
 func (s *TypesenseClusterSpec) GetCorsDomains() string {
 	if s.CorsDomains == nil {
 		return ""
