@@ -5,8 +5,8 @@
 ![26_0](https://img.shields.io/badge/typesense-26.0-lightgreen?logoColor=black&link=https%3A%2F%2Ftypesense.org%2Fdocs%2F26.0%2Fapi%2F)
 ![Kubernetes](https://img.shields.io/badge/kubernetes-1.26+-lightgreen?labelColor=blue&link=https%3A%2F%2Ftypesense.org%2Fdocs%2F27.0%2Fapi%2F)
 
-The **Typesense Kubernetes Operator** is designed to manage the deployment and lifecycle of [Typesense](https://typesense.org/) clusters within Kubernetes environments. 
-The operator is developed in Go using [Operator SDK Framework](https://sdk.operatorframework.io/), an open source toolkit to manage Kubernetes native applications, called Operators, in an effective, automated, and scalable way. 
+The **Typesense Kubernetes Operator** is designed to manage the deployment and lifecycle of [Typesense](https://typesense.org/) clusters within Kubernetes environments.
+The operator is developed in Go using [Operator SDK Framework](https://sdk.operatorframework.io/), an open source toolkit to manage Kubernetes native applications, called Operators, in an effective, automated, and scalable way.
 
 ## Description
 
@@ -15,7 +15,7 @@ Key features of Typesense Kubernetes Operator include:
 - **Custom Resource Management**: Provides a Kubernetes-native interface to define and manage Typesense cluster configurations using a CRD named `TypesenseCluster`.
 - **Typesense Lifecycle Automation**: Simplifies deploying, scaling, and managing Typesense clusters. Handles aspects like:
     - bootstrap Typesense's Admin API Key creation as a `Secret`,
-    - deploy Typesense as a `StatefulSet`, each Pod contains two containers: 
+    - deploy Typesense as a `StatefulSet`, each Pod contains two containers:
       1. the _Typesense node_ itself based on the image provided in the `specs`
       2. the _Typesense node metrics exporter_ (as a sidecar), based on the image provided in the `spec.metricsSpec`
     - provision Typesense services (headless & discovery `Services`),
@@ -69,11 +69,11 @@ Typesense may be unacceptable. The Typesense Kubernetes Operator addresses both 
 
 The Typesense Kubernetes Operator manages the entire lifecycle of Typesense Clusters within Kubernetes:
 
-1. A random token is generated and stored as a base64-encoded value in a new `Secret`. This token serves as the Admin API 
+1. A random token is generated and stored as a base64-encoded value in a new `Secret`. This token serves as the Admin API
    key for bootstrapping the Typesense cluster.
 
 > [!NOTE]
-> You can alternative provide your own `Secret` by setting the value of `adminApiKey` in `TypesenseCluster` specs; this will be used instead. 
+> You can alternative provide your own `Secret` by setting the value of `adminApiKey` in `TypesenseCluster` specs; this will be used instead.
 > The data key name has to be **always** `typesense-api-key`!
 > ```yaml
 > apiVersion: v1
@@ -83,7 +83,7 @@ The Typesense Kubernetes Operator manages the entire lifecycle of Typesense Clus
 >  type: Opaque
 > data:
 >  typesense-api-key: SXdpVG9CcnFYTHZYeTJNMG1TS1hPaGt0dlFUY3VWUloxc1M5REtsRUNtMFFwQU93R1hoanVIVWJLQnE2ejdlSQ==
-> ``` 
+> ```
 
 2. A `NodesListConfigMap` is created, containing the endpoints of the cluster nodes as a single concatenated string in its `data` field.
    During each reconciliation loop, the operator identifies any changes in endpoints and updates the `NodesListConfigMap`. This `NodesListConfigMap`
@@ -96,8 +96,8 @@ The Typesense Kubernetes Operator manages the entire lifecycle of Typesense Clus
 > * **This completely eliminates the need for a sidecar** to translate the endpoints of the headless `Service` into `Pod` IP addresses.
 > The endpoints automatically resolves to the new IP addresses, and raft will begin contacting these endpoints
 > within its 30-second polling interval.
-> * Be cautious while choosing the cluster name (`Spec.Name`) in `TypesenseCluster` CRDs, as raft expects the combined endpoint name and 
-> API and Peering ports (e.g. `{cluster-name}-sts-{pod-index}.{cluster-name}-sts-svc:8107:8108`) **not** to exceed  **64** characters 
+> * Be cautious while choosing the cluster name (`Spec.Name`) in `TypesenseCluster` CRDs, as raft expects the combined endpoint name and
+> API and Peering ports (e.g. `{cluster-name}-sts-{pod-index}.{cluster-name}-sts-svc:8107:8108`) **not** to exceed  **64** characters
 > in length.
 
 3. Next, the reconciler creates a headless `Service` required for the `StatefulSet`, along with a standard Kubernetes
@@ -105,8 +105,8 @@ The Typesense Kubernetes Operator manages the entire lifecycle of Typesense Clus
 4. A `StatefulSet` is then created. The quorum configuration stored in the `NodesListConfigMap` is mounted as a volume in each `Pod`
    under `/usr/share/typesense/nodelist`. No `Pod` restart is necessary when the `NodesListConfigMap` changes, as raft automatically
    detects and applies the updates.
-5. Optionally, an **nginx:alpine** workload is provisioned as `Deployment` and published via an `Ingress`, in order to exposed safely 
-   the Typesense REST/API endpoint outside the Kubernetes cluster **only** to selected referrers. The configuration of the 
+5. Optionally, an **nginx:alpine** workload is provisioned as `Deployment` and published via an `Ingress`, in order to exposed safely
+   the Typesense REST/API endpoint outside the Kubernetes cluster **only** to selected referrers. The configuration of the
    nginx workload is stored in a `NodesListConfigMap`.
 6. Optionally, one or more instances of **DocSearch** are deployed as distinct `CronJobs` (one per scraping target URL),
    which based on user-defined schedules, periodically scrape the target sites and store the results in Typesense.
@@ -132,13 +132,13 @@ of manual intervention in order to recover a cluster that has lost quorum.
 ![image](https://github.com/user-attachments/assets/007852ba-e173-43a4-babf-d250f8a34ad1)
 
 > [!IMPORTANT]
-> [Scaling the StatefulSet down and subsequently (gradually) up](https://typesense.org/docs/guide/high-availability.html#recovering-a-cluster-that-has-lost-quorum), 
+> [Scaling the StatefulSet down and subsequently (gradually) up](https://typesense.org/docs/guide/high-availability.html#recovering-a-cluster-that-has-lost-quorum),
 > would typically be the manual intervention needed to recover a cluster that has lost its quorum.
 > **However**, the controller automates this process, as long as is not a memory or disk capacity issue, ensuring no service
 > interruption and **eliminating the need for any administration action**.
 
 
-0. The quorum reconciler probes each cluster node **status** endpoint: `http://{nodeUrl}:{api-port}/status`. The response 
+0. The quorum reconciler probes each cluster node **status** endpoint: `http://{nodeUrl}:{api-port}/status`. The response
     looks like this:
     ```json
     {"committed_index":1,"queued_writes":0,"state":"LEADER"}
@@ -147,7 +147,7 @@ of manual intervention in order to recover a cluster that has lost quorum.
     the controller will evaluate the status of the whole cluster which can be:
 
     | Status            | Description                                                    |
-    |-------------------|----------------------------------------------------------------|
+    | ----------------- | -------------------------------------------------------------- |
     | OK                | A single `LEADER` node was found                               |
     | SPLIT_BRAIN       | More than one `LEADER`s were found                             |
     | NOT_READY         | More than the minimum required nodes were in `NOT_READY` state |
@@ -158,13 +158,13 @@ of manual intervention in order to recover a cluster that has lost quorum.
 > of its individual nodes. It is just an indication of what's going on internally in the pods/nodes.
 
 1. If the cluster status is evaluated as `SPLIT_BRAIN`, it is instantly downgraded to a single node cluster
-    giving Typesense the chance to try recover a healthy quorum fast and reliable. 
+    giving Typesense the chance to try recover a healthy quorum fast and reliable.
 
-2. For any other cluster status outcome, the quorum reconciler, proceeds to probe each cluster node health endpoint: 
+2. For any other cluster status outcome, the quorum reconciler, proceeds to probe each cluster node health endpoint:
 `http://{nodeUrl}:{api-port}/health`. The various response values of this request can be:
 
     | Response                                             | HTTP Status Code | Description                                         |
-    |------------------------------------------------------|:----------------:|-----------------------------------------------------|
+    | ---------------------------------------------------- | :--------------: | --------------------------------------------------- |
     | `{ok: true}`                                         |      `200`       | The node is healthy and active member of the quorum |
     | `{ok: false}`                                        |      `503`       | The node is unhealthy (various reasons)             |
     | `{ok: false, resource_error: "OUT_OF_{MEMORY/DISK}}` |      `503`       | The node requires manual intervention               |
@@ -173,19 +173,19 @@ of manual intervention in order to recover a cluster that has lost quorum.
 3. If the cluster status is evaluated as `ELECTION_DEADLOCK`, it is instantly downgraded to a single node cluster
    giving Typesense the chance to try recover a healthy quorum fast and reliable.
 
-4.  - If the cluster status is evaluated as `NOT_READY` and it's either a single node cluster or the healthy evaluated 
-      nodes are less than the minimum required nodes (at least `(N-1)/2`) then the cluster is instantly downgraded to a 
-      single node cluster giving Typesense the chance to try recover a healthy quorum fast and reliable and waits a term 
-      before starting the reconciliation again. If nothing of the above conditions are met, then the reconciler proceeds 
+4.  - If the cluster status is evaluated as `NOT_READY` and it's either a single node cluster or the healthy evaluated
+      nodes are less than the minimum required nodes (at least `(N-1)/2`) then the cluster is instantly downgraded to a
+      single node cluster giving Typesense the chance to try recover a healthy quorum fast and reliable and waits a term
+      before starting the reconciliation again. If nothing of the above conditions are met, then the reconciler proceeds
       to the next check point:
-    - If the cluster status is evaluated as `OK` but the number of actual `StatefulSet` replicas is less than the desired 
-      number of replicas specified in the `typesense.specs.replicas`, it is upgraded (either instantly or gradually; 
-      depends on the value of `typesense.specs.incrementalQuorumRecovery`) and restarts the reconciliation after 
+    - If the cluster status is evaluated as `OK` but the number of actual `StatefulSet` replicas is less than the desired
+      number of replicas specified in the `typesense.specs.replicas`, it is upgraded (either instantly or gradually;
+      depends on the value of `typesense.specs.incrementalQuorumRecovery`) and restarts the reconciliation after
       approximately a minute. If none of the conditions above are met, the reconciler proceeds to the next check point:
     - If the healthy evaluated nodes are less than the minimum required nodes (at least `(N-1)/2`), then the cluster is
       marked as not ready and returns the control back to the reconciler waiting a term till it restarts the reconciliation loop,
-    - If none of these checkpoints led to a restart of the reconciliation loop without a quorum recovery, then 
-      the then the cluster is marked as **ready and fully operational**. 
+    - If none of these checkpoints led to a restart of the reconciliation loop without a quorum recovery, then
+      the then the cluster is marked as **ready and fully operational**.
 
 ## Custom Resource Definitions
 
@@ -198,27 +198,27 @@ introducing `TypesenseCluster`, a new Custom Resource Definition:
 
 **Spec**
 
-| Name                          | Description                                                            | Optional | Default       |
-|-------------------------------|------------------------------------------------------------------------|----------|---------------|
-| image                         | Typesense image                                                        |          |               |
-| adminApiKey                   | Reference to the `Secret` to be used for bootstrap                     | X        |               |
-| replicas                      | Size of the cluster (allowed 1, 3, 5 or 7)                             |          | 3             |
-| apiPort                       | REST/API port                                                          |          | 8108          |
-| peeringPort                   | Peering port                                                           |          | 8107          |
-| resetPeersOnError             | automatic reset of peers on error                                      |          | true          |
-| enableCors                    | enables CORS                                                           | X        | false         |
-| corsDomains                   | comma separated list of domains allowed for CORS                       | X        |               |
-| resources                     | resource request & limit                                               | X        | _check specs_ |
-| affinity                      | group of affinity scheduling rules                                     | X        |               |
-| nodeSelector                  | node selection constraint                                              | X        |               |
-| tolerations                   | schedule pods with matching taints                                     | X        |               |
-| additionalServerConfiguration | a reference to a `NodesListConfigMap` holding extra configuration      | X        |               |
-| storage                       | check `StorageSpec` below                                              |          |               |
-| ingress                       | check `IngressSpec` below                                              | X        |               |
-| scrapers                      | array of `DocSearchScraperSpec`; check below                           | X        |               |
-| metrics                       | check `MetricsSpec` below                                              | X        |               |
-| topologySpreadConstraints     | how to spread a  group of pods across topology domains                 | X        |               |
-| incrementalQuorumRecovery     | add nodes gradually to the statefulset while recovering                | X        | false         |
+| Name                          | Description                                                       | Optional | Default       |
+| ----------------------------- | ----------------------------------------------------------------- | -------- | ------------- |
+| image                         | Typesense image                                                   |          |               |
+| adminApiKey                   | Reference to the `Secret` to be used for bootstrap                | X        |               |
+| replicas                      | Size of the cluster (allowed 1, 3, 5 or 7)                        |          | 3             |
+| apiPort                       | REST/API port                                                     |          | 8108          |
+| peeringPort                   | Peering port                                                      |          | 8107          |
+| resetPeersOnError             | automatic reset of peers on error                                 |          | true          |
+| enableCors                    | enables CORS                                                      | X        | false         |
+| corsDomains                   | comma separated list of domains allowed for CORS                  | X        |               |
+| resources                     | resource request & limit                                          | X        | _check specs_ |
+| affinity                      | group of affinity scheduling rules                                | X        |               |
+| nodeSelector                  | node selection constraint                                         | X        |               |
+| tolerations                   | schedule pods with matching taints                                | X        |               |
+| additionalServerConfiguration | a reference to a `NodesListConfigMap` holding extra configuration | X        |               |
+| storage                       | check `StorageSpec` below                                         |          |               |
+| ingress                       | check `IngressSpec` below                                         | X        |               |
+| scrapers                      | array of `DocSearchScraperSpec`; check below                      | X        |               |
+| metrics                       | check `MetricsSpec` below                                         | X        |               |
+| topologySpreadConstraints     | how to spread a  group of pods across topology domains            | X        |               |
+| incrementalQuorumRecovery     | add nodes gradually to the statefulset while recovering           | X        | false         |
 
 > [!IMPORTANT]
 > * Any Typesense server configuration variable that is defined in Spec is overriding any additional reference of
@@ -232,23 +232,23 @@ introducing `TypesenseCluster`, a new Custom Resource Definition:
 **StorageSpec** (optional)
 
 | Name             | Description                 | Optional | Default  |
-|------------------|-----------------------------|----------|----------|
+| ---------------- | --------------------------- | -------- | -------- |
 | size             | Size of the underlying `PV` | X        | 100Mi    |
 | storageClassName | `StorageClass` to be used   |          | standard |
 
 **IngressSpec** (optional)
 
-| Name              | Description                          | Optional | Default |
-|-------------------|--------------------------------------|----------|---------|
-| referer           | FQDN allowed to access reverse proxy | X        |         |
-| HttpDirectives    | Nginx Proxy HttpDirectives           | X        |         |
-| serverDirectives  | Nginx Proxy serverDirectives         | X        |         |
-| locationDirectives| Nginx Proxy locationDirectives       | X        |         |
-| host              | Ingress Host                         |          |         |
-| clusterIssuer     | cert-manager `ClusterIssuer`         | X        |         |
-| tlsSecretName     | TLS secret name to use               | X        |         |
-| ingressClassName  | Ingress to be used                   |          |         |
-| annotations       | User-Defined annotations             | X        |         |
+| Name               | Description                          | Optional | Default |
+| ------------------ | ------------------------------------ | -------- | ------- |
+| referer            | FQDN allowed to access reverse proxy | X        |         |
+| HttpDirectives     | Nginx Proxy HttpDirectives           | X        |         |
+| serverDirectives   | Nginx Proxy serverDirectives         | X        |         |
+| locationDirectives | Nginx Proxy locationDirectives       | X        |         |
+| host               | Ingress Host                         |          |         |
+| clusterIssuer      | cert-manager `ClusterIssuer`         | X        |         |
+| tlsSecretName      | TLS secret name to use               | X        |         |
+| ingressClassName   | Ingress to be used                   |          |         |
+| annotations        | User-Defined annotations             | X        |         |
 
 > [!IMPORTANT]
 > This feature makes use of the existence of [cert-manager](https://cert-manager.io/) in the cluster, but **does not** actively enforce it with an error.
@@ -258,37 +258,37 @@ introducing `TypesenseCluster`, a new Custom Resource Definition:
 
 **DocSearchScraperSpec** (optional)
 
-| Name        | Description                              | Optional | Default |
-|-------------|------------------------------------------|----------|---------|
-| name        | name of the scraper                      |          |         |
-| image       | container image to use                   |          |         |
-| config      | config to use                            |          |         |
-| schedule    | cron expression; no timezone; no seconds |          |         |
+| Name     | Description                              | Optional | Default |
+| -------- | ---------------------------------------- | -------- | ------- |
+| name     | name of the scraper                      |          |         |
+| image    | container image to use                   |          |         |
+| config   | config to use                            |          |         |
+| schedule | cron expression; no timezone; no seconds |          |         |
 
 > [!CAUTION]
 > Although in Typesense documentation under _Production Best Practices_ -> _Configuration_ is stated:
-> "_Typesense comes built-in with a high performance HTTP server (opens new window)that is used by likes of Fastly (opens new window)in 
-> their edge servers at scale. So Typesense can be directly exposed to incoming public-facing internet traffic, 
-> without the need to place it behind another web server like Nginx / Apache or your backend API._" 
-> 
+> "_Typesense comes built-in with a high performance HTTP server (opens new window)that is used by likes of Fastly (opens new window)in
+> their edge servers at scale. So Typesense can be directly exposed to incoming public-facing internet traffic,
+> without the need to place it behind another web server like Nginx / Apache or your backend API._"
+>
 > It is highly recommended, from this operator's perspective, to always expose Typesense behind a reverse proxy (using the `referer` option).
 
 **MetricsSpec** (optional)
 
 | Name      | Description                               | Optional | Default                                        |
-|-----------|-------------------------------------------|----------|------------------------------------------------|
+| --------- | ----------------------------------------- | -------- | ---------------------------------------------- |
 | image     | container image to use                    | X        | akyriako78/typesense-prometheus-exporter:0.1.7 |
 | release   | Prometheus release to become a target of  |          |                                                |
 | interval  | interval in _seconds_ between two scrapes | X        | 15                                             |
 | resources | resource request & limit                  | X        | _check specs_                                  |
 
 > [!TIP]
-> If you've provisioned Prometheus via [kube-prometheus-stack](https://github.com/prometheus-community/helm-charts/blob/main/charts/kube-prometheus-stack/README.md), 
+> If you've provisioned Prometheus via [kube-prometheus-stack](https://github.com/prometheus-community/helm-charts/blob/main/charts/kube-prometheus-stack/README.md),
 > you can find the corresponding `release` value of your Prometheus instance by checking the labels of the operator pod e.g:
-> 
+>
 > ```bash
 > kubectl describe pod {kube-prometheus-stack-operator-pod} -n {kube-prometheus-stack-namespace}
-> 
+>
 > name:             promstack-kube-prometheus-operator-755485dc68-dmkw2
 > Namespace:        monitoring
 > [...]
@@ -312,14 +312,14 @@ introducing `TypesenseCluster`, a new Custom Resource Definition:
 **Spec**
 
 | Name       | Description                                                                        |
-|------------|------------------------------------------------------------------------------------|
-| phase      | Typesense Cluster/Controller Operational Phase                                     |       
-| conditions | `metav1.Condition`s related to the outcome of the reconciliation (see table below) | 
+| ---------- | ---------------------------------------------------------------------------------- |
+| phase      | Typesense Cluster/Controller Operational Phase                                     |
+| conditions | `metav1.Condition`s related to the outcome of the reconciliation (see table below) |
 
 **Conditions Summary**
 
 | Condition      | Value | Reason                     | Description                                                |
-|----------------|-------|----------------------------|------------------------------------------------------------|
+| -------------- | ----- | -------------------------- | ---------------------------------------------------------- |
 | ConditionReady | true  | QuorumReady                | Cluster is Operational                                     |
 |                | false | QuorumNotReady             | Cluster is not Operational                                 |
 |                | false | QuorumNotReadyWaitATerm    | Cluster is not Operational; Waits a Terms                  |
@@ -344,6 +344,31 @@ helm repo update
 helm upgrade --install typesense-operator typesense-operator/typesense-operator -n typesense-system --create-namespace
 ```
 
+With Helm v3, CRDs created by this chart are not updated by default and should be manually updated.
+Consult also the [Helm Documentation on CRDs](https://helm.sh/docs/chart_best_practices/custom_resource_definitions).
+
+#### From <= 0.2.20 to 0.2.21
+
+CRDs are moved into the `typesense-operator/chart/crds` directory. We added the possibility to define a secret name for the reverse proxy ingress.
+
+```bash
+kubectl apply --force-conflicts --server-side -f https://raw.githubusercontent.com/akyriako/typesense-operator/refs/tags/typesense-operator-0.2.21/charts/typesense-operator/crds/typesensecluster-crd.yaml
+```
+
+> Force Conflicts is required here as CRDs have some helm specific values that are now removed.
+
+**ATTENTION:** Installing this will remove the formerly template handled CRDs. To prevent this and migrate gracefully annotate the CRDs beforehand:
+
+```bash
+kubectl annotate customresourcedefinitions.apiextensions.k8s.io typesenseclusters.ts.opentelekomcloud.com helm.sh/resource-policy=keep
+```
+
+After the installation you can remove the annotation again:
+
+```bash
+kubectl annotate customresourcedefinitions.apiextensions.k8s.io typesenseclusters.ts.opentelekomcloud.com helm.sh/resource-policy-
+```
+
 ### Running on the cluster
 
 #### Deploy from Sources
@@ -365,7 +390,7 @@ make deploy IMG=<some-registry>/typesense-operator:<tag>
 Provision one of the samples available in `config/samples`:
 
 | Suffix           | Description        | CSI Driver                                 | Storage Class         |
-|------------------|--------------------|--------------------------------------------|-----------------------|
+| ---------------- | ------------------ | ------------------------------------------ | --------------------- |
 |                  | Generic            |                                            | standard              |
 | azure            | Microsoft Azure    | disk.csi.azure.com                         | managed-csi           |
 | aws              | AWS                | ebs.csi.aws.com                            | gp2                   |
@@ -451,7 +476,7 @@ If you are editing the API definitions, generate the manifests such as CRs or CR
 make generate && make manifests
 ```
 
-> [!NOTE] 
+> [!NOTE]
 > Run `make --help` for more information on all potential `make` targets
 
 More information can be found via the [Kubebuilder Documentation](https://book.kubebuilder.io/introduction.html)
@@ -460,8 +485,8 @@ More information can be found via the [Kubebuilder Documentation](https://book.k
 
 When debugging (or running the controller out-of-cluster with `make run`) all **health** and **status** requests to individual pods
 will fail as the node endpoints are not available to your development machine. For that matter you will need to deploy
-on your environment [KubeVPN](https://github.com/KubeNetworks/kubevpn). KubeVPN, offers a Cloud Native Dev Environment 
-that connects to your Kubernetes cluster network. It facilitates the interception of inbound traffic from remote 
+on your environment [KubeVPN](https://github.com/KubeNetworks/kubevpn). KubeVPN, offers a Cloud Native Dev Environment
+that connects to your Kubernetes cluster network. It facilitates the interception of inbound traffic from remote
 Kubernetes cluster services or pods to your local PC so you can access them using either their FQDN or their IP address.
 
 Follow the [official installation instructions](https://github.com/KubeNetworks/kubevpn?tab=readme-ov-file#quickstart) to install and configure KubeVPN.
