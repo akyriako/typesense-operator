@@ -52,7 +52,7 @@ OPERATOR_SDK_VERSION ?= v1.38.0
 # Image URL to use all building/pushing image targets
 DOCKER_HUB_NAME ?= $(shell docker info | sed '/Username:/!d;s/.* //')
 IMG_NAME ?= typesense-operator
-IMG_TAG ?= 0.2.21
+IMG_TAG ?= 0.2.22
 IMG ?= $(DOCKER_HUB_NAME)/$(IMG_NAME):$(IMG_TAG)
 
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
@@ -343,4 +343,6 @@ $(HELMIFY): $(LOCALBIN)
 	test -s $(LOCALBIN)/helmify || GOBIN=$(LOCALBIN) go install github.com/arttor/helmify/cmd/helmify@latest
 
 helm: manifests kustomize helmify
-	$(KUSTOMIZE) build config/default | $(HELMIFY) -crd-dir -image-pull-secrets charts/typesense-operator
+	$(KUSTOMIZE) build config/default | $(HELMIFY) -image-pull-secrets charts/typesense-operator
+	sed -i -e 's|^appVersion:.*|appVersion: "$(IMG_TAG)"|' -e 's|^version:.*|version: $(IMG_TAG)|' charts/typesense-operator/Chart.yaml
+
