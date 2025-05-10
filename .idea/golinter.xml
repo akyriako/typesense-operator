@@ -25,7 +25,5 @@
         <option value="prealloc" />
       </list>
     </option>
-    <option name="goLinterExe" value="$PROJECT_DIR$/../../../../lint/golangci-lint" />
-    <option name="linterSelected" value="true" />
   </component>
 </project>
