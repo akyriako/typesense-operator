@@ -135,6 +135,9 @@ type IngressSpec struct {
 
 	// +optional
 	TLSSecretName *string `json:"tlsSecretName,omitempty"`
+
+	// +kubebuilder:validation:Optional
+	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
 }
 
 type DocSearchScraperSpec struct {

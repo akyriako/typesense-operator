@@ -83,6 +83,17 @@ spec:
   storage:
     size: 75Mi
     storageClassName: typesense-local-path
+#  ingress:
+#    host: www.example.de
+#    ingressClassName: nginx
+#    clusterIssuer: opentelekomcloud-letsencrypt-staging
+#    resources:
+#      limits:
+#        cpu: "300m"
+#        memory: "128Mi"
+#      requests:
+#        cpu: "100m"
+#        memory: "32Mi"
   scrapers:
     - name: docusaurus-example-com
       image: typesense/docsearch-scraper:0.11.0

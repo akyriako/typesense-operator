@@ -169,7 +169,13 @@ func (r *TypesenseClusterReconciler) ReconcileIngress(ctx context.Context, ts ts
 			return err
 		}
 	} else {
-		if configMapUpdated {
+		desiredResources := ts.Spec.Ingress.GetReverseProxyResources()
+		deploymentResourcesNeedUpdate := !reflect.DeepEqual(desiredResources, deployment.Spec.Template.Spec.Containers[0].Resources)
+		if deploymentResourcesNeedUpdate {
+			deployment.Spec.Template.Spec.Containers[0].Resources = desiredResources
+		}
+
+		if configMapUpdated || deploymentResourcesNeedUpdate {
 			if deployment.Spec.Template.Annotations == nil {
 				deployment.Spec.Template.Annotations = make(map[string]string)
 			}
@@ -469,6 +475,7 @@ func (r *TypesenseClusterReconciler) createIngressDeployment(ctx context.Context
 									ContainerPort: 80,
 								},
 							},
+							Resources: ts.Spec.Ingress.GetReverseProxyResources(),
 							VolumeMounts: []v1.VolumeMount{
 								{
 									Name:      "nginx-config",
