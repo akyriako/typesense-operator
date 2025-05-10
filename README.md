@@ -256,22 +256,28 @@ introducing `TypesenseCluster`, a new Custom Resource Definition:
 > If you are targeting Open Telekom Cloud, you might be interested in provisioning additionally the designated DNS solver webhook
 > for Open Telekom Cloud. You can find it [here](https://github.com/akyriako/cert-manager-webhook-opentelekomcloud).
 
-**DocSearchScraperSpec** (optional)
-
-| Name        | Description                              | Optional | Default |
-|-------------|------------------------------------------|----------|---------|
-| name        | name of the scraper                      |          |         |
-| image       | container image to use                   |          |         |
-| config      | config to use                            |          |         |
-| schedule    | cron expression; no timezone; no seconds |          |         |
-
 > [!CAUTION]
 > Although in Typesense documentation under _Production Best Practices_ -> _Configuration_ is stated:
-> "_Typesense comes built-in with a high performance HTTP server (opens new window)that is used by likes of Fastly (opens new window)in 
-> their edge servers at scale. So Typesense can be directly exposed to incoming public-facing internet traffic, 
-> without the need to place it behind another web server like Nginx / Apache or your backend API._" 
-> 
+> "_Typesense comes built-in with a high performance HTTP server (opens new window)that is used by likes of Fastly (opens new window)in
+> their edge servers at scale. So Typesense can be directly exposed to incoming public-facing internet traffic,
+> without the need to place it behind another web server like Nginx / Apache or your backend API._"
+>
 > It is highly recommended, from this operator's perspective, to always expose Typesense behind a reverse proxy (using the `referer` option).
+
+**DocSearchScraperSpec** (optional)
+
+| Name              | Description                                          | Optional | Default |
+|-------------------|------------------------------------------------------|----------|---------|
+| name              | name of the scraper                                  |          |         |
+| image             | container image to use                               |          |         |
+| config            | config to use                                        |          |         |
+| schedule          | cron expression; no timezone; no seconds             |          |         |
+| authConfiguration | a reference to a `Secret` holding auth configuration | X        |         |
+
+> [!IMPORTANT]
+> If you need to scrape a target that requires authentication, you can add the authentication configuration
+> as environment variables via `authConfiguration`. In order to see which options are supported currently out of the box,
+> consult the official documentation: https://typesense.org/docs/guide/docsearch.html#authentication
 
 **MetricsSpec** (optional)
 
