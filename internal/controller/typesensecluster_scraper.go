@@ -163,6 +163,7 @@ func (r *TypesenseClusterReconciler) createScraper(ctx context.Context, key clie
 											Value: "http",
 										},
 									},
+									EnvFrom: scraperSpec.GetScraperAuthConfiguration(),
 									Resources: corev1.ResourceRequirements{
 										Limits: corev1.ResourceList{
 											corev1.ResourceCPU:    resource.MustParse("1024m"),

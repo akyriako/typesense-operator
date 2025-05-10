@@ -53,42 +53,46 @@ spec:
 #  name: c-kind-2-config
 #data:
 #  TYPESENSE_ENABLE_SEARCH_ANALYTICS: "true"
-#---
-#apiVersion: ts.opentelekomcloud.com/v1alpha1
-#kind: TypesenseCluster
-#metadata:
-#  labels:
-#    app.kubernetes.io/name: typesense-operator
-#    app.kubernetes.io/managed-by: kustomize
-#  name: c-kind-2
-#spec:
-#  image: typesense/typesense:26.0
-#  replicas: 5
-#  enableCors: true
-#  apiPort: 8108
-#  additionalServerConfiguration:
-#    name: c-kind-2-config
-#  storage:
-#    size: 75Mi
-#    storageClassName: typesense-local-path
-#  ingress:
-#    host: host.example.com
-#    ingressClassName: nginx
-#    clusterIssuer: lets-encrypt-prod
-#  scrapers:
-#    - name: empty-target
-#      image: typesense/docsearch-scraper:0.11.0
-#      config: ''
-#      schedule: '*/2 * * * *'
-#    - name: docusaurus-example-com
-#      image: typesense/docsearch-scraper:0.11.0
-#      config: "{\"index_name\":\"docuraurus-example\",\"start_urls\":[\"https://docusaurus.example.com/\"],\"sitemap_urls\":[\"https://docusaurus.example.com/sitemap.xml\"],\"sitemap_alternate_links\":true,\"stop_urls\":[\"/tests\"],\"selectors\":{\"lvl0\":{\"selector\":\"(//ul[contains(@class,'menu__list')]//a[contains(@class, 'menu__link menu__link--sublist menu__link--active')]/text() | //nav[contains(@class, 'navbar')]//a[contains(@class, 'navbar__link--active')]/text())[last()]\",\"type\":\"xpath\",\"global\":true,\"default_value\":\"Documentation\"},\"lvl1\":\"header h1\",\"lvl2\":\"article h2\",\"lvl3\":\"article h3\",\"lvl4\":\"article h4\",\"lvl5\":\"article h5, article td:first-child\",\"lvl6\":\"article h6\",\"text\":\"article p, article li, article td:last-child\"},\"strip_chars\":\" .,;:#\",\"custom_settings\":{\"separatorsToIndex\":\"_\",\"attributesForFaceting\":[\"language\",\"version\",\"type\",\"docusaurus_tag\"],\"attributesToRetrieve\":[\"hierarchy\",\"content\",\"anchor\",\"url\",\"url_without_anchor\",\"type\"]},\"conversation_id\":[\"833762294\"],\"nb_hits\":46250}"
-#      schedule: '*/2 * * * *'
-#  metrics:
-#    image: akyriako78/typesense-prometheus-exporter:0.1.7
-#    interval: 15
-#    release: promstack
-#---
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  labels:
+    app.kubernetes.io/name: typesense-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: scraper-auth-docusaurus-example-com
+type: Opaque
+data:
+  KC_URL: VGhpc0lzTm90QVNlY3VyZVBhc3N3b3Jk
+  KC_REALM: VGhpc0lzTm90QVNlY3VyZVBhc3N3b3Jk
+  KC_CLIENT_ID: VGhpc0lzTm90QVNlY3VyZVBhc3N3b3Jk
+  KC_CLIENT_SECRET: VGhpc0lzTm90QVNlY3VyZVBhc3N3b3Jk
+---
+apiVersion: ts.opentelekomcloud.com/v1alpha1
+kind: TypesenseCluster
+metadata:
+  labels:
+    app.kubernetes.io/name: typesense-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: c-kind-2
+spec:
+  image: typesense/typesense:28.0
+  replicas: 5
+  enableCors: true
+  apiPort: 8108
+  storage:
+    size: 75Mi
+    storageClassName: typesense-local-path
+  scrapers:
+    - name: docusaurus-example-com
+      image: typesense/docsearch-scraper:0.11.0
+      authConfiguration:
+        name: scraper-auth-docusaurus-example-com
+      config: "{\"index_name\":\"docuraurus-example\",\"start_urls\":[\"https://docusaurus.example.com/\"],\"sitemap_urls\":[\"https://docusaurus.example.com/sitemap.xml\"],\"sitemap_alternate_links\":true,\"stop_urls\":[\"/tests\"],\"selectors\":{\"lvl0\":{\"selector\":\"(//ul[contains(@class,'menu__list')]//a[contains(@class, 'menu__link menu__link--sublist menu__link--active')]/text() | //nav[contains(@class, 'navbar')]//a[contains(@class, 'navbar__link--active')]/text())[last()]\",\"type\":\"xpath\",\"global\":true,\"default_value\":\"Documentation\"},\"lvl1\":\"header h1\",\"lvl2\":\"article h2\",\"lvl3\":\"article h3\",\"lvl4\":\"article h4\",\"lvl5\":\"article h5, article td:first-child\",\"lvl6\":\"article h6\",\"text\":\"article p, article li, article td:last-child\"},\"strip_chars\":\" .,;:#\",\"custom_settings\":{\"separatorsToIndex\":\"_\",\"attributesForFaceting\":[\"language\",\"version\",\"type\",\"docusaurus_tag\"],\"attributesToRetrieve\":[\"hierarchy\",\"content\",\"anchor\",\"url\",\"url_without_anchor\",\"type\"]},\"conversation_id\":[\"833762294\"],\"nb_hits\":46250}"
+      schedule: '*/2 * * * *'
+  metrics:
+    release: promstack
+---
 #apiVersion: ts.opentelekomcloud.com/v1alpha1
 #kind: TypesenseCluster
 #metadata:
