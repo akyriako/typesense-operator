@@ -473,6 +473,20 @@ Kubernetes cluster services or pods to your local PC so you can access them usin
 
 Follow the [official installation instructions](https://github.com/KubeNetworks/kubevpn?tab=readme-ov-file#quickstart) to install and configure KubeVPN.
 
+## Disclaimer
+
+This project is an independent and unofficial implementation and **is not affiliated with or endorsed by Typesense, Inc.**
+The `typesense-operator` is provided **as-is** without any warranties or guarantees. Use at your own risk.
+
+While every effort has been made to ensure correctness and reliability, the maintainers are not responsible for any data loss, downtime, or other issues arising from the use of this software in production or other environments.
+Before deploying in a critical environment, we strongly recommend:
+
+* Thoroughly reviewing the source code,
+* Testing in a safe, non-production setting,
+* Keeping up to date with issues and pull requests.
+
+By using this project, you agree that you assume full responsibility for any outcomes related to its use.
+
 ## License
 
 Copyright 2023.
