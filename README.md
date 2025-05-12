@@ -259,7 +259,7 @@ introducing `TypesenseCluster`, a new Custom Resource Definition:
 
 > [!CAUTION]
 > Although in Typesense documentation under _Production Best Practices_ -> _Configuration_ is stated:
-> "_Typesense comes built-in with a high performance HTTP server (opens new window)that is used by likes of Fastly (opens new window)in
+> "_Typesense comes built-in with a high performance HTTP server that is used by likes of Fastly in
 > their edge servers at scale. So Typesense can be directly exposed to incoming public-facing internet traffic,
 > without the need to place it behind another web server like Nginx / Apache or your backend API._"
 >
