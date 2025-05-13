@@ -173,7 +173,7 @@ func (r *TypesenseClusterReconciler) Reconcile(ctx context.Context, req ctrl.Req
 
 	// Update strategy: Update the whole specs when changes are identified
 	// Update the whole specs when changes are identified
-	sts, err := r.ReconcileStatefulSet(ctx, ts)
+	sts, err := r.ReconcileStatefulSet(ctx, &ts)
 	if err != nil {
 		cerr := r.setConditionNotReady(ctx, &ts, ConditionReasonStatefulSetNotReady, err)
 		if cerr != nil {

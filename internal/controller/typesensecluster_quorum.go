@@ -16,6 +16,8 @@ const (
 	QuorumReadinessGateCondition = "RaftQuorumReady"
 	HealthyWriteLagKey           = "TYPESENSE_HEALTHY_WRITE_LAG"
 	HealthyWriteLagDefaultValue  = 500
+	HealthyReadLagKey            = "TYPESENSE_HEALTHY_READ_LAG"
+	HealthyReadLagDefaultValue   = 1000
 )
 
 func (r *TypesenseClusterReconciler) ReconcileQuorum(ctx context.Context, ts *tsv1alpha1.TypesenseCluster, secret *v1.Secret, stsObjectKey client.ObjectKey) (ConditionQuorum, int, error) {
@@ -83,8 +85,6 @@ func (r *TypesenseClusterReconciler) ReconcileQuorum(ctx context.Context, ts *ts
 			clusterNeedsAttention = true
 		}
 
-		// TODO if condition.Reason == string(nodeIsLagging) {
-
 		nodesHealth[node], _ = strconv.ParseBool(string(condition.Status))
 
 		podName := fmt.Sprintf("%s-%d", fmt.Sprintf(ClusterStatefulSet, ts.Name), n)
@@ -126,11 +126,9 @@ func (r *TypesenseClusterReconciler) ReconcileQuorum(ctx context.Context, ts *ts
 
 			node := quorum.Nodes[0]
 			nodeStatus := nodesStatus[node]
-
 			state := nodeStatus.State
-			queuedWrites := nodeStatus.QueuedWrites
 
-			if state == ErrorState || queuedWrites != 0 || (state == NotReadyState && queuedWrites == 0) || state == UnreachableState {
+			if state == ErrorState || state == UnreachableState {
 				r.logger.Info("purging quorum")
 				err := r.PurgeStatefulSetPods(ctx, sts)
 				if err != nil {
@@ -161,6 +159,18 @@ func (r *TypesenseClusterReconciler) ReconcileQuorum(ctx context.Context, ts *ts
 	}
 
 	return ConditionReasonQuorumReady, 0, nil
+}
+
+func (r *TypesenseClusterReconciler) shouldWaitATermOnSingleNode(nodeState NodeState, queuedWrites int) bool {
+	if nodeState == ErrorState || nodeState == UnreachableState {
+		return false
+	}
+
+	if nodeState == FollowerState && queuedWrites == 0 {
+		return false
+	}
+
+	return true
 }
 
 func (r *TypesenseClusterReconciler) downgradeQuorum(

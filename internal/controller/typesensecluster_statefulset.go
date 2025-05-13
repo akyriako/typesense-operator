@@ -23,9 +23,11 @@ const (
 	startupProbeFailureThreshold int32 = 30
 	startupProbePeriodSeconds    int32 = 10
 	hashAnnotationKey                  = "ts.opentelekomcloud.com/pod-template-hash"
+	readLagAnnotationKey               = "ts.opentelekomcloud.com/read-lag-threshold"
+	writeLagAnnotationKey              = "ts.opentelekomcloud.com/write-lag-threshold"
 )
 
-func (r *TypesenseClusterReconciler) ReconcileStatefulSet(ctx context.Context, ts tsv1alpha1.TypesenseCluster) (*appsv1.StatefulSet, error) {
+func (r *TypesenseClusterReconciler) ReconcileStatefulSet(ctx context.Context, ts *tsv1alpha1.TypesenseCluster) (*appsv1.StatefulSet, error) {
 	r.logger.V(debugLevel).Info("reconciling statefulset")
 
 	stsName := fmt.Sprintf(ClusterStatefulSet, ts.Name)
@@ -51,12 +53,14 @@ func (r *TypesenseClusterReconciler) ReconcileStatefulSet(ctx context.Context, t
 		sts, err := r.createStatefulSet(
 			ctx,
 			stsObjectKey,
-			&ts,
+			ts,
 		)
 		if err != nil {
 			r.logger.Error(err, "creating statefulset failed", "sts", stsObjectKey.Name)
 			return nil, err
 		}
+
+		r.logLagThresholds(sts, ts)
 		return sts, nil
 	} else {
 		skipConditions := []string{
@@ -70,13 +74,13 @@ func (r *TypesenseClusterReconciler) ReconcileStatefulSet(ctx context.Context, t
 			string(ConditionReasonQuorumNotReadyWaitATerm),
 		}
 
-		if !contains(skipConditions, r.getConditionReady(&ts).Reason) {
-			desiredSts, err := r.buildStatefulSet(ctx, stsObjectKey, &ts)
+		if !contains(skipConditions, r.getConditionReady(ts).Reason) {
+			desiredSts, err := r.buildStatefulSet(ctx, stsObjectKey, ts)
 			if err != nil {
 				r.logger.Error(err, "building statefulset failed", "sts", stsObjectKey.Name)
 			}
 
-			if r.shouldUpdateStatefulSet(sts, desiredSts, &ts) {
+			if r.shouldUpdateStatefulSet(sts, desiredSts, ts) {
 				r.logger.V(debugLevel).Info("updating statefulset", "sts", sts.Name)
 
 				updatedSts, err := r.updateStatefulSet(ctx, sts, desiredSts)
@@ -93,17 +97,26 @@ func (r *TypesenseClusterReconciler) ReconcileStatefulSet(ctx context.Context, t
 					r.logger.V(debugLevel).Error(err, fmt.Sprintf("unable to fetch config map: %s", configMapName))
 				}
 
-				_, _, err = r.updateConfigMap(ctx, &ts, cm, updatedSts.Spec.Replicas)
+				_, _, err = r.updateConfigMap(ctx, ts, cm, updatedSts.Spec.Replicas)
 				if err != nil {
 					r.logger.V(debugLevel).Error(err, fmt.Sprintf("unable to update config map: %s", configMapName))
 				}
 
+				r.logLagThresholds(updatedSts, ts)
 				return updatedSts, nil
 			}
 		}
 	}
 
+	r.logLagThresholds(sts, ts)
 	return sts, nil
+}
+
+func (r *TypesenseClusterReconciler) logLagThresholds(sts *appsv1.StatefulSet, ts *tsv1alpha1.TypesenseCluster) {
+	read := sts.Spec.Template.Annotations[readLagAnnotationKey]
+	write := sts.Spec.Template.Annotations[writeLagAnnotationKey]
+
+	r.logger.V(debugLevel).Info("reporting lag thresholds", "cluster", ts.Name, "read", read, "write", write)
 }
 
 func (r *TypesenseClusterReconciler) createStatefulSet(ctx context.Context, key client.ObjectKey, ts *tsv1alpha1.TypesenseCluster) (*appsv1.StatefulSet, error) {
@@ -143,6 +156,12 @@ func (r *TypesenseClusterReconciler) updateStatefulSet(ctx context.Context, sts 
 }
 
 func (r *TypesenseClusterReconciler) buildStatefulSet(ctx context.Context, key client.ObjectKey, ts *tsv1alpha1.TypesenseCluster) (*appsv1.StatefulSet, error) {
+	readLagThreshold, writeLagThreshold := r.getHealthyLagThresholds(ctx, ts)
+
+	lagThresholdAnnotations := make(map[string]string)
+	lagThresholdAnnotations[readLagAnnotationKey] = strconv.Itoa(readLagThreshold)
+	lagThresholdAnnotations[writeLagAnnotationKey] = strconv.Itoa(writeLagThreshold)
+
 	clusterName := ts.Name
 	sts := &appsv1.StatefulSet{
 		TypeMeta:   metav1.TypeMeta{},
@@ -155,7 +174,7 @@ func (r *TypesenseClusterReconciler) buildStatefulSet(ctx context.Context, key c
 				MatchLabels: getLabels(ts),
 			},
 			Template: corev1.PodTemplateSpec{
-				ObjectMeta: getObjectMeta(ts, &key.Name, nil),
+				ObjectMeta: getObjectMeta(ts, &key.Name, lagThresholdAnnotations),
 				Spec: corev1.PodSpec{
 					SecurityContext: &corev1.PodSecurityContext{
 						RunAsUser:    ptr.To[int64](10000),

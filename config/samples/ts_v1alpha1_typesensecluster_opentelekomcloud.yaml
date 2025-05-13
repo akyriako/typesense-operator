@@ -26,8 +26,15 @@ metadata:
     app.kubernetes.io/managed-by: kustomize
   name: c-otc-1
 spec:
-  image: typesense/typesense:28.0.rc37
-  replicas: 3
+  image: typesense/typesense:28.0
+  replicas: 5
+  resources:
+    limits:
+      cpu: "2000m"
+      memory: "2048Mi"
+    requests:
+      cpu: "100m"
+      memory: "256Mi"
   storage:
     size: 10Gi
     storageClassName: csi-disk
