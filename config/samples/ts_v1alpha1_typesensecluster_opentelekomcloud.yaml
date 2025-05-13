@@ -30,8 +30,8 @@ spec:
   replicas: 5
   resources:
     limits:
-      cpu: "2000m"
-      memory: "2048Mi"
+      cpu: "1800m"
+      memory: "1024Mi"
     requests:
       cpu: "100m"
       memory: "256Mi"
@@ -54,19 +54,19 @@ spec:
   metrics:
     release: promstack
 ---
-#apiVersion: ts.opentelekomcloud.com/v1alpha1
-#kind: TypesenseCluster
-#metadata:
-#  labels:
-#    app.kubernetes.io/name: typesense-operator
-#    app.kubernetes.io/managed-by: kustomize
-#  name: c-otc-2
-#spec:
-#  image: typesense/typesense:26.0
-#  replicas: 1
-#  storage:
-#    storageClassName: csi-disk
-#---
+apiVersion: ts.opentelekomcloud.com/v1alpha1
+kind: TypesenseCluster
+metadata:
+  labels:
+    app.kubernetes.io/name: typesense-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: c-otc-2
+spec:
+  image: typesense/typesense:28.0
+  replicas: 1
+  storage:
+    storageClassName: csi-disk
+---
 #apiVersion: ts.opentelekomcloud.com/v1alpha1
 #kind: TypesenseCluster
 #metadata:

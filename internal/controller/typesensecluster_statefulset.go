@@ -60,7 +60,7 @@ func (r *TypesenseClusterReconciler) ReconcileStatefulSet(ctx context.Context, t
 			return nil, err
 		}
 
-		r.logLagThresholds(sts, ts)
+		r.logLagThresholds(sts)
 		return sts, nil
 	} else {
 		skipConditions := []string{
@@ -102,21 +102,29 @@ func (r *TypesenseClusterReconciler) ReconcileStatefulSet(ctx context.Context, t
 					r.logger.V(debugLevel).Error(err, fmt.Sprintf("unable to update config map: %s", configMapName))
 				}
 
-				r.logLagThresholds(updatedSts, ts)
+				r.logLagThresholds(updatedSts)
 				return updatedSts, nil
 			}
 		}
 	}
 
-	r.logLagThresholds(sts, ts)
+	r.logLagThresholds(sts)
 	return sts, nil
 }
 
-func (r *TypesenseClusterReconciler) logLagThresholds(sts *appsv1.StatefulSet, ts *tsv1alpha1.TypesenseCluster) {
+func (r *TypesenseClusterReconciler) logLagThresholds(sts *appsv1.StatefulSet) {
 	read := sts.Spec.Template.Annotations[readLagAnnotationKey]
 	write := sts.Spec.Template.Annotations[writeLagAnnotationKey]
 
-	r.logger.V(debugLevel).Info("reporting lag thresholds", "cluster", ts.Name, "read", read, "write", write)
+	if read == "" {
+		read = strconv.Itoa(HealthyReadLagDefaultValue)
+	}
+
+	if write == "" {
+		write = strconv.Itoa(HealthyWriteLagDefaultValue)
+	}
+
+	r.logger.V(debugLevel).Info("reporting lag thresholds", "read", read, "write", write)
 }
 
 func (r *TypesenseClusterReconciler) createStatefulSet(ctx context.Context, key client.ObjectKey, ts *tsv1alpha1.TypesenseCluster) (*appsv1.StatefulSet, error) {
@@ -158,7 +166,7 @@ func (r *TypesenseClusterReconciler) updateStatefulSet(ctx context.Context, sts 
 func (r *TypesenseClusterReconciler) buildStatefulSet(ctx context.Context, key client.ObjectKey, ts *tsv1alpha1.TypesenseCluster) (*appsv1.StatefulSet, error) {
 	readLagThreshold, writeLagThreshold := r.getHealthyLagThresholds(ctx, ts)
 
-	lagThresholdAnnotations := make(map[string]string)
+	lagThresholdAnnotations := make(map[string]string, 2)
 	lagThresholdAnnotations[readLagAnnotationKey] = strconv.Itoa(readLagThreshold)
 	lagThresholdAnnotations[writeLagAnnotationKey] = strconv.Itoa(writeLagThreshold)
 

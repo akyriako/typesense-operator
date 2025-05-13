@@ -161,18 +161,6 @@ func (r *TypesenseClusterReconciler) ReconcileQuorum(ctx context.Context, ts *ts
 	return ConditionReasonQuorumReady, 0, nil
 }
 
-func (r *TypesenseClusterReconciler) shouldWaitATermOnSingleNode(nodeState NodeState, queuedWrites int) bool {
-	if nodeState == ErrorState || nodeState == UnreachableState {
-		return false
-	}
-
-	if nodeState == FollowerState && queuedWrites == 0 {
-		return false
-	}
-
-	return true
-}
-
 func (r *TypesenseClusterReconciler) downgradeQuorum(
 	ctx context.Context,
 	ts *tsv1alpha1.TypesenseCluster,
