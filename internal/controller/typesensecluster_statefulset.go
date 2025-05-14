@@ -2,6 +2,8 @@ package controller
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/json"
 	"fmt"
 	tsv1alpha1 "github.com/akyriako/typesense-operator/api/v1alpha1"
 	"github.com/mitchellh/hashstructure/v2"
@@ -369,7 +371,18 @@ func (r *TypesenseClusterReconciler) buildStatefulSet(ctx context.Context, key c
 	if err != nil {
 		return nil, err
 	}
-	base16Hash := fmt.Sprintf("%x", podTemplateHash)
+
+	b, err := json.Marshal(sts.Spec.Template.Spec.Containers[0].Resources)
+	if err != nil {
+		return nil, err
+	}
+	resourcesHash, err := hashstructure.Hash(
+		string(b),
+		hashstructure.FormatV2,
+		nil,
+	)
+
+	specsHash := fmt.Sprintf("%d%d", podTemplateHash, resourcesHash)
 
 	if additionalConfiguration := ts.Spec.GetAdditionalServerConfiguration(); additionalConfiguration != nil {
 		for _, ac := range additionalConfiguration {
@@ -387,12 +400,13 @@ func (r *TypesenseClusterReconciler) buildStatefulSet(ctx context.Context, key c
 						return nil, err
 					}
 
-					base16Hash = fmt.Sprintf("%s%x", base16Hash, dataHash)
+					specsHash = fmt.Sprintf("%s%d", specsHash, dataHash)
 				}
 			}
 		}
 	}
 
+	base16Hash := fmt.Sprintf("%x", sha256.Sum256([]byte(specsHash)))
 	r.logger.V(debugLevel).Info("calculated hash", "hash", base16Hash)
 
 	if sts.Spec.Template.Annotations == nil {
