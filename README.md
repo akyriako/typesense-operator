@@ -1,16 +1,16 @@
-# Typesense Kubernetes Operator
+# Typesense Kubernetes Operator (TyKO)
 ![Status Badge](https://img.shields.io/badge/status-beta-orange) ![28_0](https://img.shields.io/badge/typesense-28.0-lightgreen?logoColor=black&link=https%3A%2F%2Ftypesense.org%2Fdocs%2F28.0%2Fapi%2F)
 ![27_1](https://img.shields.io/badge/typesense-27.1-lightgreen?logoColor=black&link=https%3A%2F%2Ftypesense.org%2Fdocs%2F27.1%2Fapi%2F)
 ![27_0](https://img.shields.io/badge/typesense-27.0-lightgreen?logoColor=black&link=https%3A%2F%2Ftypesense.org%2Fdocs%2F27.0%2Fapi%2F)
 ![26_0](https://img.shields.io/badge/typesense-26.0-lightgreen?logoColor=black&link=https%3A%2F%2Ftypesense.org%2Fdocs%2F26.0%2Fapi%2F)
 ![Kubernetes](https://img.shields.io/badge/kubernetes-1.26+-lightgreen?labelColor=blue&link=https%3A%2F%2Ftypesense.org%2Fdocs%2F27.0%2Fapi%2F)
 
-The **Typesense Kubernetes Operator** is designed to manage the deployment and lifecycle of [Typesense](https://typesense.org/) clusters within Kubernetes environments. 
+The **Typesense Kubernetes Operator** (TyKO) is designed to manage the deployment and lifecycle of [Typesense](https://typesense.org/) clusters within Kubernetes environments. 
 The operator is developed in Go using [Operator SDK Framework](https://sdk.operatorframework.io/), an open source toolkit to manage Kubernetes native applications, called Operators, in an effective, automated, and scalable way. 
 
 ## Description
 
-Key features of Typesense Kubernetes Operator include:
+Key features of TyKO include:
 
 - **Custom Resource Management**: Provides a Kubernetes-native interface to define and manage Typesense cluster configurations using a CRD named `TypesenseCluster`.
 - **Typesense Lifecycle Automation**: Simplifies deploying, scaling, and managing Typesense clusters. Handles aspects like:
@@ -19,7 +19,7 @@ Key features of Typesense Kubernetes Operator include:
       1. the _Typesense node_ itself based on the image provided in the `specs`
       2. the _Typesense node metrics exporter_ (as a sidecar), based on the image provided in the `spec.metricsSpec`
     - provision Typesense services (headless & discovery `Services`),
-    - actively discover and update Typesense's nodes list (quorum configuration mounted as `NodesListConfigMap`),
+    - actively discover and update Typesense's nodes list (quorum configuration mounted as `ConfigMap`),
     - place claims for Typesense `PersistentVolumes`
     - _optionally_ expose Typesense API endpoint via an `Ingress`
     - _optionally_ provision one or multiple instances (one per target URL) of DocSearch as `Cronjobs`
@@ -39,8 +39,8 @@ log entries are received for a specified period of time, a follower transitions 
 can accept votes from its peers nodes. Upon receiving a majority of votes, the candidate is becoming the leader of the quorum.
 The leader’s responsibilities include handling new log entries and replicating them to other nodes.
 
-Another thing to consider is what happens when the node set changes, when nodes join or leave the cluster.
-If a quorum of nodes is **available**, raft can dynamically modify the node set without any issue (this happens every 30sec).
+Another thing to consider is what happens when the node-set changes, when nodes join or leave the cluster.
+If a quorum of nodes is **available**, raft can dynamically modify the node-set without any issue (this happens every 30sec).
 But if the cluster cannot form a quorum, then problems start to appear or better to pile up. A cluster with `N` nodes can tolerate
 a failure of at most `(N-1)/2` nodes without losing its quorum. If the available nodes go below this threshold then two events
 are taking place:
@@ -67,7 +67,7 @@ Typesense may be unacceptable. The Typesense Kubernetes Operator addresses both 
 
 ### Problem 1: Quorum reconfiguration
 
-The Typesense Kubernetes Operator manages the entire lifecycle of Typesense Clusters within Kubernetes:
+TyKO manages the entire lifecycle of Typesense Clusters within Kubernetes:
 
 1. A random token is generated and stored as a base64-encoded value in a new `Secret`. This token serves as the Admin API 
    key for bootstrapping the Typesense cluster.
@@ -85,8 +85,8 @@ The Typesense Kubernetes Operator manages the entire lifecycle of Typesense Clus
 >  typesense-api-key: SXdpVG9CcnFYTHZYeTJNMG1TS1hPaGt0dlFUY3VWUloxc1M5REtsRUNtMFFwQU93R1hoanVIVWJLQnE2ejdlSQ==
 > ``` 
 
-2. A `NodesListConfigMap` is created, containing the endpoints of the cluster nodes as a single concatenated string in its `data` field.
-   During each reconciliation loop, the operator identifies any changes in endpoints and updates the `NodesListConfigMap`. This `NodesListConfigMap`
+2. A `ConfigMap` is created, named `NodesListConfigMap`, containing the endpoints of the cluster nodes as a single concatenated string in its `data` field.
+   During each reconciliation loop, the operator identifies any changes in endpoints and updates the `ConfigMap`. This `ConfigMap`
    is mounted in every `Pod` at the path where raft expects the quorum configuration, ensuring quorum configuration stays always updated.
    The endpoint of each `Pod` the headless service adheres to the following naming convention:
 
@@ -103,22 +103,17 @@ The Typesense Kubernetes Operator manages the entire lifecycle of Typesense Clus
 3. Next, the reconciler creates a headless `Service` required for the `StatefulSet`, along with a standard Kubernetes
    Service of type `ClusterIP`. The latter exposes the REST/API endpoints of the Typesense cluster to external systems.
 4. A `StatefulSet` is then created. The quorum configuration stored in the `NodesListConfigMap` is mounted as a volume in each `Pod`
-   under `/usr/share/typesense/nodelist`. No `Pod` restart is necessary when the `NodesListConfigMap` changes, as raft automatically
+   under `/usr/share/typesense/nodelist`. No `Pod` restart is necessary when the data of `NodesListConfigMap` change, as raft automatically
    detects and applies the updates.
 5. Optionally, an **nginx:alpine** workload is provisioned as `Deployment` and published via an `Ingress`, in order to exposed safely 
    the Typesense REST/API endpoint outside the Kubernetes cluster **only** to selected referrers. The configuration of the 
-   nginx workload is stored in a `NodesListConfigMap`.
+   nginx workload is stored in a `ConfigMap`.
 6. Optionally, one or more instances of **DocSearch** are deployed as distinct `CronJobs` (one per scraping target URL),
    which based on user-defined schedules, periodically scrape the target sites and store the results in Typesense.
 
 ![Untitled-2025-02-24-0826](https://github.com/user-attachments/assets/6e6d67cf-4bab-4eac-ada0-8e4c6f46537d)
 
-> [!NOTE]
-> The interval between reconciliation loops depends on the number of nodes. This approach ensures raft has sufficient
-> "breathing room" to carry out its operations—such as leader election, log replication, and bootstrapping—before the
-> next quorum health reconciliation begins.
-
-7. The controller assesses the quorum's health by probing each node at `http://{nodeUrl}:{api-port}/health`. Based on the
+7. TyKO assesses the quorum's health by probing each node at `http://{nodeUrl}:{api-port}/health`. Based on the
    results, it formulates an action plan for the next reconciliation loop. This process is detailed in the following section:
 
 ### Problem 2: Recovering a cluster that has lost quorum
@@ -134,7 +129,7 @@ of manual intervention in order to recover a cluster that has lost quorum.
 > [!IMPORTANT]
 > [Scaling the StatefulSet down and subsequently (gradually) up](https://typesense.org/docs/guide/high-availability.html#recovering-a-cluster-that-has-lost-quorum), 
 > would typically be the manual intervention needed to recover a cluster that has lost its quorum.
-> **However**, the controller automates this process, as long as is not a memory or disk capacity issue, ensuring no service
+> **However**, the controller automates this process, **as long as is not a memory or disk capacity issue**, ensuring no service
 > interruption and **eliminating the need for any administration action**.
 
 
@@ -191,7 +186,7 @@ of manual intervention in order to recover a cluster that has lost quorum.
 
 ### TypesenseCluster
 
-Typesense Kubernetes Operator is controlling the lifecycle of multiple Typesense instances in the same Kubernetes cluster by
+TyKO is controlling the lifecycle of multiple Typesense instances in the same Kubernetes cluster by
 introducing `TypesenseCluster`, a new Custom Resource Definition:
 
 ![image](https://github.com/user-attachments/assets/841ad290-0401-4d7c-b85f-60a219ba88c5)
@@ -291,7 +286,7 @@ introducing `TypesenseCluster`, a new Custom Resource Definition:
 
 > [!TIP]
 > If you've provisioned Prometheus via [kube-prometheus-stack](https://github.com/prometheus-community/helm-charts/blob/main/charts/kube-prometheus-stack/README.md), 
-> you can find the corresponding `release` value of your Prometheus instance by checking the labels of the operator pod e.g:
+> you can find the corresponding `release` value of your Prometheus instance by checking the labels of the Prometheus operator pod e.g:
 > 
 > ```bash
 > kubectl describe pod {kube-prometheus-stack-operator-pod} -n {kube-prometheus-stack-namespace}
