@@ -138,6 +138,24 @@ type IngressSpec struct {
 
 	// +kubebuilder:validation:Optional
 	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
+
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default:="nginx:alpine"
+	Image string `json:"image,omitempty"`
+
+	// +optional
+	ReadOnlyRootFilesystem *ReadOnlyRootFilesystemSpec `json:"readOnlyRootFilesystem,omitempty"`
+}
+
+type ReadOnlyRootFilesystemSpec struct {
+	// +optional
+	SecurityContext *corev1.SecurityContext `json:"securityContext,omitempty"`
+
+	// +optional
+	Volumes []corev1.Volume `json:"volumes,omitempty"`
+
+	// +optional
+	VolumeMounts []corev1.VolumeMount `json:"volumeMounts,omitempty"`
 }
 
 type DocSearchScraperSpec struct {

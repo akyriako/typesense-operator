@@ -5,6 +5,8 @@ import (
 	"encoding/base64"
 	"fmt"
 	tsv1alpha1 "github.com/akyriako/typesense-operator/api/v1alpha1"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sort"
 )
@@ -120,4 +122,50 @@ func contains(values []string, value string) bool {
 	}
 
 	return false
+}
+
+func normalizeVolumes(vols []corev1.Volume) []corev1.Volume {
+	if vols == nil {
+		vols = []corev1.Volume{}
+	}
+
+	vcopy := append([]corev1.Volume(nil), vols...)
+	for i := range vcopy {
+		if cm := vcopy[i].VolumeSource.ConfigMap; cm != nil {
+			cm.DefaultMode = nil
+		}
+	}
+
+	sort.Slice(vcopy, func(i, j int) bool {
+		return vcopy[i].Name < vcopy[j].Name
+	})
+
+	return vcopy
+}
+
+func normalizeVolumeMounts(mounts []corev1.VolumeMount) []corev1.VolumeMount {
+	if mounts == nil {
+		mounts = []corev1.VolumeMount{}
+	}
+	copyMounts := append([]corev1.VolumeMount(nil), mounts...)
+	sort.Slice(copyMounts, func(i, j int) bool {
+		return copyMounts[i].Name < copyMounts[j].Name
+	})
+	return copyMounts
+}
+
+// needsSyncVolumes returns true if the desired vols differ from what's in the pod.
+func needsSyncVolumes(desired, existing []corev1.Volume) bool {
+	return !equality.Semantic.DeepEqual(
+		normalizeVolumes(desired),
+		normalizeVolumes(existing),
+	)
+}
+
+// needsSyncMounts returns true if the desired mounts differ from what's in the container.
+func needsSyncMounts(desired, existing []corev1.VolumeMount) bool {
+	return !equality.Semantic.DeepEqual(
+		normalizeVolumeMounts(desired),
+		normalizeVolumeMounts(existing),
+	)
 }
