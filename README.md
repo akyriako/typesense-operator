@@ -238,18 +238,28 @@ introducing `TypesenseCluster`, a new Custom Resource Definition:
 
 **IngressSpec** (optional)
 
-| Name               | Description                          | Optional | Default       |
-|--------------------|--------------------------------------|----------|---------------|
-| referer            | FQDN allowed to access reverse proxy | X        |               |
-| HttpDirectives     | Nginx Proxy HttpDirectives           | X        |               |
-| serverDirectives   | Nginx Proxy serverDirectives         | X        |               |
-| locationDirectives | Nginx Proxy locationDirectives       | X        |               |
-| host               | Ingress Host                         |          |               |
-| clusterIssuer      | cert-manager `ClusterIssuer`         | X        |               |
-| tlsSecretName      | TLS secret name to use               | X        |               |
-| ingressClassName   | Ingress to be used                   |          |               |
-| annotations        | User-Defined annotations             | X        |               |
-| resources          | resource request & limit             | X        | _check specs_ |
+| Name                   | Description                              | Optional | Default       |
+|------------------------|------------------------------------------|----------|---------------|
+| image                  | Nginx image to use                       | X        | nginx:alpine  |
+| referer                | FQDN allowed to access reverse proxy     | X        |               |
+| HttpDirectives         | Nginx Proxy HttpDirectives               | X        |               |
+| serverDirectives       | Nginx Proxy serverDirectives             | X        |               |
+| locationDirectives     | Nginx Proxy locationDirectives           | X        |               |
+| host                   | Ingress Host                             |          |               |
+| clusterIssuer          | cert-manager `ClusterIssuer`             | X        |               |
+| tlsSecretName          | TLS secret name to use                   | X        |               |
+| ingressClassName       | Ingress to be used                       |          |               |
+| annotations            | User-Defined annotations                 | X        |               |
+| resources              | resource request & limit                 | X        | _check specs_ |
+| readOnlyRootFilesystem | check `ReadOnlyRootFilesystemSpec` below | X        | _check specs_ |
+
+**ReadOnlyRootFilesystemSpec** (optional)
+
+| Name            | Description                        | Optional | Default                                         |
+|-----------------|------------------------------------|----------|-------------------------------------------------|
+| securityContext | security conf for the container    | X        | `SecurityContext{ReadOnlyRootFilesystem: true}` |
+| volumes         | additional volumes                 | X        |                                                 |
+| volumeMounts    | additional mounts in the container | X        |                                                 |
 
 > [!IMPORTANT]
 > This feature makes use of the existence of [cert-manager](https://cert-manager.io/) in the cluster, but **does not** actively enforce it with an error.
