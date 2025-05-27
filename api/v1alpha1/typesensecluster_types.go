@@ -18,6 +18,7 @@ package v1alpha1
 
 import (
 	corev1 "k8s.io/api/core/v1"
+	networkingv1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -145,6 +146,15 @@ type IngressSpec struct {
 
 	// +optional
 	ReadOnlyRootFilesystem *ReadOnlyRootFilesystemSpec `json:"readOnlyRootFilesystem,omitempty"`
+
+	// +optional
+	// +kubebuilder:default:="/"
+	Path string `json:"path,omitempty"`
+
+	// +optional
+	// +kubebuilder:default:="ImplementationSpecific"
+	// +kubebuilder:validation:Enum=Exact;Prefix;ImplementationSpecific
+	PathType *networkingv1.PathType `json:"pathType,omitempty"`
 }
 
 type ReadOnlyRootFilesystemSpec struct {

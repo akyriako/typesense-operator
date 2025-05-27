@@ -88,19 +88,21 @@ spec:
   ingress:
     referer: referer.example.com
     host: host.example.com
+    path: /
+    pathType: ImplementationSpecific
     ingressClassName: nginx
     clusterIssuer: lets-encrypt-prod
-    readOnlyRootFilesystem:
-      volumes:
-        - name: nginx-var-cache
-          emptyDir: {}
-        - name: run
-          emptyDir: {}
-      volumeMounts:
-        - name: nginx-var-cache
-          mountPath: /var/cache/nginx
-        - name: run
-          mountPath: /run
+#    readOnlyRootFilesystem:
+#      volumes:
+#        - name: nginx-var-cache
+#          emptyDir: {}
+#        - name: run
+#          emptyDir: {}
+#      volumeMounts:
+#        - name: nginx-var-cache
+#          mountPath: /var/cache/nginx
+#        - name: run
+#          mountPath: /run
 ---
 #apiVersion: ts.opentelekomcloud.com/v1alpha1
 #kind: TypesenseCluster

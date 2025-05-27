@@ -92,7 +92,9 @@ func (r *TypesenseClusterReconciler) ReconcileIngress(ctx context.Context, ts ts
 			(ts.Spec.Ingress.ClusterIssuer != nil && *ts.Spec.Ingress.ClusterIssuer != ig.Annotations["cert-manager.io/cluster-issuer"]) ||
 			!reflect.DeepEqual(ts.Spec.Ingress.Annotations, r.getIngressAnnotations(ig)) ||
 			(ts.Spec.Ingress.TLSSecretName != nil && *ts.Spec.Ingress.TLSSecretName != ig.Spec.TLS[0].SecretName) ||
-			ts.Spec.Ingress.IngressClassName != *ig.Spec.IngressClassName {
+			ts.Spec.Ingress.IngressClassName != *ig.Spec.IngressClassName ||
+			ts.Spec.Ingress.Path != ig.Spec.Rules[0].IngressRuleValue.HTTP.Paths[0].Path ||
+			*ts.Spec.Ingress.PathType != *ig.Spec.Rules[0].IngressRuleValue.HTTP.Paths[0].PathType {
 
 			r.logger.V(debugLevel).Info("updating ingress", "ingress", ingressObjectKey.Name)
 
@@ -300,8 +302,8 @@ func (r *TypesenseClusterReconciler) createIngress(ctx context.Context, key clie
 						HTTP: &networkingv1.HTTPIngressRuleValue{
 							Paths: []networkingv1.HTTPIngressPath{
 								{
-									Path:     "/",
-									PathType: ptr.To[networkingv1.PathType](networkingv1.PathTypeImplementationSpecific),
+									Path:     ts.Spec.Ingress.Path,
+									PathType: ts.Spec.Ingress.PathType,
 									Backend: networkingv1.IngressBackend{
 										Service: &networkingv1.IngressServiceBackend{
 											Name: fmt.Sprintf(ClusterReverseProxyService, ts.Name),
@@ -340,6 +342,8 @@ func (r *TypesenseClusterReconciler) updateIngress(ctx context.Context, ig netwo
 
 	ig.Spec.Rules[0].Host = ts.Spec.Ingress.Host
 	ig.Spec.IngressClassName = ptr.To[string](ts.Spec.Ingress.IngressClassName)
+	ig.Spec.Rules[0].HTTP.Paths[0].Path = ts.Spec.Ingress.Path
+	ig.Spec.Rules[0].HTTP.Paths[0].PathType = ts.Spec.Ingress.PathType
 
 	annotations := map[string]string{}
 	var tlsSecretName string

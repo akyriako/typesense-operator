@@ -22,6 +22,7 @@ package v1alpha1
 
 import (
 	"k8s.io/api/core/v1"
+	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
@@ -95,6 +96,11 @@ func (in *IngressSpec) DeepCopyInto(out *IngressSpec) {
 		in, out := &in.ReadOnlyRootFilesystem, &out.ReadOnlyRootFilesystem
 		*out = new(ReadOnlyRootFilesystemSpec)
 		(*in).DeepCopyInto(*out)
+	}
+	if in.PathType != nil {
+		in, out := &in.PathType, &out.PathType
+		*out = new(networkingv1.PathType)
+		**out = **in
 	}
 }
 

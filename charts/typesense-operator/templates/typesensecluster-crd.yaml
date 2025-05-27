@@ -1047,6 +1047,18 @@ spec:
                     type: string
                   locationDirectives:
                     type: string
+                  path:
+                    default: /
+                    type: string
+                  pathType:
+                    default: ImplementationSpecific
+                    description: PathType represents the type of path referred to by
+                      a HTTPIngressPath.
+                    enum:
+                    - Exact
+                    - Prefix
+                    - ImplementationSpecific
+                    type: string
                   readOnlyRootFilesystem:
                     properties:
                       securityContext:
