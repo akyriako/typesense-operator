@@ -2,6 +2,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   name: {{ include "typesense-operator.fullname" . }}-manager-role
+  namespace: {{ include "typesense-operator.namespace" . | quote }}
   labels:
   {{- include "typesense-operator.labels" . | nindent 4 }}
 rules:
@@ -179,4 +180,4 @@ roleRef:
 subjects:
 - kind: ServiceAccount
   name: '{{ include "typesense-operator.fullname" . }}-controller-manager'
-  namespace: '{{ .Release.Namespace }}'
+  namespace: {{ include "typesense-operator.namespace" . | quote }}

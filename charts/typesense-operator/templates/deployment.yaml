@@ -2,6 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: {{ include "typesense-operator.fullname" . }}-controller-manager
+  namespace: {{ include "typesense-operator.namespace" . | quote }}
   labels:
     control-plane: controller-manager
   {{- include "typesense-operator.labels" . | nindent 4 }}
