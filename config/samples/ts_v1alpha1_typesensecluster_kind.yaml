@@ -77,9 +77,18 @@ metadata:
   name: c-kind-2
 spec:
   image: typesense/typesense:28.0
-  replicas: 5
+  replicas: 3
+  adminApiKey:
+    name: typesense-common-bootstrap-key
   enableCors: true
   apiPort: 8108
+  resources:
+    limits:
+      cpu: "200m"
+      memory: "128Mi"
+    requests:
+      cpu: "100m"
+      memory: "64Mi"
   storage:
     size: 75Mi
     storageClassName: typesense-local-path

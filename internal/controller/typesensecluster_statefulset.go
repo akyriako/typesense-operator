@@ -318,6 +318,60 @@ func (r *TypesenseClusterReconciler) buildStatefulSet(ctx context.Context, key c
 							},
 							Resources: ts.Spec.GetMetricsExporterResources(),
 						},
+						{
+							Name:            "healthcheck",
+							Image:           "akyriako78/typesense-healthcheck:0.1.5",
+							ImagePullPolicy: corev1.PullIfNotPresent,
+							Ports: []corev1.ContainerPort{
+								{
+									Name:          "healthcheck",
+									ContainerPort: 8808,
+								},
+							},
+							Env: []corev1.EnvVar{
+								{
+									Name: "TYPESENSE_API_KEY",
+									ValueFrom: &corev1.EnvVarSource{
+										SecretKeyRef: &corev1.SecretKeySelector{
+											Key: ClusterAdminApiKeySecretKeyName,
+											LocalObjectReference: corev1.LocalObjectReference{
+												Name: r.getAdminApiKeyObjectKey(ts).Name,
+											},
+										},
+									},
+								},
+								{
+									Name:  "LOG_LEVEL",
+									Value: strconv.Itoa(0),
+								},
+								{
+									Name:  "TYPESENSE_PROTOCOL",
+									Value: "http",
+								},
+								{
+									Name:  "TYPESENSE_API_PORT",
+									Value: strconv.Itoa(ts.Spec.ApiPort),
+								},
+								{
+									Name:  "TYPESENSE_PEERING_PORT",
+									Value: strconv.Itoa(ts.Spec.PeeringPort),
+								},
+								{
+									Name:  "HealthCheckPort",
+									Value: strconv.Itoa(8808),
+								},
+								{
+									Name:  "TYPESENSE_NODES",
+									Value: "/usr/share/typesense/nodes",
+								},
+							},
+							VolumeMounts: []corev1.VolumeMount{
+								{
+									MountPath: "/usr/share/typesense",
+									Name:      "nodeslist",
+								},
+							},
+						},
 					},
 					Affinity:                  ts.Spec.Affinity,
 					NodeSelector:              ts.Spec.NodeSelector,
