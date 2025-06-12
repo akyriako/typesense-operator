@@ -320,7 +320,7 @@ func (r *TypesenseClusterReconciler) buildStatefulSet(ctx context.Context, key c
 						},
 						{
 							Name:            "healthcheck",
-							Image:           "akyriako78/typesense-healthcheck:0.1.5",
+							Image:           "akyriako78/typesense-healthcheck:0.1.6",
 							ImagePullPolicy: corev1.PullIfNotPresent,
 							Ports: []corev1.ContainerPort{
 								{
@@ -357,12 +357,16 @@ func (r *TypesenseClusterReconciler) buildStatefulSet(ctx context.Context, key c
 									Value: strconv.Itoa(ts.Spec.PeeringPort),
 								},
 								{
-									Name:  "HealthCheckPort",
+									Name:  "HEALTHCHECK_PORT",
 									Value: strconv.Itoa(8808),
 								},
 								{
 									Name:  "TYPESENSE_NODES",
 									Value: "/usr/share/typesense/nodes",
+								},
+								{
+									Name:  "CLUSTER_NAMESPACE",
+									Value: ts.Namespace,
 								},
 							},
 							VolumeMounts: []corev1.VolumeMount{
