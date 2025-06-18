@@ -369,6 +369,7 @@ func (r *TypesenseClusterReconciler) buildStatefulSet(ctx context.Context, key c
 									Value: ts.Namespace,
 								},
 							},
+							Resources: ts.Spec.GetHealthCheckSidecarResources(),
 							VolumeMounts: []corev1.VolumeMount{
 								{
 									MountPath: "/usr/share/typesense",

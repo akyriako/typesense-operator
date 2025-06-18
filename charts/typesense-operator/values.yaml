@@ -12,7 +12,7 @@ controllerManager:
         - ALL
     image:
       repository: akyriako78/typesense-operator
-      tag: 0.2.25-rc.6
+      tag: 0.2.25-rc.7
     imagePullPolicy: IfNotPresent
     resources:
       limits:
