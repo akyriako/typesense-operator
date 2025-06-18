@@ -1,3 +1,5 @@
+namespaceOverride: ""
+
 controllerManager:
   manager:
     args:
