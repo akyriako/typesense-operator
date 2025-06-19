@@ -6,7 +6,9 @@ import (
 	tsv1alpha1 "github.com/akyriako/typesense-operator/api/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
+	discoveryv1 "k8s.io/api/discovery/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -47,17 +49,13 @@ func (r *TypesenseClusterReconciler) ReconcileConfigMap(ctx context.Context, ts 
 		}
 	}
 
-	//nodes := strings.Split(NodesListConfigMap.Data["nodes"], ",")
-	//for i := 0; i < len(nodes); i++ {
-	//	nodes[i] = strings.Replace(nodes[i], fmt.Sprintf(":%d:%d", ts.Spec.PeeringPort, ts.Spec.ApiPort), "", 1)
-	//}
 	return &configMapExists, nil
 }
 
 const nodeNameLenLimit = 64
 
 func (r *TypesenseClusterReconciler) createConfigMap(ctx context.Context, key client.ObjectKey, ts *tsv1alpha1.TypesenseCluster) (*v1.ConfigMap, error) {
-	nodes, err := r.getNodes(ts, ts.Spec.Replicas)
+	nodes, err := r.getNodes(ctx, ts, ts.Spec.Replicas, true)
 	if err != nil {
 		return nil, err
 	}
@@ -107,7 +105,7 @@ func (r *TypesenseClusterReconciler) updateConfigMap(ctx context.Context, ts *ts
 		replicas = sts.Spec.Replicas
 	}
 
-	nodes, err := r.getNodes(ts, *replicas)
+	nodes, err := r.getNodes(ctx, ts, *replicas, false)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -147,31 +145,152 @@ func (r *TypesenseClusterReconciler) deleteConfigMap(ctx context.Context, cm *v1
 	return nil
 }
 
-func (r *TypesenseClusterReconciler) getNodes(ts *tsv1alpha1.TypesenseCluster, replicas int32) ([]string, error) {
-	nodes := make([]string, replicas)
-	for i := 0; i < int(replicas); i++ {
-		nodeName := fmt.Sprintf("%s-sts-%d.%s-sts-svc", ts.Name, i, ts.Name)
-		if len(nodeName) > nodeNameLenLimit {
-			return nil, fmt.Errorf("raft error: node name should not exceed %d characters: %s", nodeNameLenLimit, nodeName)
+func (r *TypesenseClusterReconciler) getNodes(ctx context.Context, ts *tsv1alpha1.TypesenseCluster, replicas int32, bootstrapping bool) ([]string, error) {
+	nodes := make([]string, 0)
+
+	if bootstrapping {
+		for i := 0; i < int(replicas); i++ {
+			nodeName := fmt.Sprintf("%s-sts-%d.%s-sts-svc", ts.Name, i, ts.Name)
+			if len(nodeName) > nodeNameLenLimit {
+				return nil, fmt.Errorf("raft error: node name should not exceed %d characters: %s", nodeNameLenLimit, nodeName)
+			}
+
+			nodes = append(nodes, fmt.Sprintf("%s:%d:%d", nodeName, ts.Spec.PeeringPort, ts.Spec.ApiPort))
 		}
 
-		nodes[i] = fmt.Sprintf("%s:%d:%d", nodeName, ts.Spec.PeeringPort, ts.Spec.ApiPort)
+		return nodes, nil
+	}
+
+	stsName := fmt.Sprintf(ClusterStatefulSet, ts.Name)
+	stsObjectKey := client.ObjectKey{
+		Name:      stsName,
+		Namespace: ts.Namespace,
+	}
+	sts, err := r.GetFreshStatefulSet(ctx, stsObjectKey)
+	if err != nil {
+		return nil, err
+	}
+
+	slices, err := r.getEndpointSlicesForStatefulSet(ctx, sts)
+	if err != nil {
+		return nil, err
+	}
+
+	i := 0
+	for _, s := range slices {
+		for _, e := range s.Endpoints {
+			addr := e.Addresses[0]
+			r.logger.V(debugLevel).Info("discovered slice endpoint", "slice", s.Name, "endpoint", e.Hostname, "address", addr)
+			nodes = append(nodes, fmt.Sprintf("%s:%d:%d", addr, ts.Spec.PeeringPort, ts.Spec.ApiPort))
+
+			i++
+		}
 	}
 
 	return nodes, nil
 }
 
-func (r *TypesenseClusterReconciler) getNodeFullyQualifiedDomainName(ts *tsv1alpha1.TypesenseCluster, raftNodeEndpoint string) string {
+func (r *TypesenseClusterReconciler) getEndpointSlicesForStatefulSet(ctx context.Context, sts *appsv1.StatefulSet) ([]discoveryv1.EndpointSlice, error) {
+	r.logger.V(debugLevel).Info("collecting endpoint slices")
+
+	//svcName := sts.Spec.ServiceName
+	//namespace := sts.Namespace
+	//
+	//var sliceList discoveryv1.EndpointSliceList
+	//if err := r.Client.List(ctx, &sliceList,
+	//	client.InNamespace(namespace),
+	//	client.MatchingLabels{discoveryv1.LabelServiceName: svcName},
+	//); err != nil {
+	//	return nil, err
+	//}
+	//
+	//// Filter slices: only include those with at least one Ready or Serving endpoint
+	//var readySlices []discoveryv1.EndpointSlice
+	//for _, slice := range sliceList.Items {
+	//	for _, ep := range slice.Endpoints {
+	//		if ep.Conditions.Ready != nil || ep.Conditions.Serving != nil {
+	//			readySlices = append(readySlices, slice)
+	//			break
+	//		}
+	//	}
+	//}
+	//
+	svcName := sts.Spec.ServiceName
+	namespace := sts.Namespace
+
+	// 1) List EndpointSlices for headless Service
+	var sliceList discoveryv1.EndpointSliceList
+	if err := r.Client.List(ctx, &sliceList,
+		client.InNamespace(namespace),
+		client.MatchingLabels{discoveryv1.LabelServiceName: svcName},
+	); err != nil {
+		return nil, err
+	}
+
+	// 2) Build a set of “live” Pod IPs for this StatefulSet
+	selector := labels.SelectorFromSet(sts.Spec.Selector.MatchLabels)
+	var podList v1.PodList
+	if err := r.Client.List(ctx, &podList,
+		client.InNamespace(namespace),
+		client.MatchingLabelsSelector{Selector: selector},
+	); err != nil {
+		return nil, err
+	}
+	liveIPs := map[string]struct{}{}
+	for _, pod := range podList.Items {
+		if pod.DeletionTimestamp == nil && pod.Status.Phase == v1.PodRunning && pod.Status.PodIP != "" {
+			liveIPs[pod.Status.PodIP] = struct{}{}
+		}
+	}
+
+	// 3) Filter slices: keep only slices that contain at least one endpoint
+	//    whose IP is still in liveIPs
+	var readySlices []discoveryv1.EndpointSlice
+	for _, slice := range sliceList.Items {
+		keep := false
+		for _, ep := range slice.Endpoints {
+			// only consider endpoints that reference a Pod and whose IP is still live
+			if ep.TargetRef != nil &&
+				ep.TargetRef.Kind == "Pod" &&
+				len(ep.Addresses) > 0 {
+				ip := ep.Addresses[0]
+				if _, ok := liveIPs[ip]; ok {
+					keep = true
+					break
+				}
+			}
+		}
+		if keep {
+			readySlices = append(readySlices, slice)
+		}
+	}
+
+	return readySlices, nil
+}
+
+func (r *TypesenseClusterReconciler) getNodeEndpoint(ts *tsv1alpha1.TypesenseCluster, raftNodeEndpoint string) string {
+	if hasIP4Prefix(raftNodeEndpoint) {
+		node := strings.Replace(raftNodeEndpoint, fmt.Sprintf(":%d:%d", ts.Spec.PeeringPort, ts.Spec.ApiPort), "", 1)
+		return node
+	}
+
 	node := strings.Replace(raftNodeEndpoint, fmt.Sprintf(":%d:%d", ts.Spec.PeeringPort, ts.Spec.ApiPort), "", 1)
-	fqdn := fmt.Sprintf("%s.%s.svc.cluster.local", node, ts.Namespace)
+	fqdn := fmt.Sprintf("%s.%s-sts-svc.%s.svc.cluster.local", node, ts.Name, ts.Namespace)
 
 	return fqdn
 }
 
 func (r *TypesenseClusterReconciler) getShortName(raftNodeEndpoint string) string {
-	if idx := strings.Index(raftNodeEndpoint, "."); idx != -1 {
-		return raftNodeEndpoint[:idx]
+	parts := strings.SplitN(raftNodeEndpoint, ":", 2)
+	host := parts[0]
+
+	if hasIP4Prefix(host) {
+		return host
 	}
 
-	return raftNodeEndpoint
+	if idx := strings.Index(host, "."); idx != -1 {
+		return host[:idx]
+	}
+
+	return host
 }

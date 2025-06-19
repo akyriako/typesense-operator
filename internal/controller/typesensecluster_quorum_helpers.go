@@ -8,14 +8,16 @@ import (
 	"io"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"net"
 	"net/http"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"strconv"
 	"strings"
 )
 
-func (r *TypesenseClusterReconciler) getNodeStatus(ctx context.Context, httpClient *http.Client, node string, ts *tsv1alpha1.TypesenseCluster, secret *v1.Secret) (NodeStatus, error) {
-	fqdn := r.getNodeFullyQualifiedDomainName(ts, node)
+func (r *TypesenseClusterReconciler) getNodeStatus(ctx context.Context, httpClient *http.Client, node NodeEndpoint, ts *tsv1alpha1.TypesenseCluster, secret *v1.Secret) (NodeStatus, error) {
+	fqdn := r.getNodeEndpoint(ts, node.IP.String())
 	url := fmt.Sprintf("http://%s:%d/status", fqdn, ts.Spec.ApiPort)
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
@@ -89,8 +91,8 @@ func (r *TypesenseClusterReconciler) getClusterStatus(nodesStatus map[string]Nod
 	return ClusterStatusNotReady
 }
 
-func (r *TypesenseClusterReconciler) getNodeHealth(ctx context.Context, httpClient *http.Client, node string, ts *tsv1alpha1.TypesenseCluster) (NodeHealth, error) {
-	fqdn := r.getNodeFullyQualifiedDomainName(ts, node)
+func (r *TypesenseClusterReconciler) getNodeHealth(ctx context.Context, httpClient *http.Client, node NodeEndpoint, ts *tsv1alpha1.TypesenseCluster) (NodeHealth, error) {
+	fqdn := r.getNodeEndpoint(ts, node.IP.String())
 	url := fmt.Sprintf("http://%s:%d/health", fqdn, ts.Spec.ApiPort)
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
@@ -134,7 +136,28 @@ func (r *TypesenseClusterReconciler) getQuorum(ctx context.Context, ts *tsv1alph
 	availableNodes := len(nodes)
 	minRequiredNodes := getMinimumRequiredNodes(availableNodes)
 
-	return &Quorum{minRequiredNodes, availableNodes, nodes, cm}, nil
+	var pods v1.PodList
+	labelSelector := labels.SelectorFromSet(sts.Spec.Selector.MatchLabels)
+	if err := r.List(ctx, &pods, &client.ListOptions{
+		Namespace:     sts.Namespace,
+		LabelSelector: labelSelector,
+	}); err != nil {
+		r.logger.Error(err, "failed to list pods", "statefulset", sts.Name)
+		return nil, err
+	}
+
+	qn := make(map[string]net.IP)
+
+	for _, pod := range pods.Items {
+		if pod.Status.PodIP != "" {
+			raftEndpoint := fmt.Sprintf("%s:%d:%d", pod.Status.PodIP, ts.Spec.PeeringPort, ts.Spec.ApiPort)
+			if _, contains := contains(nodes, raftEndpoint); contains {
+				qn[pod.Name] = net.ParseIP(pod.Status.PodIP)
+			}
+		}
+	}
+
+	return &Quorum{minRequiredNodes, availableNodes, qn, cm}, nil
 }
 
 func getMinimumRequiredNodes(availableNodes int) int {

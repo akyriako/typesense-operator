@@ -5,4 +5,4 @@ kind: Kustomization
 images:
 - name: controller
   newName: akyriako78/typesense-operator
-  newTag: 0.2.25-rc.7
+  newTag: 0.3.0-dev.2

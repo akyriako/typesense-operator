@@ -43,10 +43,16 @@ func (r *TypesenseClusterReconciler) ReconcileQuorum(ctx context.Context, ts *ts
 	queuedWrites := 0
 	healthyWriteLagThreshold := r.getHealthyWriteLagThreshold(ctx, ts)
 
-	for _, node := range quorum.Nodes {
-		status, err := r.getNodeStatus(ctx, httpClient, node, ts, secret)
+	//quorum.Nodes is coming straight from the PodList of Statefulset
+	for node, ip := range quorum.Nodes {
+		ne := NodeEndpoint{
+			PodName: node,
+			IP:      ip,
+		}
+
+		status, err := r.getNodeStatus(ctx, httpClient, ne, ts, secret)
 		if err != nil {
-			r.logger.Error(err, "fetching node status failed", "node", r.getShortName(node))
+			r.logger.Error(err, "fetching node status failed", "node", r.getShortName(node), "ip", ip)
 		}
 
 		if status.QueuedWrites > 0 && queuedWrites < status.QueuedWrites {
@@ -57,6 +63,8 @@ func (r *TypesenseClusterReconciler) ReconcileQuorum(ctx context.Context, ts *ts
 			"reporting node status",
 			"node",
 			r.getShortName(node),
+			"ip",
+			ip,
 			"state",
 			status.State,
 			"queued_writes",
@@ -77,10 +85,15 @@ func (r *TypesenseClusterReconciler) ReconcileQuorum(ctx context.Context, ts *ts
 	clusterNeedsAttention := false
 	nodesHealth := make(map[string]bool)
 
-	for n, node := range quorum.Nodes {
+	n := 0
+	for node, ip := range quorum.Nodes {
+		ne := NodeEndpoint{
+			PodName: node,
+			IP:      ip,
+		}
 		nodeStatus := nodesStatus[node]
 
-		condition := r.calculatePodReadinessGate(ctx, httpClient, node, nodeStatus, ts)
+		condition := r.calculatePodReadinessGate(ctx, httpClient, ne, nodeStatus, ts)
 		if condition.Reason == string(nodeNotRecoverable) {
 			clusterNeedsAttention = true
 		}
@@ -95,6 +108,8 @@ func (r *TypesenseClusterReconciler) ReconcileQuorum(ctx context.Context, ts *ts
 			r.logger.Error(err, fmt.Sprintf("unable to update statefulset pod: %s", podObjectKey.Name))
 			return ConditionReasonQuorumNotReady, 0, err
 		}
+
+		n++
 	}
 
 	if clusterNeedsAttention {
@@ -124,8 +139,8 @@ func (r *TypesenseClusterReconciler) ReconcileQuorum(ctx context.Context, ts *ts
 	if clusterStatus == ClusterStatusNotReady {
 		if availableNodes == 1 {
 
-			node := quorum.Nodes[0]
-			nodeStatus := nodesStatus[node]
+			podName := fmt.Sprintf("%s-%d", fmt.Sprintf(ClusterStatefulSet, ts.Name), 0)
+			nodeStatus := nodesStatus[podName]
 			state := nodeStatus.State
 
 			if state == ErrorState || state == UnreachableState {
@@ -238,7 +253,7 @@ const (
 	nodeNotRecoverable readinessGateReason = "NodeNotRecoverable"
 )
 
-func (r *TypesenseClusterReconciler) calculatePodReadinessGate(ctx context.Context, httpClient *http.Client, node string, nodeStatus NodeStatus, ts *tsv1alpha1.TypesenseCluster) *v1.PodCondition {
+func (r *TypesenseClusterReconciler) calculatePodReadinessGate(ctx context.Context, httpClient *http.Client, node NodeEndpoint, nodeStatus NodeStatus, ts *tsv1alpha1.TypesenseCluster) *v1.PodCondition {
 	conditionReason := nodeHealthy
 	conditionMessage := fmt.Sprintf("node's role is now: %s", nodeStatus.State)
 	conditionStatus := v1.ConditionTrue
@@ -248,7 +263,7 @@ func (r *TypesenseClusterReconciler) calculatePodReadinessGate(ctx context.Conte
 		conditionReason = nodeNotHealthy
 		conditionStatus = v1.ConditionFalse
 
-		r.logger.Error(err, "fetching node health failed", "node", r.getShortName(node))
+		r.logger.Error(err, "fetching node health failed", "node", r.getShortName(node.PodName), "ip", node.IP)
 	} else {
 		if !health.Ok {
 			if health.ResourceError != nil && (*health.ResourceError == OutOfMemory || *health.ResourceError == OutOfDisk) {
@@ -256,7 +271,7 @@ func (r *TypesenseClusterReconciler) calculatePodReadinessGate(ctx context.Conte
 				conditionMessage = fmt.Sprintf("node is failing: %s", string(*health.ResourceError))
 				conditionStatus = v1.ConditionFalse
 
-				err := fmt.Errorf("health check reported a blocking node error on %s: %s", r.getShortName(node), string(*health.ResourceError))
+				err := fmt.Errorf("health check reported a blocking node error on %s: %s", r.getShortName(node.PodName), string(*health.ResourceError))
 				r.logger.Error(err, "quorum cannot be recovered automatically")
 			}
 
@@ -265,7 +280,7 @@ func (r *TypesenseClusterReconciler) calculatePodReadinessGate(ctx context.Conte
 		}
 	}
 
-	r.logger.V(debugLevel).Info("reporting node health", "node", r.getShortName(node), "healthy", health.Ok)
+	r.logger.V(debugLevel).Info("reporting node health", "node", r.getShortName(node.PodName), "ip", node.IP, "healthy", health.Ok)
 	condition := &v1.PodCondition{
 		Type:    QuorumReadinessGateCondition,
 		Status:  conditionStatus,

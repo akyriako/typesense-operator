@@ -76,7 +76,7 @@ func (r *TypesenseClusterReconciler) ReconcileStatefulSet(ctx context.Context, t
 			string(ConditionReasonQuorumNotReadyWaitATerm),
 		}
 
-		if !contains(skipConditions, r.getConditionReady(ts).Reason) {
+		if _, contains := contains(skipConditions, r.getConditionReady(ts).Reason); !contains {
 			desiredSts, err := r.buildStatefulSet(ctx, stsObjectKey, ts)
 			if err != nil {
 				r.logger.Error(err, "building statefulset failed", "sts", stsObjectKey.Name)
@@ -320,7 +320,7 @@ func (r *TypesenseClusterReconciler) buildStatefulSet(ctx context.Context, key c
 						},
 						{
 							Name:            "healthcheck",
-							Image:           "akyriako78/typesense-healthcheck:0.1.6",
+							Image:           "akyriako78/typesense-healthcheck:0.1.7",
 							ImagePullPolicy: corev1.PullIfNotPresent,
 							Ports: []corev1.ContainerPort{
 								{
@@ -374,6 +374,7 @@ func (r *TypesenseClusterReconciler) buildStatefulSet(ctx context.Context, key c
 								{
 									MountPath: "/usr/share/typesense",
 									Name:      "nodeslist",
+									ReadOnly:  true,
 								},
 							},
 						},

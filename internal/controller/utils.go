@@ -8,6 +8,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"regexp"
 	"sort"
 )
 
@@ -113,15 +114,16 @@ func getDelayPerReplicaFactor(size int) int64 {
 	return minDelayPerReplicaFactor
 }
 
-func contains(values []string, value string) bool {
-	sort.Strings(values)
-	for _, v := range values {
+func contains(values []string, value string) (int, bool) {
+	//sort.Strings(values)
+
+	for i, v := range values {
 		if v == value {
-			return true
+			return i, true
 		}
 	}
 
-	return false
+	return -1, false
 }
 
 func normalizeVolumes(vols []corev1.Volume) []corev1.Volume {
@@ -168,4 +170,13 @@ func needsSyncMounts(desired, existing []corev1.VolumeMount) bool {
 		normalizeVolumeMounts(desired),
 		normalizeVolumeMounts(existing),
 	)
+}
+
+var ip4Prefix = regexp.MustCompile(
+	`^((25[0-5]|2[0-4]\d|[01]?\d?\d)\.){3}` +
+		`(25[0-5]|2[0-4]\d|[01]?\d?\d)`,
+)
+
+func hasIP4Prefix(s string) bool {
+	return ip4Prefix.MatchString(s)
 }
