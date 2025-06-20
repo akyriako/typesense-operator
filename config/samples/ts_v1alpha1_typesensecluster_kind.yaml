@@ -26,33 +26,33 @@ data:
   TYPESENSE_HEALTHY_READ_LAG: "1000"
   TYPESENSE_HEALTHY_WRITE_LAG: "500"
 ---
-#apiVersion: ts.opentelekomcloud.com/v1alpha1
-#kind: TypesenseCluster
-#metadata:
-#  labels:
-#    app.kubernetes.io/name: typesense-operator
-#    app.kubernetes.io/managed-by: kustomize
-#  name: c-kind-1
-#spec:
-#  image: typesense/typesense:27.1
-#  replicas: 3
-#  corsDomains: "http://localhost,https://www.example.de"
-#  storage:
-#    size: 150Mi
-#    storageClassName: typesense-local-path
-#  adminApiKey:
-#    name: typesense-common-bootstrap-key
-#  metrics:
-#    release: promstack
-#  additionalServerConfiguration:
-#    name: c-kind-1-server-configuration
-#---
-#apiVersion: v1
-#kind: ConfigMap
-#metadata:
-#  name: c-kind-2-config
-#data:
-#  TYPESENSE_ENABLE_SEARCH_ANALYTICS: "true"
+apiVersion: ts.opentelekomcloud.com/v1alpha1
+kind: TypesenseCluster
+metadata:
+  labels:
+    app.kubernetes.io/name: typesense-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: c-kind-1
+spec:
+  image: typesense/typesense:29.0.rc30
+  replicas: 5
+  corsDomains: "http://localhost,https://www.example.de"
+  storage:
+    size: 150Mi
+    storageClassName: typesense-local-path
+  adminApiKey:
+    name: typesense-common-bootstrap-key
+  metrics:
+    release: promstack
+  additionalServerConfiguration:
+    name: c-kind-1-server-configuration
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: c-kind-2-config
+data:
+  TYPESENSE_ENABLE_SEARCH_ANALYTICS: "true"
 ---
 apiVersion: v1
 kind: Secret
@@ -77,7 +77,7 @@ metadata:
   name: c-kind-2
 spec:
   image: typesense/typesense:28.0
-  replicas: 5
+  replicas: 7
   adminApiKey:
     name: typesense-common-bootstrap-key
   enableCors: true

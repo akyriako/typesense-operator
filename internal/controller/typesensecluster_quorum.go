@@ -8,6 +8,7 @@ import (
 	"k8s.io/utils/ptr"
 	"net/http"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sort"
 	"strconv"
 	"time"
 )
@@ -43,8 +44,16 @@ func (r *TypesenseClusterReconciler) ReconcileQuorum(ctx context.Context, ts *ts
 	queuedWrites := 0
 	healthyWriteLagThreshold := r.getHealthyWriteLagThreshold(ctx, ts)
 
+	nodeKeys := make([]string, 0, len(quorum.Nodes))
+	for k := range quorum.Nodes {
+		nodeKeys = append(nodeKeys, k)
+	}
+	sort.Strings(nodeKeys)
+
 	//quorum.Nodes is coming straight from the PodList of Statefulset
-	for node, ip := range quorum.Nodes {
+	for _, key := range nodeKeys {
+		node := key
+		ip := quorum.Nodes[key]
 		ne := NodeEndpoint{
 			PodName: node,
 			IP:      ip,
@@ -63,10 +72,10 @@ func (r *TypesenseClusterReconciler) ReconcileQuorum(ctx context.Context, ts *ts
 			"reporting node status",
 			"node",
 			r.getShortName(node),
-			"ip",
-			ip,
 			"state",
 			status.State,
+			"ip",
+			ip,
 			"queued_writes",
 			status.QueuedWrites,
 			"commited_index",
@@ -85,8 +94,9 @@ func (r *TypesenseClusterReconciler) ReconcileQuorum(ctx context.Context, ts *ts
 	clusterNeedsAttention := false
 	nodesHealth := make(map[string]bool)
 
-	n := 0
-	for node, ip := range quorum.Nodes {
+	for o, key := range nodeKeys {
+		node := key
+		ip := quorum.Nodes[key]
 		ne := NodeEndpoint{
 			PodName: node,
 			IP:      ip,
@@ -100,7 +110,7 @@ func (r *TypesenseClusterReconciler) ReconcileQuorum(ctx context.Context, ts *ts
 
 		nodesHealth[node], _ = strconv.ParseBool(string(condition.Status))
 
-		podName := fmt.Sprintf("%s-%d", fmt.Sprintf(ClusterStatefulSet, ts.Name), n)
+		podName := fmt.Sprintf("%s-%d", fmt.Sprintf(ClusterStatefulSet, ts.Name), o)
 		podObjectKey := client.ObjectKey{Namespace: ts.Namespace, Name: podName}
 
 		err = r.updatePodReadinessGate(ctx, podObjectKey, condition)
@@ -108,8 +118,6 @@ func (r *TypesenseClusterReconciler) ReconcileQuorum(ctx context.Context, ts *ts
 			r.logger.Error(err, fmt.Sprintf("unable to update statefulset pod: %s", podObjectKey.Name))
 			return ConditionReasonQuorumNotReady, 0, err
 		}
-
-		n++
 	}
 
 	if clusterNeedsAttention {
@@ -202,12 +210,12 @@ func (r *TypesenseClusterReconciler) downgradeQuorum(
 
 	desiredReplicas := int32(1)
 
-	_, size, err := r.updateConfigMap(ctx, ts, cm, ptr.To[int32](desiredReplicas))
+	err = r.ScaleStatefulSet(ctx, stsObjectKey, desiredReplicas)
 	if err != nil {
 		return ConditionReasonQuorumNotReady, 0, err
 	}
 
-	err = r.ScaleStatefulSet(ctx, stsObjectKey, desiredReplicas)
+	_, size, err := r.updateConfigMap(ctx, ts, cm, ptr.To[int32](desiredReplicas))
 	if err != nil {
 		return ConditionReasonQuorumNotReady, 0, err
 	}
@@ -232,12 +240,12 @@ func (r *TypesenseClusterReconciler) upgradeQuorum(
 		size = sts.Status.Replicas + 1
 	}
 
-	_, _, err = r.updateConfigMap(ctx, ts, cm, &size)
+	err = r.ScaleStatefulSet(ctx, stsObjectKey, size)
 	if err != nil {
 		return ConditionReasonQuorumNotReady, 0, err
 	}
 
-	err = r.ScaleStatefulSet(ctx, stsObjectKey, size)
+	_, _, err = r.updateConfigMap(ctx, ts, cm, &size)
 	if err != nil {
 		return ConditionReasonQuorumNotReady, 0, err
 	}
@@ -280,7 +288,7 @@ func (r *TypesenseClusterReconciler) calculatePodReadinessGate(ctx context.Conte
 		}
 	}
 
-	r.logger.V(debugLevel).Info("reporting node health", "node", r.getShortName(node.PodName), "ip", node.IP, "healthy", health.Ok)
+	r.logger.V(debugLevel).Info("reporting node health", "node", r.getShortName(node.PodName), "healthy", health.Ok, "ip", node.IP)
 	condition := &v1.PodCondition{
 		Type:    QuorumReadinessGateCondition,
 		Status:  conditionStatus,

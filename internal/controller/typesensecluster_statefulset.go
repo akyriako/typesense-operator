@@ -362,7 +362,7 @@ func (r *TypesenseClusterReconciler) buildStatefulSet(ctx context.Context, key c
 								},
 								{
 									Name:  "TYPESENSE_NODES",
-									Value: "/usr/share/typesense/nodes",
+									Value: "/usr/share/typesense/fallback",
 								},
 								{
 									Name:  "CLUSTER_NAMESPACE",

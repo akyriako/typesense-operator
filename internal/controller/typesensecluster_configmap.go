@@ -63,7 +63,8 @@ func (r *TypesenseClusterReconciler) createConfigMap(ctx context.Context, key cl
 	cm := &v1.ConfigMap{
 		ObjectMeta: getObjectMeta(ts, &key.Name, nil),
 		Data: map[string]string{
-			"nodes": strings.Join(nodes, ","),
+			"nodes":    strings.Join(nodes, ","),
+			"fallback": strings.Join(nodes, ","),
 		},
 	}
 
@@ -106,6 +107,7 @@ func (r *TypesenseClusterReconciler) updateConfigMap(ctx context.Context, ts *ts
 	}
 
 	nodes, err := r.getNodes(ctx, ts, *replicas, false)
+	fallback, err := r.getNodes(ctx, ts, *replicas, true)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -118,12 +120,13 @@ func (r *TypesenseClusterReconciler) updateConfigMap(ctx context.Context, ts *ts
 
 	desired := cm.DeepCopy()
 	desired.Data = map[string]string{
-		"nodes": strings.Join(nodes, ","),
+		"nodes":    strings.Join(nodes, ","),
+		"fallback": strings.Join(fallback, ","),
 	}
 
 	r.logger.V(debugLevel).Info("current quorum configuration", "size", availableNodes, "nodes", nodes)
 
-	if cm.Data["nodes"] != desired.Data["nodes"] {
+	if cm.Data["nodes"] != desired.Data["nodes"] || cm.Data["fallback"] != desired.Data["fallback"] {
 		r.logger.Info("updating quorum configuration", "size", availableNodes, "nodes", nodes)
 
 		err := r.Update(ctx, desired)
@@ -180,7 +183,7 @@ func (r *TypesenseClusterReconciler) getNodes(ctx context.Context, ts *tsv1alpha
 	for _, s := range slices {
 		for _, e := range s.Endpoints {
 			addr := e.Addresses[0]
-			r.logger.V(debugLevel).Info("discovered slice endpoint", "slice", s.Name, "endpoint", e.Hostname, "address", addr)
+			//r.logger.V(debugLevel).Info("discovered slice endpoint", "slice", s.Name, "endpoint", e.Hostname, "address", addr)
 			nodes = append(nodes, fmt.Sprintf("%s:%d:%d", addr, ts.Spec.PeeringPort, ts.Spec.ApiPort))
 
 			i++
@@ -192,29 +195,6 @@ func (r *TypesenseClusterReconciler) getNodes(ctx context.Context, ts *tsv1alpha
 
 func (r *TypesenseClusterReconciler) getEndpointSlicesForStatefulSet(ctx context.Context, sts *appsv1.StatefulSet) ([]discoveryv1.EndpointSlice, error) {
 	r.logger.V(debugLevel).Info("collecting endpoint slices")
-
-	//svcName := sts.Spec.ServiceName
-	//namespace := sts.Namespace
-	//
-	//var sliceList discoveryv1.EndpointSliceList
-	//if err := r.Client.List(ctx, &sliceList,
-	//	client.InNamespace(namespace),
-	//	client.MatchingLabels{discoveryv1.LabelServiceName: svcName},
-	//); err != nil {
-	//	return nil, err
-	//}
-	//
-	//// Filter slices: only include those with at least one Ready or Serving endpoint
-	//var readySlices []discoveryv1.EndpointSlice
-	//for _, slice := range sliceList.Items {
-	//	for _, ep := range slice.Endpoints {
-	//		if ep.Conditions.Ready != nil || ep.Conditions.Serving != nil {
-	//			readySlices = append(readySlices, slice)
-	//			break
-	//		}
-	//	}
-	//}
-	//
 	svcName := sts.Spec.ServiceName
 	namespace := sts.Namespace
 
@@ -238,7 +218,7 @@ func (r *TypesenseClusterReconciler) getEndpointSlicesForStatefulSet(ctx context
 	}
 	liveIPs := map[string]struct{}{}
 	for _, pod := range podList.Items {
-		if pod.DeletionTimestamp == nil && pod.Status.Phase == v1.PodRunning && pod.Status.PodIP != "" {
+		if pod.DeletionTimestamp == nil && (pod.Status.Phase == v1.PodRunning || pod.Status.Phase == v1.PodPending) && pod.Status.PodIP != "" {
 			liveIPs[pod.Status.PodIP] = struct{}{}
 		}
 	}
