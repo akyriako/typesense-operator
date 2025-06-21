@@ -100,12 +100,12 @@ The Typesense Kubernetes Operator manages the entire lifecycle of Typesense Clus
 
 3. Next, the reconciler creates a headless `Service` required for the `StatefulSet`, along with a standard Kubernetes
    Service of type `ClusterIP`. The latter exposes the REST/API endpoints of the Typesense cluster to external systems.
-4. A `StatefulSet` is then created. The quorum configuration stored in the `NodesListConfigMap` is mounted as a volume in each `Pod`
-   under `/usr/share/typesense/nodelist`. No `Pod` restart is necessary when the `NodesListConfigMap` changes, as raft automatically
+4. A `StatefulSet` is then created. The quorum configuration stored in the `ConfigMap` is mounted as a volume in each `Pod`
+   under `/usr/share/typesense/nodelist`. No `Pod` restart is necessary when the `ConfigMap` changes, as raft automatically
    detects and applies the updates.
 5. Optionally, an **nginx:alpine** workload is provisioned as `Deployment` and published via an `Ingress`, in order to exposed safely 
    the Typesense REST/API endpoint outside the Kubernetes cluster **only** to selected referrers. The configuration of the 
-   nginx workload is stored in a `NodesListConfigMap`.
+   nginx workload is stored in a `ConfigMap`.
 6. Optionally, one or more instances of **DocSearch** are deployed as distinct `CronJobs` (one per scraping target URL),
    which based on user-defined schedules, periodically scrape the target sites and store the results in Typesense.
 
