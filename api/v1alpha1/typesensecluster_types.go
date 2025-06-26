@@ -96,6 +96,8 @@ type TypesenseClusterSpec struct {
 
 	Metrics *MetricsExporterSpec `json:"metrics,omitempty"`
 
+	HealthCheck *HealthCheckSpec `json:"healthcheck,omitempty"`
+
 	// +kubebuilder:validation:Optional
 	TopologySpreadConstraints []corev1.TopologySpreadConstraint `json:"topologySpreadConstraints,omitempty"`
 
@@ -196,6 +198,15 @@ type MetricsExporterSpec struct {
 	// +kubebuilder:validation:ExclusiveMaximum=false
 	// +kubebuilder:validation:Type=integer
 	IntervalInSeconds int `json:"interval,omitempty"`
+
+	// +kubebuilder:validation:Optional
+	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
+}
+
+type HealthCheckSpec struct {
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default:="akyriako78/typesense-healthcheck:0.1.7"
+	Image string `json:"image,omitempty"`
 
 	// +kubebuilder:validation:Optional
 	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`

@@ -112,7 +112,21 @@ func (s *TypesenseClusterSpec) GetMetricsExporterResources() corev1.ResourceRequ
 	}
 }
 
+func (s *TypesenseClusterSpec) GetHealthCheckSidecarSpecs() HealthCheckSpec {
+	if s.HealthCheck != nil {
+		return *s.HealthCheck
+	}
+
+	return HealthCheckSpec{
+		Image: "akyriako78/typesense-healthcheck:0.1.7",
+	}
+}
+
 func (s *TypesenseClusterSpec) GetHealthCheckSidecarResources() corev1.ResourceRequirements {
+	if s.HealthCheck != nil && s.HealthCheck.Resources != nil {
+		return *s.HealthCheck.Resources
+	}
+
 	return corev1.ResourceRequirements{
 		Limits: corev1.ResourceList{
 			corev1.ResourceCPU:    resource.MustParse("100m"),

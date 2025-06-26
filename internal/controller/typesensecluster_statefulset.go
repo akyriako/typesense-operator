@@ -320,7 +320,7 @@ func (r *TypesenseClusterReconciler) buildStatefulSet(ctx context.Context, key c
 						},
 						{
 							Name:            "healthcheck",
-							Image:           "akyriako78/typesense-healthcheck:0.1.7",
+							Image:           ts.Spec.GetHealthCheckSidecarSpecs().Image,
 							ImagePullPolicy: corev1.PullIfNotPresent,
 							Ports: []corev1.ContainerPort{
 								{
