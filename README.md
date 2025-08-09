@@ -6,7 +6,7 @@
 
 [//]: # (**Kubernetes-native automation for highly available Typesense clusters.**)
 
-[![TypesenseSupportedVersions](https://img.shields.io/badge/Typesense-^26.0-green?logo=stackblitz)]()[![KubernetesSupportedVersions](https://img.shields.io/badge/Kubernetes-^1.26-green?logo=kubernetes&logoColor=f5f5f5)]()
+[![TypesenseSupportedVersions](https://img.shields.io/badge/Typesense-^26.0-green?logo=stackblitz)]() [![KubernetesSupportedVersions](https://img.shields.io/badge/Kubernetes-^1.26-green?logo=kubernetes&logoColor=f5f5f5)]()
 [![Stars](https://img.shields.io/github/stars/akyriako/typesense-operator?logo=github)]() [![License](https://img.shields.io/github/license/akyriako/typesense-operator)]()
 
 [//]: # (---)
