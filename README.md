@@ -7,7 +7,9 @@
 [//]: # (**Kubernetes-native automation for highly available Typesense clusters.**)
 
 [![TypesenseSupportedVersions](https://img.shields.io/badge/Typesense-^26.0-green?logo=stackblitz)]() [![KubernetesSupportedVersions](https://img.shields.io/badge/Kubernetes-^1.26-green?logo=kubernetes&logoColor=f5f5f5)]()
-[![Stars](https://img.shields.io/github/stars/akyriako/typesense-operator?logo=github)]() [![License](https://img.shields.io/github/license/akyriako/typesense-operator)]()
+[![License](https://img.shields.io/github/license/akyriako/typesense-operator)]() ![Go](https://img.shields.io/github/go-mod/go-version/akyriako/typesense-operator
+) ![GitHub Release](https://img.shields.io/github/v/release/akyriako/typesense-operator) [![Stars](https://img.shields.io/github/stars/akyriako/typesense-operator?logo=github)]()
+
 
 [//]: # (---)
 
@@ -21,7 +23,7 @@
 - Built with Go & Operator SDK — lightweight, Kubernetes-native, and flexible
 - Community-driven, with plethora of examples for Kind, CCE, AKS, EKS, and more
 
-## ⚡ Get Started — 3-min Setup
+## ⚡ Get Started
 
 ```bash
 # Install the Operator
