@@ -2,6 +2,7 @@ package controller
 
 import (
 	v1 "k8s.io/api/core/v1"
+	"net"
 )
 
 type NodeState string
@@ -42,9 +43,14 @@ type NodeHealth struct {
 	ResourceError *NodeHealthResourceError `json:"resource_error,omitempty"`
 }
 
+type NodeEndpoint struct {
+	PodName string
+	IP      net.IP
+}
+
 type Quorum struct {
 	MinRequiredNodes   int
 	AvailableNodes     int
-	Nodes              []string
+	Nodes              map[string]net.IP
 	NodesListConfigMap *v1.ConfigMap
 }

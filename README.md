@@ -10,7 +10,6 @@
 [![License](https://img.shields.io/github/license/akyriako/typesense-operator)]() ![Go](https://img.shields.io/github/go-mod/go-version/akyriako/typesense-operator
 ) ![GitHub Release](https://img.shields.io/github/v/release/akyriako/typesense-operator) [![Stars](https://img.shields.io/github/stars/akyriako/typesense-operator?logo=github)]()
 
-
 [//]: # (---)
 
 ## 🎯 Why TyKO?

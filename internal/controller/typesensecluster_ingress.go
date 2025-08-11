@@ -92,7 +92,9 @@ func (r *TypesenseClusterReconciler) ReconcileIngress(ctx context.Context, ts ts
 			(ts.Spec.Ingress.ClusterIssuer != nil && *ts.Spec.Ingress.ClusterIssuer != ig.Annotations["cert-manager.io/cluster-issuer"]) ||
 			!reflect.DeepEqual(ts.Spec.Ingress.Annotations, r.getIngressAnnotations(ig)) ||
 			(ts.Spec.Ingress.TLSSecretName != nil && *ts.Spec.Ingress.TLSSecretName != ig.Spec.TLS[0].SecretName) ||
-			ts.Spec.Ingress.IngressClassName != *ig.Spec.IngressClassName {
+			ts.Spec.Ingress.IngressClassName != *ig.Spec.IngressClassName ||
+			ts.Spec.Ingress.Path != ig.Spec.Rules[0].IngressRuleValue.HTTP.Paths[0].Path ||
+			*ts.Spec.Ingress.PathType != *ig.Spec.Rules[0].IngressRuleValue.HTTP.Paths[0].PathType {
 
 			r.logger.V(debugLevel).Info("updating ingress", "ingress", ingressObjectKey.Name)
 
@@ -175,7 +177,52 @@ func (r *TypesenseClusterReconciler) ReconcileIngress(ctx context.Context, ts ts
 			deployment.Spec.Template.Spec.Containers[0].Resources = desiredResources
 		}
 
-		if configMapUpdated || deploymentResourcesNeedUpdate {
+		deploymentImageNeedUpdate := !reflect.DeepEqual(ts.Spec.Ingress.Image, deployment.Spec.Template.Spec.Containers[0].Image)
+		if deploymentImageNeedUpdate {
+			deployment.Spec.Template.Spec.Containers[0].Image = ts.Spec.Ingress.Image
+		}
+
+		readOnlyRootFilesystemSpecsNeedUpdate := false
+		if ts.Spec.Ingress.ReadOnlyRootFilesystem == nil {
+			if deployment.Spec.Template.Spec.Containers[0].SecurityContext != nil {
+				readOnlyRootFilesystemSpecsNeedUpdate = true
+				deployment.Spec.Template.Spec.Containers[0].SecurityContext = nil
+				deployment.Spec.Template.Spec.Volumes = r.getDefaultReverseProxyVolumes(ts.Name)
+				deployment.Spec.Template.Spec.Containers[0].VolumeMounts = r.getDefaultReverseProxyVolumeMounts()
+			}
+		} else {
+			securityContext := ts.Spec.Ingress.ReadOnlyRootFilesystem.SecurityContext
+			if securityContext == nil {
+				securityContext = &v1.SecurityContext{
+					ReadOnlyRootFilesystem: ptr.To(true),
+				}
+			}
+
+			if !reflect.DeepEqual(securityContext, deployment.Spec.Template.Spec.Containers[0].SecurityContext) {
+				readOnlyRootFilesystemSpecsNeedUpdate = true
+				deployment.Spec.Template.Spec.Containers[0].SecurityContext = securityContext
+			}
+
+			desiredVolumes := r.getDefaultReverseProxyVolumes(ts.Name)
+			desiredVolumes = append(desiredVolumes, ts.Spec.Ingress.ReadOnlyRootFilesystem.Volumes...)
+
+			existingVolumes := deployment.Spec.Template.Spec.Volumes
+			if needsSyncVolumes(desiredVolumes, existingVolumes) {
+				readOnlyRootFilesystemSpecsNeedUpdate = true
+				deployment.Spec.Template.Spec.Volumes = desiredVolumes
+			}
+
+			desiredMounts := r.getDefaultReverseProxyVolumeMounts()
+			desiredMounts = append(desiredMounts, ts.Spec.Ingress.ReadOnlyRootFilesystem.VolumeMounts...)
+
+			existingMounts := deployment.Spec.Template.Spec.Containers[0].VolumeMounts
+			if needsSyncMounts(desiredMounts, existingMounts) {
+				readOnlyRootFilesystemSpecsNeedUpdate = true
+				deployment.Spec.Template.Spec.Containers[0].VolumeMounts = desiredMounts
+			}
+		}
+
+		if configMapUpdated || deploymentResourcesNeedUpdate || deploymentImageNeedUpdate || readOnlyRootFilesystemSpecsNeedUpdate {
 			if deployment.Spec.Template.Annotations == nil {
 				deployment.Spec.Template.Annotations = make(map[string]string)
 			}
@@ -255,8 +302,8 @@ func (r *TypesenseClusterReconciler) createIngress(ctx context.Context, key clie
 						HTTP: &networkingv1.HTTPIngressRuleValue{
 							Paths: []networkingv1.HTTPIngressPath{
 								{
-									Path:     "/",
-									PathType: ptr.To[networkingv1.PathType](networkingv1.PathTypeImplementationSpecific),
+									Path:     ts.Spec.Ingress.Path,
+									PathType: ts.Spec.Ingress.PathType,
 									Backend: networkingv1.IngressBackend{
 										Service: &networkingv1.IngressServiceBackend{
 											Name: fmt.Sprintf(ClusterReverseProxyService, ts.Name),
@@ -295,6 +342,8 @@ func (r *TypesenseClusterReconciler) updateIngress(ctx context.Context, ig netwo
 
 	ig.Spec.Rules[0].Host = ts.Spec.Ingress.Host
 	ig.Spec.IngressClassName = ptr.To[string](ts.Spec.Ingress.IngressClassName)
+	ig.Spec.Rules[0].HTTP.Paths[0].Path = ts.Spec.Ingress.Path
+	ig.Spec.Rules[0].HTTP.Paths[0].PathType = ts.Spec.Ingress.PathType
 
 	annotations := map[string]string{}
 	var tlsSecretName string
@@ -453,7 +502,50 @@ func (r *TypesenseClusterReconciler) getIngressNginxConf(ts *tsv1alpha1.Typesens
 	return conf, nil
 }
 
+func (r *TypesenseClusterReconciler) getDefaultReverseProxyVolumes(tsClusterName string) []v1.Volume {
+	return []v1.Volume{
+		{
+			Name: "nginx-config",
+			VolumeSource: v1.VolumeSource{
+				ConfigMap: &v1.ConfigMapVolumeSource{
+					LocalObjectReference: v1.LocalObjectReference{
+						Name: fmt.Sprintf(ClusterReverseProxyConfigMap, tsClusterName),
+					},
+				},
+			},
+		},
+	}
+}
+
+func (r *TypesenseClusterReconciler) getDefaultReverseProxyVolumeMounts() []v1.VolumeMount {
+	return []v1.VolumeMount{
+		{
+			Name:      "nginx-config",
+			MountPath: "/etc/nginx/nginx.conf",
+			SubPath:   "nginx.conf",
+		},
+	}
+}
+
 func (r *TypesenseClusterReconciler) createIngressDeployment(ctx context.Context, key client.ObjectKey, ts *tsv1alpha1.TypesenseCluster, ig *networkingv1.Ingress) (*appsv1.Deployment, error) {
+	volumes := r.getDefaultReverseProxyVolumes(ts.Name)
+	volumeMounts := r.getDefaultReverseProxyVolumeMounts()
+	var securityContext *v1.SecurityContext
+
+	if ts.Spec.Ingress.ReadOnlyRootFilesystem != nil {
+		volumes = append(volumes, ts.Spec.Ingress.ReadOnlyRootFilesystem.Volumes...)
+		volumeMounts = append(volumeMounts, ts.Spec.Ingress.ReadOnlyRootFilesystem.VolumeMounts...)
+
+		if ts.Spec.Ingress.ReadOnlyRootFilesystem.SecurityContext != nil {
+			securityContext = ts.Spec.Ingress.ReadOnlyRootFilesystem.SecurityContext
+		} else {
+			securityContext = &v1.SecurityContext{
+				ReadOnlyRootFilesystem: ptr.To(true),
+			}
+		}
+
+	}
+
 	deployment := &appsv1.Deployment{
 		ObjectMeta: getReverseProxyObjectMeta(ts, &key.Name, nil),
 		Spec: appsv1.DeploymentSpec{
@@ -469,46 +561,28 @@ func (r *TypesenseClusterReconciler) createIngressDeployment(ctx context.Context
 					Containers: []v1.Container{
 						{
 							Name:  fmt.Sprintf(ClusterReverseProxy, ts.Name),
-							Image: "nginx:alpine",
+							Image: ts.Spec.Ingress.Image,
 							Ports: []v1.ContainerPort{
 								{
 									ContainerPort: 80,
 								},
 							},
-							Resources: ts.Spec.Ingress.GetReverseProxyResources(),
-							VolumeMounts: []v1.VolumeMount{
-								{
-									Name:      "nginx-config",
-									MountPath: "/etc/nginx/nginx.conf",
-									SubPath:   "nginx.conf",
-								},
-							},
+							Resources:       ts.Spec.Ingress.GetReverseProxyResources(),
+							VolumeMounts:    volumeMounts,
+							SecurityContext: securityContext,
 						},
 					},
-					Volumes: []v1.Volume{
-						{
-							Name: "nginx-config",
-							VolumeSource: v1.VolumeSource{
-								ConfigMap: &v1.ConfigMapVolumeSource{
-									LocalObjectReference: v1.LocalObjectReference{
-										Name: fmt.Sprintf(ClusterReverseProxyConfigMap, ts.Name),
-									},
-								},
-							},
-						},
-					},
+					Volumes: volumes,
 				},
 			},
 		},
 	}
 
-	err := ctrl.SetControllerReference(ig, deployment, r.Scheme)
-	if err != nil {
+	if err := ctrl.SetControllerReference(ig, deployment, r.Scheme); err != nil {
 		return nil, err
 	}
 
-	err = r.Create(ctx, deployment)
-	if err != nil {
+	if err := r.Create(ctx, deployment); err != nil {
 		return nil, err
 	}
 

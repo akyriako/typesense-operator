@@ -18,6 +18,7 @@ package v1alpha1
 
 import (
 	corev1 "k8s.io/api/core/v1"
+	networkingv1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -95,6 +96,8 @@ type TypesenseClusterSpec struct {
 
 	Metrics *MetricsExporterSpec `json:"metrics,omitempty"`
 
+	HealthCheck *HealthCheckSpec `json:"healthcheck,omitempty"`
+
 	// +kubebuilder:validation:Optional
 	TopologySpreadConstraints []corev1.TopologySpreadConstraint `json:"topologySpreadConstraints,omitempty"`
 
@@ -138,6 +141,33 @@ type IngressSpec struct {
 
 	// +kubebuilder:validation:Optional
 	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
+
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default:="nginx:alpine"
+	Image string `json:"image,omitempty"`
+
+	// +optional
+	ReadOnlyRootFilesystem *ReadOnlyRootFilesystemSpec `json:"readOnlyRootFilesystem,omitempty"`
+
+	// +optional
+	// +kubebuilder:default:="/"
+	Path string `json:"path,omitempty"`
+
+	// +optional
+	// +kubebuilder:default:="ImplementationSpecific"
+	// +kubebuilder:validation:Enum=Exact;Prefix;ImplementationSpecific
+	PathType *networkingv1.PathType `json:"pathType,omitempty"`
+}
+
+type ReadOnlyRootFilesystemSpec struct {
+	// +optional
+	SecurityContext *corev1.SecurityContext `json:"securityContext,omitempty"`
+
+	// +optional
+	Volumes []corev1.Volume `json:"volumes,omitempty"`
+
+	// +optional
+	VolumeMounts []corev1.VolumeMount `json:"volumeMounts,omitempty"`
 }
 
 type DocSearchScraperSpec struct {
@@ -168,6 +198,15 @@ type MetricsExporterSpec struct {
 	// +kubebuilder:validation:ExclusiveMaximum=false
 	// +kubebuilder:validation:Type=integer
 	IntervalInSeconds int `json:"interval,omitempty"`
+
+	// +kubebuilder:validation:Optional
+	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
+}
+
+type HealthCheckSpec struct {
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default:="akyriako78/typesense-healthcheck:0.1.7"
+	Image string `json:"image,omitempty"`
 
 	// +kubebuilder:validation:Optional
 	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`

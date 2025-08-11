@@ -76,7 +76,7 @@ func (r *TypesenseClusterReconciler) ReconcileStatefulSet(ctx context.Context, t
 			string(ConditionReasonQuorumNotReadyWaitATerm),
 		}
 
-		if !contains(skipConditions, r.getConditionReady(ts).Reason) {
+		if _, contains := contains(skipConditions, r.getConditionReady(ts).Reason); !contains {
 			desiredSts, err := r.buildStatefulSet(ctx, stsObjectKey, ts)
 			if err != nil {
 				r.logger.Error(err, "building statefulset failed", "sts", stsObjectKey.Name)
@@ -317,6 +317,66 @@ func (r *TypesenseClusterReconciler) buildStatefulSet(ctx context.Context, key c
 								},
 							},
 							Resources: ts.Spec.GetMetricsExporterResources(),
+						},
+						{
+							Name:            "healthcheck",
+							Image:           ts.Spec.GetHealthCheckSidecarSpecs().Image,
+							ImagePullPolicy: corev1.PullIfNotPresent,
+							Ports: []corev1.ContainerPort{
+								{
+									Name:          "healthcheck",
+									ContainerPort: 8808,
+								},
+							},
+							Env: []corev1.EnvVar{
+								{
+									Name: "TYPESENSE_API_KEY",
+									ValueFrom: &corev1.EnvVarSource{
+										SecretKeyRef: &corev1.SecretKeySelector{
+											Key: ClusterAdminApiKeySecretKeyName,
+											LocalObjectReference: corev1.LocalObjectReference{
+												Name: r.getAdminApiKeyObjectKey(ts).Name,
+											},
+										},
+									},
+								},
+								{
+									Name:  "LOG_LEVEL",
+									Value: strconv.Itoa(0),
+								},
+								{
+									Name:  "TYPESENSE_PROTOCOL",
+									Value: "http",
+								},
+								{
+									Name:  "TYPESENSE_API_PORT",
+									Value: strconv.Itoa(ts.Spec.ApiPort),
+								},
+								{
+									Name:  "TYPESENSE_PEERING_PORT",
+									Value: strconv.Itoa(ts.Spec.PeeringPort),
+								},
+								{
+									Name:  "HEALTHCHECK_PORT",
+									Value: strconv.Itoa(8808),
+								},
+								{
+									Name:  "TYPESENSE_NODES",
+									Value: "/usr/share/typesense/fallback",
+								},
+								{
+									Name:  "CLUSTER_NAMESPACE",
+									Value: ts.Namespace,
+								},
+							},
+							Resources: ts.Spec.GetHealthCheckSidecarResources(),
+							VolumeMounts: []corev1.VolumeMount{
+								{
+									MountPath: "/usr/share/typesense",
+									Name:      "nodeslist",
+									ReadOnly:  true,
+								},
+							},
 						},
 					},
 					Affinity:                  ts.Spec.Affinity,
