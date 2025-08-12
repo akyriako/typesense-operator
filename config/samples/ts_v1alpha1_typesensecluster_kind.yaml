@@ -34,7 +34,7 @@ metadata:
     app.kubernetes.io/managed-by: kustomize
   name: c-kind-1
 spec:
-  image: typesense/typesense:29.0.rc30
+  image: typesense/typesense:30.0.rc7-amd64
   replicas: 5
   corsDomains: "http://localhost,https://www.example.de"
   storage:
@@ -76,7 +76,7 @@ metadata:
     app.kubernetes.io/managed-by: kustomize
   name: c-kind-2
 spec:
-  image: typesense/typesense:28.0
+  image: typesense/typesense:29.0
   replicas: 7
   adminApiKey:
     name: typesense-common-bootstrap-key

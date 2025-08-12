@@ -187,7 +187,7 @@ type MetricsExporterSpec struct {
 	Release string `json:"release"`
 
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default:="akyriako78/typesense-prometheus-exporter:0.1.7"
+	// +kubebuilder:default:="akyriako78/typesense-prometheus-exporter:0.1.8"
 	Image string `json:"image,omitempty"`
 
 	// +optional
@@ -205,7 +205,7 @@ type MetricsExporterSpec struct {
 
 type HealthCheckSpec struct {
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default:="akyriako78/typesense-healthcheck:0.1.7"
+	// +kubebuilder:default:="akyriako78/typesense-healthcheck:0.1.8"
 	Image string `json:"image,omitempty"`
 
 	// +kubebuilder:validation:Optional

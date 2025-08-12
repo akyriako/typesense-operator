@@ -90,7 +90,7 @@ func (s *TypesenseClusterSpec) GetMetricsExporterSpecs() MetricsExporterSpec {
 
 	return MetricsExporterSpec{
 		Release:           "promstack",
-		Image:             "akyriako78/typesense-prometheus-exporter:0.1.7",
+		Image:             "akyriako78/typesense-prometheus-exporter:0.1.8",
 		IntervalInSeconds: 15,
 	}
 }
@@ -118,7 +118,7 @@ func (s *TypesenseClusterSpec) GetHealthCheckSidecarSpecs() HealthCheckSpec {
 	}
 
 	return HealthCheckSpec{
-		Image: "akyriako78/typesense-healthcheck:0.1.7",
+		Image: "akyriako78/typesense-healthcheck:0.1.8",
 	}
 }
 
