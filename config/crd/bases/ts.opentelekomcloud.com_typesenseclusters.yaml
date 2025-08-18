@@ -1017,6 +1017,125 @@ spec:
                 maximum: 65535
                 minimum: 1024
                 type: integer
+              backup:
+                properties:
+                  backupHooks:
+                    properties:
+                      post:
+                        properties:
+                          commandOverride:
+                            items:
+                              type: string
+                            type: array
+                          onErrorPolicy:
+                            default: Fail
+                            type: string
+                          timeout:
+                            default: 10
+                            maximum: 30
+                            minimum: 5
+                            type: integer
+                        type: object
+                      pre:
+                        description: |-
+                          Name (it will be the container name and the action e.g backup-init or restore-init)
+                          Image (the container image to use)
+                        properties:
+                          commandOverride:
+                            items:
+                              type: string
+                            type: array
+                          onErrorPolicy:
+                            default: Fail
+                            type: string
+                          timeout:
+                            default: 10
+                            maximum: 30
+                            minimum: 5
+                            type: integer
+                        type: object
+                    type: object
+                  enabled:
+                    default: false
+                    type: boolean
+                  method:
+                    default: fsb
+                    enum:
+                    - fsb
+                    - csi
+                    type: string
+                  restoreHooks:
+                    properties:
+                      post:
+                        properties:
+                          commandOverride:
+                            items:
+                              type: string
+                            type: array
+                          onErrorPolicy:
+                            default: Fail
+                            type: string
+                          timeout:
+                            default: 10
+                            maximum: 30
+                            minimum: 5
+                            type: integer
+                        type: object
+                      pre:
+                        description: |-
+                          Name (it will be the container name and the action e.g backup-init or restore-init)
+                          Image (the container image to use)
+                        properties:
+                          commandOverride:
+                            items:
+                              type: string
+                            type: array
+                          onErrorPolicy:
+                            default: Fail
+                            type: string
+                          timeout:
+                            default: 10
+                            maximum: 30
+                            minimum: 5
+                            type: integer
+                        type: object
+                    type: object
+                  retention:
+                    default: 30
+                    minimum: 1
+                    type: integer
+                  schedule:
+                    pattern: (^((\*\/)?([0-5]?[0-9])((\,|\-|\/)([0-5]?[0-9]))*|\*)\s+((\*\/)?((2[0-3]|1[0-9]|[0-9]|00))((\,|\-|\/)(2[0-3]|1[0-9]|[0-9]|00))*|\*)\s+((\*\/)?([1-9]|[12][0-9]|3[01])((\,|\-|\/)([1-9]|[12][0-9]|3[01]))*|\*)\s+((\*\/)?([1-9]|1[0-2])((\,|\-|\/)([1-9]|1[0-2]))*|\*|(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|des))\s+((\*\/)?[0-6]((\,|\-|\/)[0-6])*|\*|00|(sun|mon|tue|wed|thu|fri|sat))\s*$)|@(annually|yearly|monthly|weekly|daily|hourly|reboot)
+                    type: string
+                  snapshotStorage:
+                    properties:
+                      size:
+                        anyOf:
+                        - type: integer
+                        - type: string
+                        default: 100Mi
+                        pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                        x-kubernetes-int-or-string: true
+                      storageClassName:
+                        type: string
+                    required:
+                    - storageClassName
+                    type: object
+                  velero:
+                    properties:
+                      backupStorageLocation:
+                        default: default
+                        type: string
+                      namespace:
+                        default: velero
+                        type: string
+                      useOwnerReferencesInBackup:
+                        default: true
+                        type: boolean
+                    type: object
+                required:
+                - schedule
+                type: object
               corsDomains:
                 type: string
               enableCors:

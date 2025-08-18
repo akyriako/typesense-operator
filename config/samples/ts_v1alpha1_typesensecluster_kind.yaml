@@ -46,61 +46,68 @@ spec:
     release: promstack
   additionalServerConfiguration:
     name: c-kind-1-server-configuration
+  backup:
+    enabled: true
+    schedule: "0 8 * * *"
+    snapshotStorage:
+      storageClassName: typesense-local-path
+    velero:
+      backupStorageLocation: s3
 ---
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: c-kind-2-config
-data:
-  TYPESENSE_ENABLE_SEARCH_ANALYTICS: "true"
----
-apiVersion: v1
-kind: Secret
-metadata:
-  labels:
-    app.kubernetes.io/name: typesense-operator
-    app.kubernetes.io/managed-by: kustomize
-  name: scraper-auth-docusaurus-example-com
-type: Opaque
-data:
-  KC_URL: VGhpc0lzTm90QVNlY3VyZVBhc3N3b3Jk
-  KC_REALM: VGhpc0lzTm90QVNlY3VyZVBhc3N3b3Jk
-  KC_CLIENT_ID: VGhpc0lzTm90QVNlY3VyZVBhc3N3b3Jk
-  KC_CLIENT_SECRET: VGhpc0lzTm90QVNlY3VyZVBhc3N3b3Jk
----
-apiVersion: ts.opentelekomcloud.com/v1alpha1
-kind: TypesenseCluster
-metadata:
-  labels:
-    app.kubernetes.io/name: typesense-operator
-    app.kubernetes.io/managed-by: kustomize
-  name: c-kind-2
-spec:
-  image: typesense/typesense:29.0
-  replicas: 7
-  adminApiKey:
-    name: typesense-common-bootstrap-key
-  enableCors: true
-  apiPort: 8108
-  resources:
-    limits:
-      cpu: "200m"
-      memory: "1024Mi"
-    requests:
-      cpu: "100m"
-      memory: "64Mi"
-  storage:
-    size: 75Mi
-    storageClassName: typesense-local-path
-  metrics:
-    release: promstack
-  ingress:
-    referer: referer.example.com
-    host: host.example.com
-    path: /
-    pathType: ImplementationSpecific
-    ingressClassName: nginx
-    clusterIssuer: lets-encrypt-prod
+#apiVersion: v1
+#kind: ConfigMap
+#metadata:
+#  name: c-kind-2-config
+#data:
+#  TYPESENSE_ENABLE_SEARCH_ANALYTICS: "true"
+#---
+#apiVersion: v1
+#kind: Secret
+#metadata:
+#  labels:
+#    app.kubernetes.io/name: typesense-operator
+#    app.kubernetes.io/managed-by: kustomize
+#  name: scraper-auth-docusaurus-example-com
+#type: Opaque
+#data:
+#  KC_URL: VGhpc0lzTm90QVNlY3VyZVBhc3N3b3Jk
+#  KC_REALM: VGhpc0lzTm90QVNlY3VyZVBhc3N3b3Jk
+#  KC_CLIENT_ID: VGhpc0lzTm90QVNlY3VyZVBhc3N3b3Jk
+#  KC_CLIENT_SECRET: VGhpc0lzTm90QVNlY3VyZVBhc3N3b3Jk
+#---
+#apiVersion: ts.opentelekomcloud.com/v1alpha1
+#kind: TypesenseCluster
+#metadata:
+#  labels:
+#    app.kubernetes.io/name: typesense-operator
+#    app.kubernetes.io/managed-by: kustomize
+#  name: c-kind-2
+#spec:
+#  image: typesense/typesense:29.0
+#  replicas: 7
+#  adminApiKey:
+#    name: typesense-common-bootstrap-key
+#  enableCors: true
+#  apiPort: 8108
+#  resources:
+#    limits:
+#      cpu: "200m"
+#      memory: "1024Mi"
+#    requests:
+#      cpu: "100m"
+#      memory: "64Mi"
+#  storage:
+#    size: 75Mi
+#    storageClassName: typesense-local-path
+#  metrics:
+#    release: promstack
+#  ingress:
+#    referer: referer.example.com
+#    host: host.example.com
+#    path: /
+#    pathType: ImplementationSpecific
+#    ingressClassName: nginx
+#    clusterIssuer: lets-encrypt-prod
 #    readOnlyRootFilesystem:
 #      volumes:
 #        - name: nginx-var-cache
