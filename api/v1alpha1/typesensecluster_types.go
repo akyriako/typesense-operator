@@ -117,6 +117,9 @@ type TypesenseClusterSpec struct {
 	// +kubebuilder:default=false
 	// +kubebuilder:validation:Type=boolean
 	IncrementalQuorumRecovery bool `json:"incrementalQuorumRecovery,omitempty"`
+
+	// +optional
+	Backup *BackupSpec `json:"backup,omitempty"`
 }
 
 type StorageSpec struct {
@@ -222,6 +225,72 @@ type HealthCheckSpec struct {
 
 	// +kubebuilder:validation:Optional
 	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
+}
+
+type BackupSpec struct {
+	// +optional
+	// +kubebuilder:default=false
+	// +kubebuilder:validation:Type=boolean
+	Enabled bool `json:"enabled,omitempty"`
+
+	// +optional
+	// +kubebuilder:validation:Type=string
+	// +kubebuilder:validation:Enum=fsb;csi
+	// +kubebuilder:default=fsb
+	Method string `json:"method,omitempty"`
+
+	// +kubebuilder:validation:Pattern:=`(^((\*\/)?([0-5]?[0-9])((\,|\-|\/)([0-5]?[0-9]))*|\*)\s+((\*\/)?((2[0-3]|1[0-9]|[0-9]|00))((\,|\-|\/)(2[0-3]|1[0-9]|[0-9]|00))*|\*)\s+((\*\/)?([1-9]|[12][0-9]|3[01])((\,|\-|\/)([1-9]|[12][0-9]|3[01]))*|\*)\s+((\*\/)?([1-9]|1[0-2])((\,|\-|\/)([1-9]|1[0-2]))*|\*|(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|des))\s+((\*\/)?[0-6]((\,|\-|\/)[0-6])*|\*|00|(sun|mon|tue|wed|thu|fri|sat))\s*$)|@(annually|yearly|monthly|weekly|daily|hourly|reboot)`
+	// +kubebuilder:validation:Type=string
+	Schedule string `json:"schedule"`
+
+	// +kubebuilder:default=30
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:ExclusiveMinimum=false
+	// +kubebuilder:validation:Type=integer
+	Retention int `json:"retention,omitempty"`
+
+	SnapshotStorage *StorageSpec `json:"snapshotStorage,omitempty"`
+
+	BackupHooks *ActionHooksSpec `json:"backupHooks,omitempty"`
+
+	RestoreHooks *ActionHooksSpec `json:"restoreHooks,omitempty"`
+
+	Velero *VeleroSpec `json:"velero,omitempty"`
+}
+
+type VeleroSpec struct {
+	// +kubebuilder:default=velero
+	Namespace string `json:"namespace,omitempty"`
+
+	// +kubebuilder:default=default
+	BackupStorageLocation string `json:"backupStorageLocation,omitempty"`
+
+	// +kubebuilder:default=true
+	UseOwnerReferencesInBackup bool `json:"useOwnerReferencesInBackup,omitempty"`
+}
+
+type ActionHooksSpec struct {
+	//Name (it will be the container name and the action e.g backup-init or restore-init)
+	//Image (the container image to use)
+	Pre  *HookSpec `json:"pre,omitempty"`
+	Post *HookSpec `json:"post,omitempty"`
+}
+
+type HookSpec struct {
+	// +kubebuilder:default=10
+	// +kubebuilder:validation:Minimum=5
+	// +kubebuilder:validation:Maximum=30
+	// +kubebuilder:validation:ExclusiveMinimum=false
+	// +kubebuilder:validation:ExclusiveMaximum=false
+	// +kubebuilder:validation:Type=integer
+	Timeout int `json:"timeout,omitempty"`
+
+	// +optional
+	// +kubebuilder:validation:Type=string
+	// +kubebuilder:default=Fail
+	OnErrorPolicy string `json:"onErrorPolicy,omitempty"`
+
+	CommandOverride []string `json:"commandOverride,omitempty"`
 }
 
 // TypesenseClusterStatus defines the observed state of TypesenseCluster
