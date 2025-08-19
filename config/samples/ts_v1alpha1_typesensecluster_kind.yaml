@@ -48,8 +48,9 @@ spec:
     name: c-kind-1-server-configuration
   backup:
     enabled: true
-    schedule: "0 8 * * *"
+    schedule: "0 */8 * * *"
     snapshotStorage:
+      auto: true
       storageClassName: typesense-local-path
     velero:
       backupStorageLocation: s3

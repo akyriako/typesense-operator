@@ -5,11 +5,13 @@ import (
 	"encoding/base64"
 	"fmt"
 	tsv1alpha1 "github.com/akyriako/typesense-operator/api/v1alpha1"
+	"github.com/robfig/cron/v3"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"regexp"
 	"sort"
+	"time"
 )
 
 const (
@@ -179,4 +181,35 @@ var ip4Prefix = regexp.MustCompile(
 
 func hasIP4Prefix(s string) bool {
 	return ip4Prefix.MatchString(s)
+}
+
+func howManyRuns(cronExpr string, retentionDays int64) (int, error) {
+	parser := cron.NewParser(cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow | cron.Descriptor)
+	schedule, err := parser.Parse(cronExpr)
+	if err != nil {
+		return 0, fmt.Errorf("invalid cron expression: %v", err)
+	}
+
+	now := time.Now().UTC()
+	window := time.Duration(retentionDays * 24 * int64(time.Hour))
+	start := now.Add(-window)
+
+	count := 0
+	next := schedule.Next(start)
+	for !next.After(now) {
+		count++
+		next = schedule.Next(next)
+	}
+
+	return count, nil
+}
+
+func roundUpToUnit(bytes int64, unitBytes int64) int64 {
+	if unitBytes <= 0 {
+		return bytes
+	}
+	if bytes%unitBytes == 0 {
+		return bytes
+	}
+	return ((bytes / unitBytes) + 1) * unitBytes
 }

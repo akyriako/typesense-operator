@@ -1112,6 +1112,9 @@ spec:
                     type: string
                   snapshotStorage:
                     properties:
+                      auto:
+                        default: false
+                        type: boolean
                       size:
                         anyOf:
                         - type: integer
