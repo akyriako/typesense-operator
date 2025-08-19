@@ -251,6 +251,9 @@ type BackupSpec struct {
 
 	SnapshotStorage *StorageSpec `json:"snapshotStorage,omitempty"`
 
+	// +kubebuilder:default="curlimages/curl:8.14.1"
+	HooksSidecarImage *string `json:"hooksSidecarImage,omitempty"`
+
 	BackupHooks *ActionHooksSpec `json:"backupHooks,omitempty"`
 
 	RestoreHooks *ActionHooksSpec `json:"restoreHooks,omitempty"`

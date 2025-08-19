@@ -30,6 +30,7 @@ const (
 	readLagAnnotationKey               = "ts.opentelekomcloud.com/read-lag-threshold"
 	writeLagAnnotationKey              = "ts.opentelekomcloud.com/write-lag-threshold"
 	restartPodsAnnotationKey           = "kubectl.kubernetes.io/restartedAt"
+	veleroApiGroup                     = "velero.io"
 )
 
 func (r *TypesenseClusterReconciler) ReconcileStatefulSet(ctx context.Context, ts *tsv1alpha1.TypesenseCluster) (*appsv1.StatefulSet, error) {
@@ -254,6 +255,10 @@ func (r *TypesenseClusterReconciler) buildStatefulSet(ctx context.Context, key c
 									Value: "/usr/share/typesense/data",
 								},
 								{
+									Name:  "TYPESENSE_SNAPSHOTS_DIR",
+									Value: "/usr/share/typesense/snapshots",
+								},
+								{
 									Name:  "TYPESENSE_API_PORT",
 									Value: strconv.Itoa(ts.Spec.ApiPort),
 								},
@@ -291,6 +296,10 @@ func (r *TypesenseClusterReconciler) buildStatefulSet(ctx context.Context, key c
 								{
 									MountPath: "/usr/share/typesense/data",
 									Name:      "data",
+								},
+								{
+									MountPath: "/usr/share/typesense/snapshots",
+									Name:      "snapshots",
 								},
 							},
 						},
@@ -427,6 +436,14 @@ func (r *TypesenseClusterReconciler) buildStatefulSet(ctx context.Context, key c
 								},
 							},
 						},
+						{
+							Name: "snapshots",
+							VolumeSource: corev1.VolumeSource{
+								PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+									ClaimName: "snapshots",
+								},
+							},
+						},
 					},
 				},
 			},
@@ -450,6 +467,86 @@ func (r *TypesenseClusterReconciler) buildStatefulSet(ctx context.Context, key c
 				},
 			},
 		},
+	}
+
+	if ts.Spec.Backup != nil {
+		veleroDeployed, err := r.IsVeleroDeployed()
+		if err != nil {
+			return nil, err
+		}
+
+		if veleroDeployed {
+			sidecar := &corev1.Container{
+				Name:            hooksSidecarContainerName,
+				Image:           *ts.Spec.Backup.HooksSidecarImage,
+				ImagePullPolicy: corev1.PullIfNotPresent,
+				Command:         []string{"sleep", "infinity"},
+				Env: []corev1.EnvVar{
+					{
+						Name: "TYPESENSE_API_KEY",
+						ValueFrom: &corev1.EnvVarSource{
+							SecretKeyRef: &corev1.SecretKeySelector{
+								Key: ClusterAdminApiKeySecretKeyName,
+								LocalObjectReference: corev1.LocalObjectReference{
+									Name: r.getAdminApiKeyObjectKey(ts).Name,
+								},
+							},
+						},
+					},
+					{
+						Name:  "TYPESENSE_DATA_DIR",
+						Value: "/usr/share/typesense/data",
+					},
+					{
+						Name:  "TYPESENSE_SNAPSHOTS_DIR",
+						Value: "/usr/share/typesense/snapshots",
+					},
+				},
+				Resources: ts.Spec.GetHooksSidecarResources(),
+				VolumeMounts: []corev1.VolumeMount{
+					{
+						MountPath: "/usr/share/typesense/data",
+						Name:      "data",
+					},
+					{
+						MountPath: "/usr/share/typesense/snapshots",
+						Name:      "snapshots",
+					},
+				},
+			}
+			sts.Spec.Template.Spec.Containers = append(sts.Spec.Template.Spec.Containers, *sidecar)
+
+			volume := corev1.Volume{
+				Name: "snapshots",
+				VolumeSource: corev1.VolumeSource{
+					PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+						ClaimName: "snapshots",
+					},
+				},
+			}
+			sts.Spec.Template.Spec.Volumes = append(sts.Spec.Template.Spec.Volumes, volume)
+
+			volumeClaimTemplate := corev1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "snapshots",
+					Labels: getLabels(ts),
+				},
+				Spec: corev1.PersistentVolumeClaimSpec{
+					AccessModes: []corev1.PersistentVolumeAccessMode{
+						corev1.ReadWriteOnce,
+					},
+					Resources: corev1.VolumeResourceRequirements{
+						Requests: corev1.ResourceList{
+							corev1.ResourceStorage: ts.Spec.GetStorage().Size,
+						},
+					},
+					StorageClassName: &ts.Spec.Storage.StorageClassName,
+				},
+			}
+			sts.Spec.VolumeClaimTemplates = append(sts.Spec.VolumeClaimTemplates, volumeClaimTemplate)
+		} else {
+			return nil, fmt.Errorf("velero api group %s was not found in cluster", veleroApiGroup)
+		}
 	}
 
 	podTemplateHash, err := hashstructure.Hash(sts.Spec.Template.Spec, hashstructure.FormatV2, nil)

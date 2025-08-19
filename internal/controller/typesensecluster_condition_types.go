@@ -21,6 +21,7 @@ const (
 	ConditionReasonIngressNotReady                                       = "IngressNotReady"
 	ConditionReasonScrapersNotReady                                      = "ScrapersNotReady"
 	ConditionReasonMetricsExporterNotReady                               = "MetricsExporterNotReady"
+	ConditionReasonBackupScheduleNotReady                                = "BackupScheduleNotReady"
 	ConditionReasonQuorumStateUnknown                    ConditionQuorum = "QuorumStateUnknown"
 	ConditionReasonQuorumReady                           ConditionQuorum = "QuorumReady"
 	ConditionReasonQuorumNotReady                        ConditionQuorum = "QuorumNotReady"
