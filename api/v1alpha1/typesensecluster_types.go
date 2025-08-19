@@ -122,6 +122,20 @@ type TypesenseClusterSpec struct {
 	Backup *BackupSpec `json:"backup,omitempty"`
 }
 
+type SnapshotStorageSpec struct {
+
+	// +optional
+	// +kubebuilder:default=false
+	// +kubebuilder:validation:Type=boolean
+	Auto bool `json:"auto,omitempty"`
+
+	// +optional
+	// +kubebuilder:default="100Mi"
+	Size resource.Quantity `json:"size,omitempty"`
+
+	StorageClassName string `json:"storageClassName"`
+}
+
 type StorageSpec struct {
 
 	// +optional
@@ -249,7 +263,7 @@ type BackupSpec struct {
 	// +kubebuilder:validation:Type=integer
 	Retention int `json:"retention,omitempty"`
 
-	SnapshotStorage *StorageSpec `json:"snapshotStorage,omitempty"`
+	SnapshotStorage *SnapshotStorageSpec `json:"snapshotStorage,omitempty"`
 
 	// +kubebuilder:default="curlimages/curl:8.14.1"
 	HooksSidecarImage *string `json:"hooksSidecarImage,omitempty"`

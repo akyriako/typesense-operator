@@ -15,6 +15,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/utils/ptr"
@@ -537,15 +538,16 @@ func (r *TypesenseClusterReconciler) buildStatefulSet(ctx context.Context, key c
 					},
 					Resources: corev1.VolumeResourceRequirements{
 						Requests: corev1.ResourceList{
-							corev1.ResourceStorage: ts.Spec.GetStorage().Size,
+							corev1.ResourceStorage: r.getSnapshotStorage(ts).Size,
 						},
 					},
-					StorageClassName: &ts.Spec.Storage.StorageClassName,
+					StorageClassName: &ts.Spec.Backup.SnapshotStorage.StorageClassName,
 				},
 			}
 			sts.Spec.VolumeClaimTemplates = append(sts.Spec.VolumeClaimTemplates, volumeClaimTemplate)
 		} else {
-			return nil, fmt.Errorf("velero api group %s was not found in cluster", veleroApiGroup)
+			veleroNotDeployedErr := fmt.Errorf("velero api group %s was not found in cluster", veleroApiGroup)
+			r.logger.V(debugLevel).Error(veleroNotDeployedErr, "creating snapshots sidecar skipped")
 		}
 	}
 
@@ -666,4 +668,33 @@ func (r *TypesenseClusterReconciler) GetFreshStatefulSet(ctx context.Context, st
 	}
 
 	return sts, nil
+}
+
+func (r *TypesenseClusterReconciler) getSnapshotStorage(ts *tsv1alpha1.TypesenseCluster) tsv1alpha1.SnapshotStorageSpec {
+	if !ts.Spec.Backup.SnapshotStorage.Auto {
+		return ts.Spec.GetSnapshotStorage()
+	}
+
+	schedule := ts.Spec.Backup.Schedule
+	retentionDays := int64(ts.Spec.Backup.Retention)
+
+	runs, err := howManyRuns(schedule, retentionDays)
+	if err != nil {
+		r.logger.Error(err, "failed to calculate snapshot schedule runs", "schedule", schedule)
+		return ts.Spec.GetSnapshotStorage()
+	}
+
+	storageSizeAsQty := ts.Spec.GetStorage().Size
+	storageSizeAsInt64, _ := storageSizeAsQty.AsInt64()
+
+	snapshotSize := int64(runs) * storageSizeAsInt64
+	unitGiB := int64(1) << 30
+	rounded := roundUpToUnit(snapshotSize, unitGiB)
+
+	r.logger.V(debugLevel).Info("calculated snapshot storage size", "size", snapshotSize)
+
+	return tsv1alpha1.SnapshotStorageSpec{
+		Size:             *resource.NewQuantity(rounded, resource.BinarySI),
+		StorageClassName: ts.Spec.Backup.SnapshotStorage.StorageClassName,
+	}
 }

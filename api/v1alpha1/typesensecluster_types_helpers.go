@@ -69,12 +69,13 @@ func (s *TypesenseClusterSpec) GetStorage() StorageSpec {
 	}
 }
 
-func (s *TypesenseClusterSpec) GetSnapshotStorage() StorageSpec {
+func (s *TypesenseClusterSpec) GetSnapshotStorage() SnapshotStorageSpec {
 	if s.Backup.SnapshotStorage != nil {
 		return *s.Backup.SnapshotStorage
 	}
 
-	return StorageSpec{
+	return SnapshotStorageSpec{
+		Auto:             false,
 		Size:             resource.MustParse("100Mi"),
 		StorageClassName: "standard",
 	}
