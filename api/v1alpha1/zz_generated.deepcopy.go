@@ -60,6 +60,11 @@ func (in *BackupSpec) DeepCopyInto(out *BackupSpec) {
 		*out = new(StorageSpec)
 		(*in).DeepCopyInto(*out)
 	}
+	if in.HooksSidecarImage != nil {
+		in, out := &in.HooksSidecarImage, &out.HooksSidecarImage
+		*out = new(string)
+		**out = **in
+	}
 	if in.BackupHooks != nil {
 		in, out := &in.BackupHooks, &out.BackupHooks
 		*out = new(ActionHooksSpec)

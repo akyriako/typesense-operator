@@ -69,6 +69,17 @@ func (s *TypesenseClusterSpec) GetStorage() StorageSpec {
 	}
 }
 
+func (s *TypesenseClusterSpec) GetSnapshotStorage() StorageSpec {
+	if s.Backup.SnapshotStorage != nil {
+		return *s.Backup.SnapshotStorage
+	}
+
+	return StorageSpec{
+		Size:             resource.MustParse("100Mi"),
+		StorageClassName: "standard",
+	}
+}
+
 func (s *TypesenseClusterSpec) GetTopologySpreadConstraints(labels map[string]string) []corev1.TopologySpreadConstraint {
 	tscs := make([]corev1.TopologySpreadConstraint, 0)
 
@@ -126,6 +137,23 @@ func (s *TypesenseClusterSpec) GetHealthCheckSidecarResources() corev1.ResourceR
 	if s.HealthCheck != nil && s.HealthCheck.Resources != nil {
 		return *s.HealthCheck.Resources
 	}
+
+	return corev1.ResourceRequirements{
+		Limits: corev1.ResourceList{
+			corev1.ResourceCPU:    resource.MustParse("100m"),
+			corev1.ResourceMemory: resource.MustParse("64Mi"),
+		},
+		Requests: corev1.ResourceList{
+			corev1.ResourceCPU:    resource.MustParse("100m"),
+			corev1.ResourceMemory: resource.MustParse("32Mi"),
+		},
+	}
+}
+
+func (s *TypesenseClusterSpec) GetHooksSidecarResources() corev1.ResourceRequirements {
+	//if s.Backup != nil && s.Backup. != nil {
+	//	return *s.HealthCheck.Resources
+	//}
 
 	return corev1.ResourceRequirements{
 		Limits: corev1.ResourceList{

@@ -1058,6 +1058,9 @@ spec:
                   enabled:
                     default: false
                     type: boolean
+                  hooksSidecarImage:
+                    default: curlimages/curl:8.14.1
+                    type: string
                   method:
                     default: fsb
                     enum:

@@ -157,6 +157,11 @@ func (r *TypesenseClusterReconciler) createService(ctx context.Context, key clie
 					Port:       8808,
 					TargetPort: intstr.IntOrString{IntVal: 8808},
 				},
+				{
+					Name:       "metrics",
+					Port:       9100,
+					TargetPort: intstr.IntOrString{IntVal: 9100},
+				},
 			},
 		},
 	}

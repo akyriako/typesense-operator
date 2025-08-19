@@ -35,7 +35,7 @@ metadata:
   name: c-kind-1
 spec:
   image: typesense/typesense:30.0.rc7-amd64
-  replicas: 5
+  replicas: 1
   corsDomains: "http://localhost,https://www.example.de"
   storage:
     size: 150Mi
