@@ -81,6 +81,29 @@ func (s *TypesenseClusterSpec) GetSnapshotStorage() SnapshotStorageSpec {
 	}
 }
 
+var (
+	defaultBackupPreHookCommand = []string{"sh", "-lc",
+		`curl -s -X POST http://127.0.0.1:8108/operations/snapshot -H 'X-TYPESENSE-API-KEY: ${TYPESENSE_API_KEY}' -H 'Content-Type: application/json' -d '{\"${TYPESENSE_SNAPSHOTS_DIR}\":\"/$(date +%s)\"}'`,
+	}
+
+	defaultBackupPostHookCommand = []string{"sh", "-lc"}
+)
+
+func (s *TypesenseClusterSpec) GetDefaultBackupHook() *ActionHooksSpec {
+	if s.Backup != nil && s.Backup.BackupHooks != nil {
+		return s.Backup.BackupHooks
+	}
+
+	return &ActionHooksSpec{
+		Pre: &HookSpec{
+			Timeout:         10,
+			OnErrorPolicy:   "Fail",
+			CommandOverride: defaultBackupPreHookCommand,
+		},
+		Post: nil,
+	}
+}
+
 func (s *TypesenseClusterSpec) GetTopologySpreadConstraints(labels map[string]string) []corev1.TopologySpreadConstraint {
 	tscs := make([]corev1.TopologySpreadConstraint, 0)
 

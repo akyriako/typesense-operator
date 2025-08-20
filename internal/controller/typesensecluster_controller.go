@@ -191,14 +191,14 @@ func (r *TypesenseClusterReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		return ctrl.Result{}, err
 	}
 
-	//err = r.ReconcileBackup(ctx, &ts, sts)
-	//if err != nil {
-	//	cerr := r.setConditionNotReady(ctx, &ts, ConditionReasonBackupScheduleNotReady, err)
-	//	if cerr != nil {
-	//		err = errors.Wrap(err, cerr.Error())
-	//	}
-	//	return ctrl.Result{}, err
-	//}
+	err = r.ReconcileBackup(ctx, &ts)
+	if err != nil {
+		cerr := r.setConditionNotReady(ctx, &ts, ConditionReasonBackupScheduleNotReady, err)
+		if cerr != nil {
+			err = errors.Wrap(err, cerr.Error())
+		}
+		return ctrl.Result{}, err
+	}
 
 	terminationGracePeriodSeconds := *sts.Spec.Template.Spec.TerminationGracePeriodSeconds
 	requeueAfter := reconcileRequeuePeriod + (time.Duration(terminationGracePeriodSeconds) * time.Second)

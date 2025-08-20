@@ -478,7 +478,7 @@ func (r *TypesenseClusterReconciler) buildStatefulSet(ctx context.Context, key c
 
 		if veleroDeployed {
 			sidecar := &corev1.Container{
-				Name:            hooksSidecarContainerName,
+				Name:            "velero-hooks-exec",
 				Image:           *ts.Spec.Backup.HooksSidecarImage,
 				ImagePullPolicy: corev1.PullIfNotPresent,
 				Command:         []string{"sleep", "infinity"},

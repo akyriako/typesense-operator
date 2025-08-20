@@ -216,3 +216,18 @@ func roundUpToUnit(bytes int64, unitBytes int64) int64 {
 	}
 	return ((bytes / unitBytes) + 1) * unitBytes
 }
+
+func toAnySlice(ss []string) []any {
+	out := make([]any, len(ss))
+	for i, s := range ss {
+		out[i] = s
+	}
+	return out
+}
+func toAnyMapString(m map[string]string) map[string]any {
+	out := make(map[string]any, len(m))
+	for k, v := range m {
+		out[k] = v
+	}
+	return out
+}
