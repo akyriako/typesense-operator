@@ -9,6 +9,7 @@ const (
 	ClusterRestService     = "%s-svc"
 	ClusterStatefulSet     = "%s-sts"
 	ClusterAppLabel        = "%s-sts"
+	ClusterBackupSchedule  = "%s-%s-schedule-%s"
 
 	ClusterReverseProxyAppLabel  = "%s-rp"
 	ClusterReverseProxyIngress   = "%s-reverse-proxy"
