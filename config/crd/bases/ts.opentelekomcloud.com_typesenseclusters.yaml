@@ -28,7 +28,7 @@ spec:
       name: Peering Port
       type: integer
     - jsonPath: .spec.healthProbeTimeoutMS
-      name: Health Probe Timeout MS
+      name: Health Probe Timeout milliseconds
       type: integer
     - jsonPath: .status.phase
       name: Phase
