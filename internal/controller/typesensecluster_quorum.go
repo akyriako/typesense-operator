@@ -3,14 +3,15 @@ package controller
 import (
 	"context"
 	"fmt"
-	tsv1alpha1 "github.com/akyriako/typesense-operator/api/v1alpha1"
-	v1 "k8s.io/api/core/v1"
-	"k8s.io/utils/ptr"
 	"net/http"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sort"
 	"strconv"
 	"time"
+
+	tsv1alpha1 "github.com/akyriako/typesense-operator/api/v1alpha1"
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/utils/ptr"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const (
@@ -38,7 +39,7 @@ func (r *TypesenseClusterReconciler) ReconcileQuorum(ctx context.Context, ts *ts
 
 	nodesStatus := make(map[string]NodeStatus)
 	httpClient := &http.Client{
-		Timeout: 500 * time.Millisecond,
+		Timeout: time.Duration(ts.Spec.HealthProbeTimeoutMS) * time.Millisecond,
 	}
 
 	queuedWrites := 0

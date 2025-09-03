@@ -61,6 +61,15 @@ type TypesenseClusterSpec struct {
 	PeeringPort int `json:"peeringPort,omitempty"`
 
 	// +optional
+	// +kubebuilder:default=500
+	// +kubebuilder:validation:Minimum=500
+	// +kubebuilder:validation:Maximum=60000
+	// +kubebuilder:validation:ExclusiveMinimum=false
+	// +kubebuilder:validation:ExclusiveMaximum=false
+	// +kubebuilder:validation:Type=integer
+	HealthProbeTimeoutMS int `json:"healthProbeTimeoutMS,omitempty"`
+
+	// +optional
 	// +kubebuilder:default=true
 	// +kubebuilder:validation:Type=boolean
 	ResetPeersOnError bool `json:"resetPeersOnError,omitempty"`
