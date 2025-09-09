@@ -15,7 +15,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/utils/ptr"
@@ -478,7 +477,7 @@ func (r *TypesenseClusterReconciler) buildStatefulSet(ctx context.Context, key c
 
 		if veleroDeployed {
 			sidecar := &corev1.Container{
-				Name:            "velero-hooks-exec",
+				Name:            hooksExecutorContainerName,
 				Image:           *ts.Spec.Backup.HooksSidecarImage,
 				ImagePullPolicy: corev1.PullIfNotPresent,
 				Command:         []string{"sleep", "infinity"},
@@ -545,6 +544,12 @@ func (r *TypesenseClusterReconciler) buildStatefulSet(ctx context.Context, key c
 				},
 			}
 			sts.Spec.VolumeClaimTemplates = append(sts.Spec.VolumeClaimTemplates, volumeClaimTemplate)
+
+			if sts.Spec.Template.Annotations == nil {
+				sts.Spec.Template.Annotations = map[string]string{}
+			}
+			// Tell Velero to back up ONLY the "snapshots" volume (FSB)
+			sts.Spec.Template.Annotations["backup.velero.io/backup-volumes"] = "snapshots"
 		} else {
 			veleroNotDeployedErr := fmt.Errorf("velero api group %s was not found in cluster", veleroApiGroup)
 			r.logger.V(debugLevel).Error(veleroNotDeployedErr, "creating snapshots sidecar skipped")
@@ -675,26 +680,30 @@ func (r *TypesenseClusterReconciler) getSnapshotStorage(ts *tsv1alpha1.Typesense
 		return ts.Spec.GetSnapshotStorage()
 	}
 
-	schedule := ts.Spec.Backup.Schedule
-	retentionDays := int64(ts.Spec.Backup.Retention)
+	//schedule := ts.Spec.Backup.Schedule
+	//retentionDays := int64(ts.Spec.Backup.RetentionInDays)
 
-	runs, err := howManyRuns(schedule, retentionDays)
-	if err != nil {
-		r.logger.Error(err, "failed to calculate snapshot schedule runs", "schedule", schedule)
-		return ts.Spec.GetSnapshotStorage()
-	}
+	//runs, err := howManyRuns(schedule, retentionDays)
+	//if err != nil {
+	//	r.logger.Error(err, "failed to calculate snapshot schedule runs", "schedule", schedule)
+	//	return ts.Spec.GetSnapshotStorage()
+	//}
 
 	storageSizeAsQty := ts.Spec.GetStorage().Size
-	storageSizeAsInt64, _ := storageSizeAsQty.AsInt64()
+	//storageSizeAsInt64, _ := storageSizeAsQty.AsInt64()
 
-	snapshotSize := int64(runs) * storageSizeAsInt64
-	unitGiB := int64(1) << 30
-	rounded := roundUpToUnit(snapshotSize, unitGiB)
+	//storageSizeAsQty := ts.Spec.GetStorage().Size
+	//storageSizeAsInt64, _ := storageSizeAsQty.AsInt64()
 
-	r.logger.V(debugLevel).Info("calculated snapshot storage size", "size", snapshotSize)
+	//snapshotSize := int64(runs) * storageSizeAsInt64
+	//unitGiB := int64(1) << 30
+	//rounded := roundUpToUnit(snapshotSize, unitGiB)
+
+	//r.logger.V(debugLevel).Info("calculated snapshot storage size", "size", snapshotSize)
 
 	return tsv1alpha1.SnapshotStorageSpec{
-		Size:             *resource.NewQuantity(rounded, resource.BinarySI),
+		//Size:             *resource.NewQuantity(rounded, resource.BinarySI),
+		Size:             storageSizeAsQty,
 		StorageClassName: ts.Spec.Backup.SnapshotStorage.StorageClassName,
 	}
 }

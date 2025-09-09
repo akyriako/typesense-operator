@@ -261,7 +261,7 @@ type BackupSpec struct {
 	// +kubebuilder:validation:Minimum=1
 	// +kubebuilder:validation:ExclusiveMinimum=false
 	// +kubebuilder:validation:Type=integer
-	Retention int `json:"retention,omitempty"`
+	RetentionInDays int `json:"retentionInDays,omitempty"`
 
 	SnapshotStorage *SnapshotStorageSpec `json:"snapshotStorage,omitempty"`
 
@@ -300,7 +300,7 @@ type HookSpec struct {
 	// +kubebuilder:validation:ExclusiveMinimum=false
 	// +kubebuilder:validation:ExclusiveMaximum=false
 	// +kubebuilder:validation:Type=integer
-	Timeout int `json:"timeout,omitempty"`
+	TimeoutInMinutes int `json:"timeoutInMinutes,omitempty"`
 
 	// +optional
 	// +kubebuilder:validation:Type=string

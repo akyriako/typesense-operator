@@ -1030,7 +1030,7 @@ spec:
                           onErrorPolicy:
                             default: Fail
                             type: string
-                          timeout:
+                          timeoutInMinutes:
                             default: 10
                             maximum: 30
                             minimum: 5
@@ -1048,7 +1048,7 @@ spec:
                           onErrorPolicy:
                             default: Fail
                             type: string
-                          timeout:
+                          timeoutInMinutes:
                             default: 10
                             maximum: 30
                             minimum: 5
@@ -1078,7 +1078,7 @@ spec:
                           onErrorPolicy:
                             default: Fail
                             type: string
-                          timeout:
+                          timeoutInMinutes:
                             default: 10
                             maximum: 30
                             minimum: 5
@@ -1096,14 +1096,14 @@ spec:
                           onErrorPolicy:
                             default: Fail
                             type: string
-                          timeout:
+                          timeoutInMinutes:
                             default: 10
                             maximum: 30
                             minimum: 5
                             type: integer
                         type: object
                     type: object
-                  retention:
+                  retentionInDays:
                     default: 30
                     minimum: 1
                     type: integer
