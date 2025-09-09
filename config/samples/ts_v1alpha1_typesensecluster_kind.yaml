@@ -35,7 +35,7 @@ metadata:
   name: c-kind-1
 spec:
   image: typesense/typesense:30.0.rc7-amd64
-  replicas: 1
+  replicas: 3
   corsDomains: "http://localhost,https://www.example.de"
   storage:
     size: 150Mi
@@ -48,7 +48,7 @@ spec:
     name: c-kind-1-server-configuration
   backup:
     enabled: true
-    schedule: "0 */8 * * *"
+    schedule: "* * * * *"
     snapshotStorage:
       auto: true
       storageClassName: typesense-local-path

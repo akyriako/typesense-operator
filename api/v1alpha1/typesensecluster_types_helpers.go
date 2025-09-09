@@ -82,8 +82,28 @@ func (s *TypesenseClusterSpec) GetSnapshotStorage() SnapshotStorageSpec {
 }
 
 var (
-	defaultBackupPreHookCommand = []string{"sh", "-lc",
-		`curl -s -X POST http://127.0.0.1:8108/operations/snapshot -H 'X-TYPESENSE-API-KEY: ${TYPESENSE_API_KEY}' -H 'Content-Type: application/json' -d '{\"${TYPESENSE_SNAPSHOTS_DIR}\":\"/$(date +%s)\"}'`,
+	defaultBackupPreHookCommand = []string{
+		"sh",
+		"-lc",
+		`set -euo pipefail
+
+		exec 1>>/proc/1/fd/1
+		exec 2>>/proc/1/fd/2
+		
+		log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')][$1] $2"; }
+		log_error() { echo "[$(date '+%Y-%m-%d %H:%M:%S')][ERROR] $1" >&2; }
+		trap 'log_error "Backup pre-hook failed at line $LINENO"' ERR
+		
+		SNAP_DIR="${TYPESENSE_SNAPSHOTS_DIR:-/snapshots}/$(date +%s)"
+		log INFO "Snapshot path: ${SNAP_DIR}"
+		
+		RESPONSE=$(curl -sS --fail --no-progress-meter -X POST "http://127.0.0.1:8108/operations/snapshot" \
+		  -H "X-TYPESENSE-API-KEY: ${TYPESENSE_API_KEY}" \
+		  -H "Content-Type: application/json" \
+		  -d "{\"snapshot_path\":\"${SNAP_DIR}\"}")
+		
+		log INFO "Snapshot API response: ${RESPONSE}"
+		`,
 	}
 
 	defaultBackupPostHookCommand = []string{"sh", "-lc"}
@@ -96,9 +116,9 @@ func (s *TypesenseClusterSpec) GetDefaultBackupHook() *ActionHooksSpec {
 
 	return &ActionHooksSpec{
 		Pre: &HookSpec{
-			Timeout:         10,
-			OnErrorPolicy:   "Fail",
-			CommandOverride: defaultBackupPreHookCommand,
+			TimeoutInMinutes: 10,
+			OnErrorPolicy:    "Fail",
+			CommandOverride:  defaultBackupPreHookCommand,
 		},
 		Post: nil,
 	}

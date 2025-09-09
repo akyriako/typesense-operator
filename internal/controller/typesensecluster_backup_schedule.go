@@ -3,11 +3,16 @@ package controller
 import (
 	"context"
 	"fmt"
+
 	tsv1alpha1 "github.com/akyriako/typesense-operator/api/v1alpha1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+)
+
+const (
+	hooksExecutorContainerName = "velero-hooks-exec"
 )
 
 func (r *TypesenseClusterReconciler) ReconcileBackup(ctx context.Context, ts *tsv1alpha1.TypesenseCluster) error {
@@ -30,8 +35,6 @@ func (r *TypesenseClusterReconciler) ReconcileBackup(ctx context.Context, ts *ts
 		Name:      scheduleName,
 		Namespace: ts.Spec.Backup.Velero.Namespace,
 	}
-
-	r.logger.V(debugLevel).Info("reconciling backup schedule", "schedule", scheduleObjectKey.String())
 
 	err := r.ensureBackupSchedule(ctx, ts, scheduleObjectKey)
 	if err != nil {
@@ -66,6 +69,17 @@ func (r *TypesenseClusterReconciler) ensureBackupSchedule(ctx context.Context, t
 			return err
 		}
 
+		// We use FSB (pod-volume backups) only for volumes explicitly annotated on pods.
+		// We Disable PV snapshots so the backup doesn't attempt unsupported/unused snapshots.
+		if err := unstructured.SetNestedField(obj.Object, false, "spec", "template", "snapshotVolumes"); err != nil {
+			return err
+		}
+
+		// Declare explicitly that we do NOT back up all pod volumes by default; only annotated ones.
+		if err := unstructured.SetNestedField(obj.Object, false, "spec", "template", "defaultVolumesToFsBackup"); err != nil {
+			return err
+		}
+
 		selector := map[string]any{
 			"matchLabels": toAnyMapString(getLabels(ts)),
 		}
@@ -77,10 +91,10 @@ func (r *TypesenseClusterReconciler) ensureBackupSchedule(ctx context.Context, t
 			"labelSelector":      selector,
 			"pre": []any{map[string]any{
 				"exec": map[string]any{
-					"container": "velero-hooks-exec",
+					"container": hooksExecutorContainerName,
 					"command":   toAnySlice(hooks.Pre.CommandOverride),
 					"onError":   hooks.Pre.OnErrorPolicy,
-					"timeout":   fmt.Sprintf("%dm", hooks.Pre.Timeout),
+					"timeout":   fmt.Sprintf("%dm", hooks.Pre.TimeoutInMinutes),
 				},
 			}},
 		}
@@ -88,7 +102,7 @@ func (r *TypesenseClusterReconciler) ensureBackupSchedule(ctx context.Context, t
 		template := map[string]any{
 			"includedNamespaces": toAnySlice([]string{ts.Namespace}),
 			"labelSelector":      selector,
-			"ttl":                fmt.Sprintf("%dh", ts.Spec.Backup.Retention*24),
+			"ttl":                fmt.Sprintf("%dh", ts.Spec.Backup.RetentionInDays*24),
 			"hooks":              map[string]any{"resources": []any{hooksSpec}},
 		}
 

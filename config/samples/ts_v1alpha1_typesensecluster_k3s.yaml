@@ -1,0 +1,46 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  labels:
+    app.kubernetes.io/name: typesense-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: typesense-common-bootstrap-key
+type: Opaque
+data:
+  typesense-api-key: SXdpVG9CcnFYTHZYeTJNMG1TS1hPaGt0dlFUY3VWUloxc1M5REtsRUNtMFFwQU93R1hoanVIVWJLQnE2ejdlSQ==
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: c-k3s-1-server-configuration
+data:
+  TYPESENSE_HEALTHY_READ_LAG: "1000"
+  TYPESENSE_HEALTHY_WRITE_LAG: "500"
+---
+apiVersion: ts.opentelekomcloud.com/v1alpha1
+kind: TypesenseCluster
+metadata:
+  labels:
+    app.kubernetes.io/name: typesense-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: c-k3s-1
+spec:
+  image: typesense/typesense:30.0.rc7-amd64
+  replicas: 3
+  storage:
+    size: 150Mi
+    storageClassName: nfs
+  adminApiKey:
+    name: typesense-common-bootstrap-key
+  metrics:
+    release: promstack
+  additionalServerConfiguration:
+    name: c-k3s-1-server-configuration
+  backup:
+    enabled: true
+    schedule: "*/3 * * * *"
+    snapshotStorage:
+      auto: false
+      storageClassName: nfs
+    velero:
+      backupStorageLocation: s3
