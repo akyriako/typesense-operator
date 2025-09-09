@@ -97,12 +97,13 @@ var (
 		SNAP_DIR="${TYPESENSE_SNAPSHOTS_DIR:-/snapshots}/$(date +%s)"
 		log INFO "Snapshot path: ${SNAP_DIR}"
 		
-		RESPONSE=$(curl -sS --fail --no-progress-meter -X POST "http://127.0.0.1:8108/operations/snapshot" \
+		RESPONSE=$(curl -sS --fail --no-progress-meter -X POST "http://127.0.0.1:8108/operations/snapshot?snapshot_path=${SNAP_DIR}" \
 		  -H "X-TYPESENSE-API-KEY: ${TYPESENSE_API_KEY}" \
-		  -H "Content-Type: application/json" \
-		  -d "{\"snapshot_path\":\"${SNAP_DIR}\"}")
+		  -H "Content-Type: application/json")
 		
 		log INFO "Snapshot API response: ${RESPONSE}"
+        ls -lhR "${SNAP_DIR}" || true
+
 		`,
 	}
 
