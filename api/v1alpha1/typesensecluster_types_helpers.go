@@ -94,7 +94,7 @@ var (
 		log_error() { echo "[$(date '+%Y-%m-%d %H:%M:%S')][ERROR] $1" >&2; }
 		trap 'log_error "Backup pre-hook failed at line $LINENO"' ERR
 		
-		SNAP_DIR="${TYPESENSE_SNAPSHOTS_DIR:-/snapshots}/$(date +%s)"
+		SNAP_DIR="${TYPESENSE_SNAPSHOTS_DIR:-/snapshots}/"
 		log INFO "Snapshot path: ${SNAP_DIR}"
 		
 		RESPONSE=$(curl -sS --fail --no-progress-meter -X POST "http://127.0.0.1:8108/operations/snapshot?snapshot_path=${SNAP_DIR}" \
