@@ -28,9 +28,6 @@ spec:
     - jsonPath: .spec.peeringPort
       name: Peering Port
       type: integer
-    - jsonPath: .spec.healthProbeTimeoutMS
-      name: Health Probe Timeout milliseconds
-      type: integer
     - jsonPath: .status.phase
       name: Phase
       type: string
@@ -1025,6 +1022,11 @@ spec:
               enableCors:
                 default: false
                 type: boolean
+              healthProbeTimeoutInMilliseconds:
+                default: 500
+                maximum: 60000
+                minimum: 500
+                type: integer
               healthcheck:
                 properties:
                   image:
@@ -3229,7 +3231,7 @@ spec:
               metrics:
                 properties:
                   image:
-                    default: akyriako78/typesense-prometheus-exporter:0.1.8
+                    default: akyriako78/typesense-prometheus-exporter:0.1.9
                     type: string
                   interval:
                     default: 15

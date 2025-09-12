@@ -90,7 +90,7 @@ func (s *TypesenseClusterSpec) GetMetricsExporterSpecs() MetricsExporterSpec {
 
 	return MetricsExporterSpec{
 		Release:           "promstack",
-		Image:             "akyriako78/typesense-prometheus-exporter:0.1.8",
+		Image:             "akyriako78/typesense-prometheus-exporter:0.1.9",
 		IntervalInSeconds: 15,
 	}
 }

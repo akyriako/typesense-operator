@@ -3234,7 +3234,7 @@ spec:
               metrics:
                 properties:
                   image:
-                    default: akyriako78/typesense-prometheus-exporter:0.1.8
+                    default: akyriako78/typesense-prometheus-exporter:0.1.9
                     type: string
                   interval:
                     default: 15
