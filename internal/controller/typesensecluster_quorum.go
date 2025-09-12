@@ -39,7 +39,7 @@ func (r *TypesenseClusterReconciler) ReconcileQuorum(ctx context.Context, ts *ts
 
 	nodesStatus := make(map[string]NodeStatus)
 	httpClient := &http.Client{
-		Timeout: time.Duration(ts.Spec.HealthProbeTimeoutMS) * time.Millisecond,
+		Timeout: time.Duration(ts.Spec.HealthProbeTimeoutInMilliseconds) * time.Millisecond,
 	}
 
 	queuedWrites := 0

@@ -82,6 +82,7 @@ spec:
     name: typesense-common-bootstrap-key
   enableCors: true
   apiPort: 8108
+  healthProbeTimeoutInMilliseconds: 1500
   resources:
     limits:
       cpu: "200m"

@@ -67,7 +67,7 @@ type TypesenseClusterSpec struct {
 	// +kubebuilder:validation:ExclusiveMinimum=false
 	// +kubebuilder:validation:ExclusiveMaximum=false
 	// +kubebuilder:validation:Type=integer
-	HealthProbeTimeoutMS int `json:"healthProbeTimeoutMS,omitempty"`
+	HealthProbeTimeoutInMilliseconds int `json:"healthProbeTimeoutInMilliseconds,omitempty"`
 
 	// +optional
 	// +kubebuilder:default=true
