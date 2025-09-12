@@ -32,13 +32,20 @@ spec:
     storageClassName: nfs
   adminApiKey:
     name: typesense-common-bootstrap-key
+  resources:
+    limits:
+      cpu: "1500m"
+      memory: "1024Mi"
+    requests:
+      cpu: "100m"
+      memory: "64Mi"
   metrics:
     release: promstack
   additionalServerConfiguration:
     name: c-k3s-1-server-configuration
   backup:
     enabled: true
-    schedule: "*/3 * * * *"
+    schedule: "*/10 * * * *"
     snapshotStorage:
       auto: false
       storageClassName: nfs
