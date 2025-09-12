@@ -2,6 +2,16 @@ apiVersion: v1
 entries:
   typesense-operator:
   - apiVersion: v2
+    appVersion: 0.3.2
+    created: "2025-09-12T09:34:16.25246942Z"
+    description: Manage the lifecycle of Typesense Clusters in Kubernetes
+    digest: e76a944fe56438983474128463298225266ee17f27816a101daa18ea06e92e4c
+    name: typesense-operator
+    type: application
+    urls:
+    - https://github.com/akyriako/typesense-operator/releases/download/typesense-operator-0.3.2/typesense-operator-0.3.2.tgz
+    version: 0.3.2
+  - apiVersion: v2
     appVersion: 0.3.1
     created: "2025-08-12T05:59:04.582309393Z"
     description: Manage the lifecycle of Typesense Clusters in Kubernetes
@@ -401,4 +411,4 @@ entries:
     urls:
     - https://github.com/akyriako/typesense-operator/releases/download/typesense-operator-0.1.0/typesense-operator-0.1.0.tgz
     version: 0.1.0
-generated: "2025-08-12T05:59:04.582658195Z"
+generated: "2025-09-12T09:34:16.252888898Z"
