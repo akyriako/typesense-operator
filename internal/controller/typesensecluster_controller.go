@@ -19,6 +19,9 @@ package controller
 import (
 	"context"
 	"fmt"
+	"strings"
+	"time"
+
 	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
 	"golang.org/x/text/cases"
@@ -33,8 +36,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
-	"strings"
-	"time"
 
 	tsv1alpha1 "github.com/akyriako/typesense-operator/api/v1alpha1"
 )
@@ -131,6 +132,11 @@ func (r *TypesenseClusterReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		}
 		return ctrl.Result{}, err
 	}
+	if updated {
+		r.logger.Info("config map updated", "configmap", ts.Name)
+		r.logger.Info("requeueing after 30 seconds to give cluster time to update", "configmap", ts.Name)
+		return ctrl.Result{RequeueAfter: requeueAfter}, nil
+	}
 
 	// Update strategy: Update the existing objects, if changes are identified in api and peering ports
 	err = r.ReconcileServices(ctx, ts)
@@ -189,7 +195,7 @@ func (r *TypesenseClusterReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	}
 
 	cond := ConditionReasonQuorumStateUnknown
-	if *updated {
+	if updated {
 		condition, _, err := r.ReconcileQuorum(ctx, &ts, secret, client.ObjectKeyFromObject(sts))
 		if err != nil {
 			r.logger.Error(err, "reconciling quorum health failed")
@@ -241,7 +247,7 @@ func (r *TypesenseClusterReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	}
 
 	lastAction := "bootstrapping"
-	if *updated {
+	if updated {
 		lastAction = "reconciling"
 	}
 	requeueAfter = time.Duration(60+terminationGracePeriodSeconds) * time.Second
