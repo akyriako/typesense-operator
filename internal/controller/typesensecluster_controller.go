@@ -195,7 +195,7 @@ func (r *TypesenseClusterReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	}
 
 	cond := ConditionReasonQuorumStateUnknown
-	if updated {
+	if !updated {
 		condition, _, err := r.ReconcileQuorum(ctx, &ts, secret, client.ObjectKeyFromObject(sts))
 		if err != nil {
 			r.logger.Error(err, "reconciling quorum health failed")
@@ -247,7 +247,7 @@ func (r *TypesenseClusterReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	}
 
 	lastAction := "bootstrapping"
-	if updated {
+	if !updated {
 		lastAction = "reconciling"
 	}
 	requeueAfter = time.Duration(60+terminationGracePeriodSeconds) * time.Second
