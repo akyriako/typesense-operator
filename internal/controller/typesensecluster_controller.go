@@ -69,8 +69,9 @@ var (
 			return !e.DeleteStateUnknown
 		},
 	})
-
-	requeueAfter = time.Second * 30
+	// kubelets sync configmaps by default every minute so let's wait for 2 minutes
+	configMapRequeuePeriod = 2 * time.Minute
+	reconcileRequeuePeriod = 60 * time.Second
 )
 
 // +kubebuilder:rbac:groups=ts.opentelekomcloud.com,resources=typesenseclusters,verbs=get;list;watch;create;update;patch;delete
@@ -134,8 +135,8 @@ func (r *TypesenseClusterReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	}
 	if updated {
 		r.logger.Info("config map updated", "configmap", ts.Name)
-		r.logger.Info("requeueing after 30 seconds to give cluster time to update", "configmap", ts.Name)
-		return ctrl.Result{RequeueAfter: requeueAfter}, nil
+		r.logger.Info("requeueing to give cluster time to update", "configmap", ts.Name, "requeueAfter", configMapRequeuePeriod)
+		return ctrl.Result{RequeueAfter: configMapRequeuePeriod}, nil
 	}
 
 	// Update strategy: Update the existing objects, if changes are identified in api and peering ports
@@ -250,10 +251,10 @@ func (r *TypesenseClusterReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	if !updated {
 		lastAction = "reconciling"
 	}
-	requeueAfter = time.Duration(60+terminationGracePeriodSeconds) * time.Second
-	r.logger.Info(fmt.Sprintf("%s cluster completed", lastAction), "condition", cond, "requeueAfter", requeueAfter)
+	rqa := reconcileRequeuePeriod + (time.Duration(terminationGracePeriodSeconds) * time.Second)
+	r.logger.Info(fmt.Sprintf("%s cluster completed", lastAction), "condition", cond, "requeueAfter", rqa)
 
-	return ctrl.Result{RequeueAfter: requeueAfter}, nil
+	return ctrl.Result{RequeueAfter: rqa}, nil
 }
 
 // SetupWithManager sets up the controller with the Manager.
