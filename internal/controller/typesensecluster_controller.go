@@ -135,6 +135,11 @@ func (r *TypesenseClusterReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	}
 	if updated {
 		r.logger.Info("config map updated", "configmap", ts.Name)
+		err = r.ForcePodsConfigMapUpdate(ctx, &ts)
+		if err != nil {
+			r.logger.Error(err, "failed to force pods configmap update", "configmap", ts.Name)
+		}
+		// TODO: remove this if forced configmap update is working
 		r.logger.Info("requeueing to give cluster time to update", "configmap", ts.Name, "requeueAfter", configMapRequeuePeriod)
 		return ctrl.Result{RequeueAfter: configMapRequeuePeriod}, nil
 	}
