@@ -109,6 +109,9 @@ func (r *TypesenseClusterReconciler) updateConfigMap(ctx context.Context, ts *ts
 	}
 
 	nodes, err := r.getNodes(ctx, ts, *replicas, false)
+	if err != nil {
+		return nil, 0, false, err
+	}
 	fallback, err := r.getNodes(ctx, ts, *replicas, true)
 	if err != nil {
 		return nil, 0, false, err
