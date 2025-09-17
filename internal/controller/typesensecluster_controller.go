@@ -18,7 +18,6 @@ package controller
 
 import (
 	"context"
-	"fmt"
 	"strings"
 	"time"
 
@@ -125,23 +124,13 @@ func (r *TypesenseClusterReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	}
 
 	// Update strategy: Update the existing object, if changes are identified in the desired.Data["nodes"]
-	updated, err := r.ReconcileConfigMap(ctx, ts)
+	configMapUpdated, err := r.ReconcileConfigMap(ctx, ts)
 	if err != nil {
 		cerr := r.setConditionNotReady(ctx, &ts, ConditionReasonConfigMapNotReady, err)
 		if cerr != nil {
 			err = errors.Wrap(err, cerr.Error())
 		}
 		return ctrl.Result{}, err
-	}
-	if updated {
-		r.logger.Info("config map updated", "configmap", ts.Name)
-		err = r.ForcePodsConfigMapUpdate(ctx, &ts)
-		if err != nil {
-			r.logger.Error(err, "failed to force pods configmap update", "configmap", ts.Name)
-		}
-		// TODO: remove this if forced configmap update is working
-		r.logger.Info("requeueing to give cluster time to update", "configmap", ts.Name, "requeueAfter", configMapRequeuePeriod)
-		return ctrl.Result{RequeueAfter: configMapRequeuePeriod}, nil
 	}
 
 	// Update strategy: Update the existing objects, if changes are identified in api and peering ports
@@ -185,7 +174,6 @@ func (r *TypesenseClusterReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	}
 
 	// Update strategy: Update the whole specs when changes are identified
-	// Update the whole specs when changes are identified
 	sts, err := r.ReconcileStatefulSet(ctx, &ts)
 	if err != nil {
 		cerr := r.setConditionNotReady(ctx, &ts, ConditionReasonStatefulSetNotReady, err)
@@ -201,7 +189,17 @@ func (r *TypesenseClusterReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	}
 
 	cond := ConditionReasonQuorumStateUnknown
-	if !updated {
+	// anytime a configmap is updated, we should force the pods to read it via an annotation bump
+	// and wait without reconciling quorum to avoid catching the nodes as they are updating
+	if configMapUpdated {
+		r.logger.Info("config map updated", "configmap", ts.Name)
+		err = r.ForcePodsConfigMapUpdate(ctx, &ts)
+		if err != nil {
+			r.logger.Error(err, "failed to force pods configmap update", "configmap", ts.Name)
+		}
+		r.logger.Info("requeueing to give cluster time to read new nodes", "requeueAfter", configMapRequeuePeriod)
+		return ctrl.Result{RequeueAfter: configMapRequeuePeriod}, nil
+	} else {
 		condition, _, err := r.ReconcileQuorum(ctx, &ts, secret, client.ObjectKeyFromObject(sts))
 		if err != nil {
 			r.logger.Error(err, "reconciling quorum health failed")
@@ -252,13 +250,8 @@ func (r *TypesenseClusterReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		cond = condition
 	}
 
-	lastAction := "bootstrapping"
-	if !updated {
-		lastAction = "reconciling"
-	}
 	rqa := reconcileRequeuePeriod + (time.Duration(terminationGracePeriodSeconds) * time.Second)
-	r.logger.Info(fmt.Sprintf("%s cluster completed", lastAction), "condition", cond, "requeueAfter", rqa)
-
+	r.logger.Info("reconciling cluster completed", "condition", cond, "requeueAfter", rqa)
 	return ctrl.Result{RequeueAfter: rqa}, nil
 }
 
