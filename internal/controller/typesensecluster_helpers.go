@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	ForceConfigMapUpdateAnnotation = "ts.opentelekomcloud.com/v1alpha1/forced-configmap-update-time"
+	ForceConfigMapUpdateAnnotation = "ts.opentelekomcloud.com/forced-configmap-update-time"
 )
 
 func (r *TypesenseClusterReconciler) patchStatus(
