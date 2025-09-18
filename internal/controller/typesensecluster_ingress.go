@@ -265,9 +265,9 @@ func (r *TypesenseClusterReconciler) ReconcileIngress(ctx context.Context, ts ts
 }
 
 func (r *TypesenseClusterReconciler) createIngress(ctx context.Context, key client.ObjectKey, ts *tsv1alpha1.TypesenseCluster) (*networkingv1.Ingress, error) {
-	if ts.Spec.Ingress.ClusterIssuer == nil && ts.Spec.Ingress.TLSSecretName == nil {
-		return nil, fmt.Errorf("cluster issuer or tls secret name must be set, skipping ingress creation")
-	}
+	//if ts.Spec.Ingress.ClusterIssuer == nil && ts.Spec.Ingress.TLSSecretName == nil {
+	//	return nil, fmt.Errorf("cluster issuer or tls secret name must be set, skipping ingress creation")
+	//}
 
 	annotations := map[string]string{}
 	var tlsSecretName string
@@ -285,16 +285,21 @@ func (r *TypesenseClusterReconciler) createIngress(ctx context.Context, key clie
 		tlsSecretName = *ts.Spec.Ingress.TLSSecretName
 	}
 
+	var tlsConfiguration []networkingv1.IngressTLS
+	if tlsSecretName != "" {
+		tlsConfiguration = []networkingv1.IngressTLS{
+			{
+				Hosts:      []string{ts.Spec.Ingress.Host},
+				SecretName: tlsSecretName,
+			},
+		}
+	}
+
 	ingress := &networkingv1.Ingress{
 		ObjectMeta: getObjectMeta(ts, &key.Name, annotations),
 		Spec: networkingv1.IngressSpec{
 			IngressClassName: ptr.To(ts.Spec.Ingress.IngressClassName),
-			TLS: []networkingv1.IngressTLS{
-				{
-					Hosts:      []string{ts.Spec.Ingress.Host},
-					SecretName: tlsSecretName,
-				},
-			},
+			TLS:              tlsConfiguration,
 			Rules: []networkingv1.IngressRule{
 				{
 					Host: ts.Spec.Ingress.Host,
@@ -335,9 +340,10 @@ func (r *TypesenseClusterReconciler) createIngress(ctx context.Context, key clie
 }
 
 func (r *TypesenseClusterReconciler) updateIngress(ctx context.Context, ig networkingv1.Ingress, ts *tsv1alpha1.TypesenseCluster) (*networkingv1.Ingress, error) {
-	if ts.Spec.Ingress.ClusterIssuer == nil && ts.Spec.Ingress.TLSSecretName == nil {
-		return nil, fmt.Errorf("cluster issuer or tls secret name must be set, keeping the current ingress in place")
-	}
+	//if ts.Spec.Ingress.ClusterIssuer == nil && ts.Spec.Ingress.TLSSecretName == nil {
+	//	return nil, fmt.Errorf("cluster issuer or tls secret name must be set, keeping the current ingress in place")
+	//}
+
 	patch := client.MergeFrom(ig.DeepCopy())
 
 	ig.Spec.Rules[0].Host = ts.Spec.Ingress.Host
@@ -360,8 +366,8 @@ func (r *TypesenseClusterReconciler) updateIngress(ctx context.Context, ig netwo
 
 	if ts.Spec.Ingress.TLSSecretName != nil {
 		tlsSecretName = *ts.Spec.Ingress.TLSSecretName
+		ig.Spec.TLS[0].SecretName = tlsSecretName
 	}
-	ig.Spec.TLS[0].SecretName = tlsSecretName
 
 	if err := r.Patch(ctx, &ig, patch); err != nil {
 		return nil, err
