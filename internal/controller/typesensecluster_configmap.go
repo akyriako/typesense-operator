@@ -3,6 +3,8 @@ package controller
 import (
 	"context"
 	"fmt"
+	"strings"
+
 	tsv1alpha1 "github.com/akyriako/typesense-operator/api/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -12,7 +14,6 @@ import (
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"strings"
 )
 
 func (r *TypesenseClusterReconciler) ReconcileConfigMap(ctx context.Context, ts tsv1alpha1.TypesenseCluster) (updated *bool, err error) {
@@ -41,9 +42,9 @@ func (r *TypesenseClusterReconciler) ReconcileConfigMap(ctx context.Context, ts 
 			return nil, err
 		}
 	} else {
-		r.logger.V(debugLevel).Info("updating config map", "configmap", configMapObjectKey.Name)
+		//r.logger.V(debugLevel).Info("updating config map", "configmap", configMapObjectKey.Name)
 
-		cm, _, err = r.updateConfigMap(ctx, &ts, cm, nil)
+		cm, _, err = r.updateConfigMap(ctx, &ts, cm, nil, false)
 		if err != nil {
 			return nil, err
 		}
@@ -81,7 +82,7 @@ func (r *TypesenseClusterReconciler) createConfigMap(ctx context.Context, key cl
 	return cm, nil
 }
 
-func (r *TypesenseClusterReconciler) updateConfigMap(ctx context.Context, ts *tsv1alpha1.TypesenseCluster, cm *v1.ConfigMap, replicas *int32) (*v1.ConfigMap, int, error) {
+func (r *TypesenseClusterReconciler) updateConfigMap(ctx context.Context, ts *tsv1alpha1.TypesenseCluster, cm *v1.ConfigMap, replicas *int32, resizeOp bool) (*v1.ConfigMap, int, error) {
 	stsName := fmt.Sprintf(ClusterStatefulSet, ts.Name)
 	stsObjectKey := client.ObjectKey{
 		Name:      stsName,
@@ -124,10 +125,15 @@ func (r *TypesenseClusterReconciler) updateConfigMap(ctx context.Context, ts *ts
 		"fallback": strings.Join(fallback, ","),
 	}
 
-	r.logger.V(debugLevel).Info("current quorum configuration", "size", availableNodes, "nodes", nodes)
+	if !resizeOp {
+		currentNodes := strings.Split(cm.Data["nodes"], ",")
+		r.logger.V(debugLevel).Info("current quorum configuration", "size", len(currentNodes), "nodes", currentNodes)
+	}
 
 	if cm.Data["nodes"] != desired.Data["nodes"] || cm.Data["fallback"] != desired.Data["fallback"] {
-		r.logger.Info("updating quorum configuration", "size", availableNodes, "nodes", nodes)
+		if !resizeOp {
+			r.logger.Info("updating quorum configuration", "size", availableNodes, "nodes", nodes)
+		}
 
 		err := r.Update(ctx, desired)
 		if err != nil {

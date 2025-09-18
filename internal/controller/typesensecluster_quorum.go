@@ -3,14 +3,15 @@ package controller
 import (
 	"context"
 	"fmt"
-	tsv1alpha1 "github.com/akyriako/typesense-operator/api/v1alpha1"
-	v1 "k8s.io/api/core/v1"
-	"k8s.io/utils/ptr"
 	"net/http"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sort"
 	"strconv"
 	"time"
+
+	tsv1alpha1 "github.com/akyriako/typesense-operator/api/v1alpha1"
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/utils/ptr"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const (
@@ -215,7 +216,7 @@ func (r *TypesenseClusterReconciler) downgradeQuorum(
 		return ConditionReasonQuorumNotReady, 0, err
 	}
 
-	_, size, err := r.updateConfigMap(ctx, ts, cm, ptr.To[int32](desiredReplicas))
+	_, size, err := r.updateConfigMap(ctx, ts, cm, ptr.To[int32](desiredReplicas), true)
 	if err != nil {
 		return ConditionReasonQuorumNotReady, 0, err
 	}
@@ -245,7 +246,7 @@ func (r *TypesenseClusterReconciler) upgradeQuorum(
 		return ConditionReasonQuorumNotReady, 0, err
 	}
 
-	_, _, err = r.updateConfigMap(ctx, ts, cm, &size)
+	_, _, err = r.updateConfigMap(ctx, ts, cm, &size, true)
 	if err != nil {
 		return ConditionReasonQuorumNotReady, 0, err
 	}
