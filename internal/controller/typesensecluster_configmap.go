@@ -3,7 +3,9 @@ package controller
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
+	"time"
 
 	tsv1alpha1 "github.com/akyriako/typesense-operator/api/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
@@ -11,47 +13,50 @@ import (
 	discoveryv1 "k8s.io/api/discovery/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func (r *TypesenseClusterReconciler) ReconcileConfigMap(ctx context.Context, ts tsv1alpha1.TypesenseCluster) (bool, error) {
+const (
+	forceConfigMapUpdateAnnotationKey = "ts.opentelekomcloud.com/forced-configmap-update-time"
+)
+
+func (r *TypesenseClusterReconciler) ReconcileConfigMap(ctx context.Context, ts tsv1alpha1.TypesenseCluster) (*bool, error) {
 	r.logger.V(debugLevel).Info("reconciling config map")
 
 	configMapName := fmt.Sprintf(ClusterNodesConfigMap, ts.Name)
+	configMapExists := true
 	configMapObjectKey := client.ObjectKey{Namespace: ts.Namespace, Name: configMapName}
 
-	configMapExists := true
 	var cm = &v1.ConfigMap{}
 	if err := r.Get(ctx, configMapObjectKey, cm); err != nil {
 		if apierrors.IsNotFound(err) {
 			configMapExists = false
 		} else {
 			r.logger.Error(err, fmt.Sprintf("unable to fetch config map: %s", configMapName))
-			return false, err
+			return nil, err
 		}
 	}
 
-	var err error
-	updated := false
 	if !configMapExists {
 		r.logger.V(debugLevel).Info("creating config map", "configmap", configMapObjectKey.Name)
 
 		_, err := r.createConfigMap(ctx, configMapObjectKey, &ts)
 		if err != nil {
 			r.logger.Error(err, "creating config map failed", "configmap", configMapObjectKey.Name)
-			return false, err
+			return nil, err
 		}
-	} else {
-		r.logger.V(debugLevel).Info("updating config map", "configmap", configMapObjectKey.Name)
 
-		_, _, updated, err = r.updateConfigMap(ctx, &ts, cm, nil)
-		if err != nil {
-			return false, err
-		}
+		return nil, nil
 	}
 
-	return updated, nil
+	_, _, updated, err := r.updateConfigMap(ctx, &ts, cm, nil, false)
+	if err != nil {
+		return ptr.To[bool](false), err
+	}
+
+	return &updated, nil
 }
 
 const nodeNameLenLimit = 64
@@ -83,7 +88,7 @@ func (r *TypesenseClusterReconciler) createConfigMap(ctx context.Context, key cl
 	return cm, nil
 }
 
-func (r *TypesenseClusterReconciler) updateConfigMap(ctx context.Context, ts *tsv1alpha1.TypesenseCluster, cm *v1.ConfigMap, replicas *int32) (*v1.ConfigMap, int, bool, error) {
+func (r *TypesenseClusterReconciler) updateConfigMap(ctx context.Context, ts *tsv1alpha1.TypesenseCluster, cm *v1.ConfigMap, replicas *int32, resizeOp bool) (*v1.ConfigMap, int, bool, error) {
 	stsName := fmt.Sprintf(ClusterStatefulSet, ts.Name)
 	stsObjectKey := client.ObjectKey{
 		Name:      stsName,
@@ -129,11 +134,18 @@ func (r *TypesenseClusterReconciler) updateConfigMap(ctx context.Context, ts *ts
 		"fallback": strings.Join(fallback, ","),
 	}
 
-	r.logger.V(debugLevel).Info("current quorum configuration", "size", availableNodes, "nodes", nodes)
+	if !resizeOp {
+		currentNodes := strings.Split(cm.Data["nodes"], ",")
+		sort.Strings(currentNodes)
+		r.logger.V(debugLevel).Info("current quorum configuration", "size", len(currentNodes), "nodes", currentNodes)
+	}
 
 	updated := false
 	if cm.Data["nodes"] != desired.Data["nodes"] || cm.Data["fallback"] != desired.Data["fallback"] {
-		r.logger.Info("updating quorum configuration", "size", availableNodes, "nodes", nodes)
+		if !resizeOp {
+			sort.Strings(nodes)
+			r.logger.Info("updating quorum configuration", "size", availableNodes, "nodes", nodes)
+		}
 
 		err := r.Update(ctx, desired)
 		if err != nil {
@@ -150,6 +162,38 @@ func (r *TypesenseClusterReconciler) deleteConfigMap(ctx context.Context, cm *v1
 	err := r.Delete(ctx, cm)
 	if err != nil {
 		return err
+	}
+
+	return nil
+}
+
+// ForcePodsConfigMapUpdate forces a configmap update for all pods in the statefulset
+// it should be called after a configmap update occurs
+// https://kubernetes.io/docs/tasks/configure-pod-container/configure-pod-configmap/#mounted-configmaps-are-updated-automatically
+func (r *TypesenseClusterReconciler) forcePodsConfigMapUpdate(ctx context.Context, ts *tsv1alpha1.TypesenseCluster) error {
+	labelMap := getLabels(ts)
+	labelSelector := labels.SelectorFromSet(labelMap)
+
+	var podList v1.PodList
+	if err := r.Client.List(ctx, &podList,
+		client.InNamespace(ts.Namespace),
+		client.MatchingLabelsSelector{Selector: labelSelector},
+	); err != nil {
+		return err
+	}
+
+	for i := range podList.Items {
+		pod := &podList.Items[i]
+
+		if pod.Annotations == nil {
+			pod.Annotations = map[string]string{}
+		}
+		pod.Annotations[forceConfigMapUpdateAnnotationKey] = time.Now().Format(time.RFC3339)
+
+		if err := r.Patch(ctx, pod, client.MergeFrom(pod.DeepCopy())); err != nil {
+			r.logger.Error(err, "patching to pod annotations failed", "pod", pod.Name)
+			return err
+		}
 	}
 
 	return nil

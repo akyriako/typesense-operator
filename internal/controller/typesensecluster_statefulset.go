@@ -5,6 +5,10 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"strconv"
+	"strings"
+	"time"
+
 	tsv1alpha1 "github.com/akyriako/typesense-operator/api/v1alpha1"
 	"github.com/mitchellh/hashstructure/v2"
 	appsv1 "k8s.io/api/apps/v1"
@@ -15,9 +19,6 @@ import (
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"strconv"
-	"strings"
-	"time"
 )
 
 const (
@@ -99,7 +100,7 @@ func (r *TypesenseClusterReconciler) ReconcileStatefulSet(ctx context.Context, t
 					r.logger.V(debugLevel).Error(err, fmt.Sprintf("unable to fetch config map: %s", configMapName))
 				}
 
-				_, _, _, err = r.updateConfigMap(ctx, ts, cm, updatedSts.Spec.Replicas)
+				_, _, _, err = r.updateConfigMap(ctx, ts, cm, updatedSts.Spec.Replicas, true)
 				if err != nil {
 					r.logger.V(debugLevel).Error(err, fmt.Sprintf("unable to update config map: %s", configMapName))
 				}

@@ -35,8 +35,15 @@ metadata:
   name: c-kind-1
 spec:
   image: typesense/typesense:30.0.rc7-amd64
-  replicas: 5
+  replicas: 3
   corsDomains: "http://localhost,https://www.example.de"
+  resources:
+    limits:
+      cpu: "1200m"
+      memory: "1024Mi"
+    requests:
+      cpu: "100m"
+      memory: "64Mi"
   storage:
     size: 150Mi
     storageClassName: typesense-local-path
@@ -47,107 +54,107 @@ spec:
   additionalServerConfiguration:
     name: c-kind-1-server-configuration
 ---
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: c-kind-2-config
-data:
-  TYPESENSE_ENABLE_SEARCH_ANALYTICS: "true"
----
-apiVersion: v1
-kind: Secret
-metadata:
-  labels:
-    app.kubernetes.io/name: typesense-operator
-    app.kubernetes.io/managed-by: kustomize
-  name: scraper-auth-docusaurus-example-com
-type: Opaque
-data:
-  KC_URL: VGhpc0lzTm90QVNlY3VyZVBhc3N3b3Jk
-  KC_REALM: VGhpc0lzTm90QVNlY3VyZVBhc3N3b3Jk
-  KC_CLIENT_ID: VGhpc0lzTm90QVNlY3VyZVBhc3N3b3Jk
-  KC_CLIENT_SECRET: VGhpc0lzTm90QVNlY3VyZVBhc3N3b3Jk
----
-apiVersion: ts.opentelekomcloud.com/v1alpha1
-kind: TypesenseCluster
-metadata:
-  labels:
-    app.kubernetes.io/name: typesense-operator
-    app.kubernetes.io/managed-by: kustomize
-  name: c-kind-2
-spec:
-  image: typesense/typesense:29.0
-  replicas: 7
-  adminApiKey:
-    name: typesense-common-bootstrap-key
-  enableCors: true
-  apiPort: 8108
-  healthProbeTimeoutInMilliseconds: 1500
-  resources:
-    limits:
-      cpu: "200m"
-      memory: "1024Mi"
-    requests:
-      cpu: "100m"
-      memory: "64Mi"
-  storage:
-    size: 75Mi
-    storageClassName: typesense-local-path
-  metrics:
-    release: promstack
-  ingress:
-    referer: referer.example.com
-    host: host.example.com
-    path: /
-    pathType: ImplementationSpecific
-    ingressClassName: nginx
-    clusterIssuer: lets-encrypt-prod
-#    readOnlyRootFilesystem:
-#      volumes:
-#        - name: nginx-var-cache
-#          emptyDir: {}
-#        - name: run
-#          emptyDir: {}
-#      volumeMounts:
-#        - name: nginx-var-cache
-#          mountPath: /var/cache/nginx
-#        - name: run
-#          mountPath: /run
----
+#apiVersion: v1
+#kind: ConfigMap
+#metadata:
+#  name: c-kind-2-config
+#data:
+#  TYPESENSE_ENABLE_SEARCH_ANALYTICS: "true"
+#---
+#apiVersion: v1
+#kind: Secret
+#metadata:
+#  labels:
+#    app.kubernetes.io/name: typesense-operator
+#    app.kubernetes.io/managed-by: kustomize
+#  name: scraper-auth-docusaurus-example-com
+#type: Opaque
+#data:
+#  KC_URL: VGhpc0lzTm90QVNlY3VyZVBhc3N3b3Jk
+#  KC_REALM: VGhpc0lzTm90QVNlY3VyZVBhc3N3b3Jk
+#  KC_CLIENT_ID: VGhpc0lzTm90QVNlY3VyZVBhc3N3b3Jk
+#  KC_CLIENT_SECRET: VGhpc0lzTm90QVNlY3VyZVBhc3N3b3Jk
+#---
 #apiVersion: ts.opentelekomcloud.com/v1alpha1
 #kind: TypesenseCluster
 #metadata:
 #  labels:
 #    app.kubernetes.io/name: typesense-operator
 #    app.kubernetes.io/managed-by: kustomize
-#  name: c-kind-3
+#  name: c-kind-2
 #spec:
-#  image: typesense/typesense:27.1
-#  replicas: 1
-#  apiPort: 18108
-#  peeringPort: 18107
-#  enableCors: true
-#  corsDomains: "http://localhost,https://www.example.de"
-#  storage:
-#    size: 10Mi
-#    storageClassName: typesense-local-path
+#  image: typesense/typesense:29.0
+#  replicas: 7
 #  adminApiKey:
 #    name: typesense-common-bootstrap-key
+#  enableCors: true
+#  apiPort: 8108
+#  healthProbeTimeoutInMilliseconds: 1500
+#  resources:
+#    limits:
+#      cpu: "200m"
+#      memory: "1024Mi"
+#    requests:
+#      cpu: "100m"
+#      memory: "64Mi"
+#  storage:
+#    size: 75Mi
+#    storageClassName: typesense-local-path
+#  metrics:
+#    release: promstack
 #  ingress:
-#    host: www.example.de
+#    referer: referer.example.com
+#    host: host.example.com
+#    path: /
+#    pathType: ImplementationSpecific
 #    ingressClassName: nginx
-#    clusterIssuer: opentelekomcloud-letsencrypt-staging
-#    resources:
-#      limits:
-#        cpu: "300m"
-#        memory: "128Mi"
-#      requests:
-#        cpu: "100m"
-#        memory: "32Mi"
-#  scrapers:
-#    - name: docusaurus-example-com
-#      image: typesense/docsearch-scraper:0.11.0
-#      authConfiguration:
-#        name: scraper-auth-docusaurus-example-com
-#      config: "{\"index_name\":\"docuraurus-example\",\"start_urls\":[\"https://docusaurus.example.com/\"],\"sitemap_urls\":[\"https://docusaurus.example.com/sitemap.xml\"],\"sitemap_alternate_links\":true,\"stop_urls\":[\"/tests\"],\"selectors\":{\"lvl0\":{\"selector\":\"(//ul[contains(@class,'menu__list')]//a[contains(@class, 'menu__link menu__link--sublist menu__link--active')]/text() | //nav[contains(@class, 'navbar')]//a[contains(@class, 'navbar__link--active')]/text())[last()]\",\"type\":\"xpath\",\"global\":true,\"default_value\":\"Documentation\"},\"lvl1\":\"header h1\",\"lvl2\":\"article h2\",\"lvl3\":\"article h3\",\"lvl4\":\"article h4\",\"lvl5\":\"article h5, article td:first-child\",\"lvl6\":\"article h6\",\"text\":\"article p, article li, article td:last-child\"},\"strip_chars\":\" .,;:#\",\"custom_settings\":{\"separatorsToIndex\":\"_\",\"attributesForFaceting\":[\"language\",\"version\",\"type\",\"docusaurus_tag\"],\"attributesToRetrieve\":[\"hierarchy\",\"content\",\"anchor\",\"url\",\"url_without_anchor\",\"type\"]},\"conversation_id\":[\"833762294\"],\"nb_hits\":46250}"
-#      schedule: '*/2 * * * *'
+#    clusterIssuer: lets-encrypt-prod
+##    readOnlyRootFilesystem:
+##      volumes:
+##        - name: nginx-var-cache
+##          emptyDir: {}
+##        - name: run
+##          emptyDir: {}
+##      volumeMounts:
+##        - name: nginx-var-cache
+##          mountPath: /var/cache/nginx
+##        - name: run
+##          mountPath: /run
+#---
+##apiVersion: ts.opentelekomcloud.com/v1alpha1
+##kind: TypesenseCluster
+##metadata:
+##  labels:
+##    app.kubernetes.io/name: typesense-operator
+##    app.kubernetes.io/managed-by: kustomize
+##  name: c-kind-3
+##spec:
+##  image: typesense/typesense:27.1
+##  replicas: 1
+##  apiPort: 18108
+##  peeringPort: 18107
+##  enableCors: true
+##  corsDomains: "http://localhost,https://www.example.de"
+##  storage:
+##    size: 10Mi
+##    storageClassName: typesense-local-path
+##  adminApiKey:
+##    name: typesense-common-bootstrap-key
+##  ingress:
+##    host: www.example.de
+##    ingressClassName: nginx
+##    clusterIssuer: opentelekomcloud-letsencrypt-staging
+##    resources:
+##      limits:
+##        cpu: "300m"
+##        memory: "128Mi"
+##      requests:
+##        cpu: "100m"
+##        memory: "32Mi"
+##  scrapers:
+##    - name: docusaurus-example-com
+##      image: typesense/docsearch-scraper:0.11.0
+##      authConfiguration:
+##        name: scraper-auth-docusaurus-example-com
+##      config: "{\"index_name\":\"docuraurus-example\",\"start_urls\":[\"https://docusaurus.example.com/\"],\"sitemap_urls\":[\"https://docusaurus.example.com/sitemap.xml\"],\"sitemap_alternate_links\":true,\"stop_urls\":[\"/tests\"],\"selectors\":{\"lvl0\":{\"selector\":\"(//ul[contains(@class,'menu__list')]//a[contains(@class, 'menu__link menu__link--sublist menu__link--active')]/text() | //nav[contains(@class, 'navbar')]//a[contains(@class, 'navbar__link--active')]/text())[last()]\",\"type\":\"xpath\",\"global\":true,\"default_value\":\"Documentation\"},\"lvl1\":\"header h1\",\"lvl2\":\"article h2\",\"lvl3\":\"article h3\",\"lvl4\":\"article h4\",\"lvl5\":\"article h5, article td:first-child\",\"lvl6\":\"article h6\",\"text\":\"article p, article li, article td:last-child\"},\"strip_chars\":\" .,;:#\",\"custom_settings\":{\"separatorsToIndex\":\"_\",\"attributesForFaceting\":[\"language\",\"version\",\"type\",\"docusaurus_tag\"],\"attributesToRetrieve\":[\"hierarchy\",\"content\",\"anchor\",\"url\",\"url_without_anchor\",\"type\"]},\"conversation_id\":[\"833762294\"],\"nb_hits\":46250}"
+##      schedule: '*/2 * * * *'
