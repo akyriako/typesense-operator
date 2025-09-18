@@ -43,6 +43,16 @@ spec:
     release: promstack
   additionalServerConfiguration:
     name: c-k3s-1-server-configuration
+  ingress:
+    host: typesense.apps.proxmox.home
+    ingressClassName: traefik
+    resources:
+      limits:
+        cpu: "300m"
+        memory: "128Mi"
+      requests:
+        cpu: "100m"
+        memory: "32Mi"
   backup:
     enabled: true
     schedule: "*/10 * * * *"
