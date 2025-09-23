@@ -20,7 +20,7 @@
 - Automates **Typesense** [lifecycle management](https://akyriako.github.io/typesense-operator-docs/docs/getting-started#key-features) (config maps, secrets, volumes, statefulsets, services, ingress, metrics, scrapers)
 - Automates **Raft quorum [configuration, discovery and recovery](https://akyriako.github.io/typesense-operator-docs/docs/how-it-works/recovering-a-cluster-that-has-lost-quorum)** without additional sidecars or manual interventions
 - Built with Go & Operator SDK — lightweight, Kubernetes-native, and flexible
-- Community-driven, with plethora of examples for Kind, CCE, AKS, EKS, and more
+- Community-driven, with plethora of examples for Kind, CCE, AKS, EKS, GCP, and more
 
 ## ⚡ Get Started
 
@@ -116,6 +116,25 @@ spec:
   replicas: 3
   storage:
     storageClassName: managed-csi
+```
+</details>
+
+<details>
+<summary>Quick example for GCP</summary>
+
+```yaml
+apiVersion: ts.opentelekomcloud.com/v1alpha1
+kind: TypesenseCluster
+metadata:
+  labels:
+    app.kubernetes.io/name: typesense-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: ts-gcp
+spec:
+  image: typesense/typesense:29.0
+  replicas: 3
+  storage:
+    storageClassName: standard-rwo
 ```
 </details>
 

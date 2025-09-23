@@ -1,0 +1,13 @@
+apiVersion: ts.opentelekomcloud.com/v1alpha1
+kind: TypesenseCluster
+metadata:
+  labels:
+    app.kubernetes.io/name: typesense-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: ts-gcp
+spec:
+  image: typesense/typesense:27.1
+  replicas: 3
+  storage:
+    size: 10Mi
+    storageClassName: standard-rwo
