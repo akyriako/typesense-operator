@@ -5,6 +5,10 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"strconv"
+	"strings"
+	"time"
+
 	tsv1alpha1 "github.com/akyriako/typesense-operator/api/v1alpha1"
 	"github.com/mitchellh/hashstructure/v2"
 	appsv1 "k8s.io/api/apps/v1"
@@ -15,9 +19,6 @@ import (
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"strconv"
-	"strings"
-	"time"
 )
 
 const (
@@ -168,9 +169,14 @@ func (r *TypesenseClusterReconciler) updateStatefulSet(ctx context.Context, sts 
 func (r *TypesenseClusterReconciler) buildStatefulSet(ctx context.Context, key client.ObjectKey, ts *tsv1alpha1.TypesenseCluster) (*appsv1.StatefulSet, error) {
 	readLagThreshold, writeLagThreshold := r.getHealthyLagThresholds(ctx, ts)
 
-	lagThresholdAnnotations := make(map[string]string, 2)
-	lagThresholdAnnotations[readLagAnnotationKey] = strconv.Itoa(readLagThreshold)
-	lagThresholdAnnotations[writeLagAnnotationKey] = strconv.Itoa(writeLagThreshold)
+	podAnnotations := make(map[string]string)
+	podAnnotations[readLagAnnotationKey] = strconv.Itoa(readLagThreshold)
+	podAnnotations[writeLagAnnotationKey] = strconv.Itoa(writeLagThreshold)
+	if ts.Spec.PodAnnotations != nil {
+		for k, v := range ts.Spec.PodAnnotations {
+			podAnnotations[k] = v
+		}
+	}
 
 	clusterName := ts.Name
 	sts := &appsv1.StatefulSet{
@@ -184,7 +190,7 @@ func (r *TypesenseClusterReconciler) buildStatefulSet(ctx context.Context, key c
 				MatchLabels: getLabels(ts),
 			},
 			Template: corev1.PodTemplateSpec{
-				ObjectMeta: getObjectMeta(ts, &key.Name, lagThresholdAnnotations),
+				ObjectMeta: getObjectMeta(ts, &key.Name, podAnnotations),
 				Spec: corev1.PodSpec{
 					SecurityContext: &corev1.PodSecurityContext{
 						RunAsUser:    ptr.To[int64](10000),

@@ -97,6 +97,9 @@ type TypesenseClusterSpec struct {
 	// +kubebuilder:validation:Optional
 	AdditionalServerConfiguration *corev1.LocalObjectReference `json:"additionalServerConfiguration,omitempty"`
 
+	// +kubebuilder:validation:Optional
+	PodAnnotations map[string]string `json:"podAnnotations,omitempty"`
+
 	Storage *StorageSpec `json:"storage"`
 
 	Ingress *IngressSpec `json:"ingress,omitempty"`
