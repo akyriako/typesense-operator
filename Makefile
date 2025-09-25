@@ -350,4 +350,5 @@ $(HELMIFY): $(LOCALBIN)
 helm: manifests kustomize helmify
 	$(KUSTOMIZE) build config/default | $(HELMIFY) -image-pull-secrets charts/typesense-operator
 	sed -i -e 's|^appVersion:.*|appVersion: "$(IMG_TAG)"|' -e 's|^version:.*|version: $(IMG_TAG)|' ./charts/typesense-operator/Chart.yaml
+	sed -i -E 's/(- Latest version: \*\*)[^*]+(\*\*)/\1$(IMG_TAG)\2/' ./README.md
 
