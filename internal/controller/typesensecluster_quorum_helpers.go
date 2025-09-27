@@ -4,16 +4,17 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	tsv1alpha1 "github.com/akyriako/typesense-operator/api/v1alpha1"
 	"io"
+	"net"
+	"net/http"
+	"strconv"
+	"strings"
+
+	tsv1alpha1 "github.com/akyriako/typesense-operator/api/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"net"
-	"net/http"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"strconv"
-	"strings"
 )
 
 func (r *TypesenseClusterReconciler) getNodeStatus(ctx context.Context, httpClient *http.Client, node NodeEndpoint, ts *tsv1alpha1.TypesenseCluster, secret *v1.Secret) (NodeStatus, error) {
@@ -37,7 +38,7 @@ func (r *TypesenseClusterReconciler) getNodeStatus(ctx context.Context, httpClie
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		r.logger.Error(err, "error executing request", "httpStatusCode", resp.StatusCode)
+		r.logger.Error(err, "error executing node status request", "httpStatusCode", resp.StatusCode, "ip", node.IP.String())
 	}
 
 	body, err := io.ReadAll(resp.Body)
@@ -49,6 +50,10 @@ func (r *TypesenseClusterReconciler) getNodeStatus(ctx context.Context, httpClie
 	err = json.Unmarshal(body, &nodeStatus)
 	if err != nil {
 		return NodeStatus{State: ErrorState}, nil
+	}
+
+	if nodeStatus.State == "" {
+		nodeStatus.State = ErrorState
 	}
 
 	return nodeStatus, nil
