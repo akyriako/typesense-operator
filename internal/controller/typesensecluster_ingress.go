@@ -265,8 +265,8 @@ func (r *TypesenseClusterReconciler) ReconcileIngress(ctx context.Context, ts ts
 }
 
 func (r *TypesenseClusterReconciler) createIngress(ctx context.Context, key client.ObjectKey, ts *tsv1alpha1.TypesenseCluster) (*networkingv1.Ingress, error) {
-	if ts.Spec.Ingress.ClusterIssuer == nil && ts.Spec.Ingress.TLSSecretName == nil {
-		return nil, fmt.Errorf("cluster issuer or tls secret name must be set, skipping ingress creation")
+	if ts.Spec.Ingress.ClusterIssuer != nil && ts.Spec.Ingress.TLSSecretName == nil {
+		return nil, fmt.Errorf("tls secret name is required, skipping ingress creation")
 	}
 
 	annotations := map[string]string{}
@@ -335,8 +335,8 @@ func (r *TypesenseClusterReconciler) createIngress(ctx context.Context, key clie
 }
 
 func (r *TypesenseClusterReconciler) updateIngress(ctx context.Context, ig networkingv1.Ingress, ts *tsv1alpha1.TypesenseCluster) (*networkingv1.Ingress, error) {
-	if ts.Spec.Ingress.ClusterIssuer == nil && ts.Spec.Ingress.TLSSecretName == nil {
-		return nil, fmt.Errorf("cluster issuer or tls secret name must be set, keeping the current ingress in place")
+	if ts.Spec.Ingress.ClusterIssuer != nil && ts.Spec.Ingress.TLSSecretName == nil {
+		return nil, fmt.Errorf("tls secret name is required, skipping ingress update")
 	}
 	patch := client.MergeFrom(ig.DeepCopy())
 

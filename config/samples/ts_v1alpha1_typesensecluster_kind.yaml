@@ -53,6 +53,10 @@ spec:
     release: promstack
   additionalServerConfiguration:
     name: c-kind-1-server-configuration
+  ingress:
+    host: ts.example.com
+    ingressClassName: nginx
+
 ---
 #apiVersion: v1
 #kind: ConfigMap

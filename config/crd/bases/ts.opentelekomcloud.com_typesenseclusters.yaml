@@ -3312,6 +3312,10 @@ spec:
                 maximum: 65535
                 minimum: 1024
                 type: integer
+              podAnnotations:
+                additionalProperties:
+                  type: string
+                type: object
               replicas:
                 default: 3
                 enum:

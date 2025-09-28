@@ -305,6 +305,13 @@ func (in *TypesenseClusterSpec) DeepCopyInto(out *TypesenseClusterSpec) {
 		*out = new(v1.LocalObjectReference)
 		**out = **in
 	}
+	if in.PodAnnotations != nil {
+		in, out := &in.PodAnnotations, &out.PodAnnotations
+		*out = make(map[string]string, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
 	if in.Storage != nil {
 		in, out := &in.Storage, &out.Storage
 		*out = new(StorageSpec)
