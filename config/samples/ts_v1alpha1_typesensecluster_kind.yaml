@@ -37,6 +37,8 @@ spec:
   image: typesense/typesense:30.0.rc7-amd64
   replicas: 3
   corsDomains: "http://localhost,https://www.example.de"
+  podAnnotations:
+    cluster-autoscaler.kubernetes.io/safe-to-evict: "false"
   resources:
     limits:
       cpu: "1200m"

@@ -13,6 +13,7 @@ import (
 	"github.com/mitchellh/hashstructure/v2"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -28,6 +29,7 @@ const (
 	hashAnnotationKey                  = "ts.opentelekomcloud.com/pod-template-hash"
 	readLagAnnotationKey               = "ts.opentelekomcloud.com/read-lag-threshold"
 	writeLagAnnotationKey              = "ts.opentelekomcloud.com/write-lag-threshold"
+	restartPodsAnnotationKey           = "kubectl.kubernetes.io/restartedAt"
 )
 
 func (r *TypesenseClusterReconciler) ReconcileStatefulSet(ctx context.Context, ts *tsv1alpha1.TypesenseCluster) (*appsv1.StatefulSet, error) {
@@ -83,7 +85,10 @@ func (r *TypesenseClusterReconciler) ReconcileStatefulSet(ctx context.Context, t
 				r.logger.Error(err, "building statefulset failed", "sts", stsObjectKey.Name)
 			}
 
-			if r.shouldUpdateStatefulSet(sts, desiredSts, ts) {
+			annotations := sts.Spec.Template.Annotations
+			delete(annotations, restartPodsAnnotationKey)
+
+			if r.shouldUpdateStatefulSet(sts, desiredSts, ts) || !apiequality.Semantic.DeepEqual(annotations, desiredSts.Spec.Template.Annotations) {
 				r.logger.V(debugLevel).Info("updating statefulset", "sts", sts.Name)
 
 				updatedSts, err := r.updateStatefulSet(ctx, sts, desiredSts)
@@ -108,6 +113,20 @@ func (r *TypesenseClusterReconciler) ReconcileStatefulSet(ctx context.Context, t
 				r.logLagThresholds(updatedSts)
 				return updatedSts, nil
 			}
+
+			//if !apiequality.Semantic.DeepEqual(sts.Spec.Template.Annotations, desiredSts.Spec.Template.Annotations){
+			//	r.logger.V(debugLevel).Info("updating statefulset pod annotations", "sts", sts.Name)
+			//
+			//	patch := client.MergeFrom(sts.DeepCopy())
+			//	sts.Spec.Template.Annotations = desiredSts.Spec.Template.Annotations
+			//
+			//	if err := r.Patch(ctx, sts, patch); err != nil {
+			//		return nil, err
+			//	}
+			//
+			//	r.logLagThresholds(sts)
+			//	return sts, nil
+			//}
 		}
 	}
 
@@ -156,7 +175,7 @@ func (r *TypesenseClusterReconciler) updateStatefulSet(ctx context.Context, sts 
 	if sts.Spec.Template.Annotations == nil {
 		sts.Spec.Template.Annotations = map[string]string{}
 	}
-	sts.Spec.Template.Annotations["kubectl.kubernetes.io/restartedAt"] = time.Now().Format(time.RFC3339)
+	sts.Spec.Template.Annotations[restartPodsAnnotationKey] = time.Now().Format(time.RFC3339)
 	sts.Spec.Template.Annotations[hashAnnotationKey] = desired.Spec.Template.Annotations[hashAnnotationKey]
 
 	if err := r.Patch(ctx, sts, patch); err != nil {
