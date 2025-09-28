@@ -52,6 +52,25 @@ spec:
 </details>
 
 <details>
+<summary>Quick example for bare metal K3s with Democratic CSI</summary>
+
+```yaml
+apiVersion: ts.opentelekomcloud.com/v1alpha1
+kind: TypesenseCluster
+metadata:
+  labels:
+    app.kubernetes.io/name: typesense-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: ts-bm-k3s
+spec:
+  image: typesense/typesense:29.0
+  replicas: 3
+  storage:
+    storageClassName: nfs
+```
+</details>
+
+<details>
 <summary>Quick example for Kind</summary>
 
 ```yaml

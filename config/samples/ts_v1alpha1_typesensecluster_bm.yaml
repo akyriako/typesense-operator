@@ -20,7 +20,7 @@ metadata:
     app.kubernetes.io/managed-by: kustomize
   name: c-bm-2
 spec:
-  image: typesense/typesense:27.1
+  image: typesense/typesense:30.0.rc7-amd64
   replicas: 1
   storage:
     size: 100Mi

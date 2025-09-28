@@ -1,0 +1,57 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  labels:
+    app.kubernetes.io/name: typesense-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: typesense-common-bootstrap-key
+type: Opaque
+data:
+  typesense-api-key: SXdpVG9CcnFYTHZYeTJNMG1TS1hPaGt0dlFUY3VWUloxc1M5REtsRUNtMFFwQU93R1hoanVIVWJLQnE2ejdlSQ==
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: c-k3s-2-server-configuration
+data:
+  TYPESENSE_HEALTHY_READ_LAG: "1000"
+  TYPESENSE_HEALTHY_WRITE_LAG: "500"
+---
+apiVersion: ts.opentelekomcloud.com/v1alpha1
+kind: TypesenseCluster
+metadata:
+  labels:
+    app.kubernetes.io/name: typesense-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: c-k3s-2
+spec:
+  image: typesense/typesense:30.0.rc7-amd64
+  replicas: 3
+  podAnnotations:
+    cluster-autoscaler.kubernetes.io/safe-to-evict: "true"
+  storage:
+    size: 150Mi
+    storageClassName: nfs
+  adminApiKey:
+    name: typesense-common-bootstrap-key
+  resources:
+    limits:
+      cpu: "1500m"
+      memory: "1024Mi"
+    requests:
+      cpu: "100m"
+      memory: "64Mi"
+  metrics:
+    release: promstack
+  additionalServerConfiguration:
+    name: c-k3s-2-server-configuration
+  ingress:
+    host: typesense.apps.proxmox.home
+    ingressClassName: traefik
+    resources:
+      limits:
+        cpu: "300m"
+        memory: "128Mi"
+      requests:
+        cpu: "100m"
+        memory: "32Mi"
