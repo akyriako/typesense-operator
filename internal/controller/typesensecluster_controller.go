@@ -121,6 +121,11 @@ func (r *TypesenseClusterReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		return ctrl.Result{}, err
 	}
 
+	err = r.ensureLabels(ctx, &ts)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+
 	// Update strategy: Admin Secret is Immutable, will not be updated on any future change
 	secret, err := r.ReconcileSecret(ctx, ts)
 	if err != nil {
