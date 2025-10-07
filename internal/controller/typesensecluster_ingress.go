@@ -228,7 +228,7 @@ func (r *TypesenseClusterReconciler) ReconcileIngress(ctx context.Context, ts ts
 			}
 
 			r.logger.V(debugLevel).Info("adding restart annotation to ingress reverse proxy deployment", "deployment", deploymentObjectKey.Name)
-			deployment.Spec.Template.Annotations["kubectl.kubernetes.io/restartedAt"] = time.Now().Format(time.RFC3339)
+			deployment.Spec.Template.Annotations[restartPodsAnnotationKey] = time.Now().Format(time.RFC3339)
 
 			if err := r.Update(ctx, deployment); err != nil {
 				r.logger.Error(err, "adding restart annotation to ingress reverse proxy deployment failed", "deployment", deploymentObjectKey.Name)
@@ -296,7 +296,7 @@ func (r *TypesenseClusterReconciler) createIngress(ctx context.Context, key clie
 	}
 
 	ingress := &networkingv1.Ingress{
-		ObjectMeta: getObjectMeta(ts, &key.Name, annotations),
+		ObjectMeta: getObjectMeta(ts, &key.Name, nil, annotations),
 		Spec: networkingv1.IngressSpec{
 			IngressClassName: ptr.To(ts.Spec.Ingress.IngressClassName),
 			TLS:              tlsConfiguration,

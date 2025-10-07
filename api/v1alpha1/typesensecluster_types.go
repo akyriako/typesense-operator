@@ -282,6 +282,8 @@ type VeleroSpec struct {
 	// +kubebuilder:default=default
 	BackupStorageLocation string `json:"backupStorageLocation,omitempty"`
 
+	VolumeSnapshotLocations []string `json:"volumeSnapshotLocations,omitempty"`
+
 	// +kubebuilder:default=true
 	UseOwnerReferencesInBackup bool `json:"useOwnerReferencesInBackup,omitempty"`
 }

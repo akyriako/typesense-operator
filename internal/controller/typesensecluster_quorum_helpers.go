@@ -179,7 +179,7 @@ func (r *TypesenseClusterReconciler) getHealthyWriteLagThreshold(ctx context.Con
 
 	var cm = &v1.ConfigMap{}
 	if err := r.Get(ctx, configMapObjectKey, cm); err != nil {
-		r.logger.Error(err, "unable to additional server configuration config map", "configMap", configMapName)
+		r.logger.Error(err, "unable to get additional server configuration config map", "configMap", configMapName)
 		return HealthyWriteLagDefaultValue
 	}
 
@@ -207,7 +207,7 @@ func (r *TypesenseClusterReconciler) getHealthyReadLagThreshold(ctx context.Cont
 
 	var cm = &v1.ConfigMap{}
 	if err := r.Get(ctx, configMapObjectKey, cm); err != nil {
-		r.logger.Error(err, "unable to additional server configuration config map", "configMap", configMapName)
+		r.logger.Error(err, "unable to get additional server configuration config map", "configMap", configMapName)
 		return HealthyReadLagDefaultValue
 	}
 
@@ -238,7 +238,7 @@ func (r *TypesenseClusterReconciler) getHealthyLagThresholds(ctx context.Context
 
 	var cm = &v1.ConfigMap{}
 	if err := r.Get(ctx, configMapObjectKey, cm); err != nil {
-		r.logger.Error(err, "unable to additional server configuration config map", "configMap", configMapName)
+		r.logger.Error(err, "unable to get additional server configuration config map", "configMap", configMapName)
 		return
 	}
 

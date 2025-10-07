@@ -3,6 +3,7 @@ package controller
 import (
 	"context"
 	"fmt"
+
 	tsv1alpha1 "github.com/akyriako/typesense-operator/api/v1alpha1"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -11,11 +12,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func (r *TypesenseClusterReconciler) ReconcileSecret(ctx context.Context, ts tsv1alpha1.TypesenseCluster) (*v1.Secret, error) {
+func (r *TypesenseClusterReconciler) ReconcileSecret(ctx context.Context, ts *tsv1alpha1.TypesenseCluster) (*v1.Secret, error) {
 	r.logger.V(debugLevel).Info("reconciling secret")
 
 	secretExists := true
-	secretObjectKey := r.getAdminApiKeyObjectKey(&ts)
+	secretObjectKey := r.getAdminApiKeyObjectKey(ts)
 
 	var secret = &v1.Secret{}
 	if err := r.Get(ctx, secretObjectKey, secret); err != nil {
@@ -30,13 +31,29 @@ func (r *TypesenseClusterReconciler) ReconcileSecret(ctx context.Context, ts tsv
 	if !secretExists {
 		r.logger.V(debugLevel).Info("creating admin api key", "secret", secretObjectKey)
 
-		secret, err := r.createAdminApiKey(ctx, secretObjectKey, &ts)
+		secret, err := r.createAdminApiKey(ctx, secretObjectKey, ts)
 		if err != nil {
 			r.logger.Error(err, "creating admin api key failed", "secret", secretObjectKey)
 			return nil, err
 		}
 		return secret, nil
 	}
+
+	scheduleName := getIncludeInBackupLabels(ts)[IncludeInBackupLabelKey]
+	if lbls := secret.GetLabels(); lbls == nil || lbls[IncludeInBackupLabelKey] != scheduleName {
+		before := secret.DeepCopy()
+		if lbls == nil {
+			lbls = map[string]string{}
+		}
+		lbls[IncludeInBackupLabelKey] = scheduleName
+		secret.SetLabels(lbls)
+
+		if err := r.Patch(ctx, secret, client.MergeFrom(before)); err != nil {
+			r.logger.Error(err, "failed to patch backup label on secret", "secret", secretObjectKey)
+			return nil, err
+		}
+	}
+
 	return secret, nil
 }
 
@@ -51,7 +68,7 @@ func (r *TypesenseClusterReconciler) createAdminApiKey(
 	}
 
 	secret := &v1.Secret{
-		ObjectMeta: getObjectMeta(ts, &secretObjectKey.Name, nil),
+		ObjectMeta: getObjectMeta(ts, &secretObjectKey.Name, getIncludeInBackupLabels(ts), nil),
 		Type:       v1.SecretTypeOpaque,
 		Immutable:  ptr.To[bool](true),
 		Data: map[string][]byte{

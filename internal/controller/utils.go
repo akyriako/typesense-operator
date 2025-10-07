@@ -9,6 +9,8 @@ import (
 
 	tsv1alpha1 "github.com/akyriako/typesense-operator/api/v1alpha1"
 	"github.com/robfig/cron/v3"
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -51,16 +53,27 @@ func getLabels(ts *tsv1alpha1.TypesenseCluster) map[string]string {
 	}
 }
 
-func getObjectMeta(ts *tsv1alpha1.TypesenseCluster, name *string, annotations map[string]string) metav1.ObjectMeta {
+func getObjectMeta(ts *tsv1alpha1.TypesenseCluster, name *string, extraLabels map[string]string, extraAnnotations map[string]string) metav1.ObjectMeta {
 	if name == nil {
 		name = &ts.Name
+	}
+
+	lbls := getLabels(ts)
+	for k, v := range extraLabels {
+		lbls[k] = v
 	}
 
 	return metav1.ObjectMeta{
 		Name:        *name,
 		Namespace:   ts.Namespace,
-		Labels:      getLabels(ts),
-		Annotations: annotations,
+		Labels:      lbls,
+		Annotations: extraAnnotations,
+	}
+}
+
+func getIncludeInBackupLabels(ts *tsv1alpha1.TypesenseCluster) map[string]string {
+	return map[string]string{
+		IncludeInBackupLabelKey: fmt.Sprintf(ClusterBackupSchedule, ts.Name, ts.Namespace),
 	}
 }
 
@@ -229,4 +242,8 @@ func toAnyMapString(m map[string]string) map[string]any {
 		out[k] = v
 	}
 	return out
+}
+
+func toTitle(s string) string {
+	return cases.Title(language.Und, cases.NoLower).String(s)
 }

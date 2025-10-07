@@ -3,6 +3,8 @@ package controller
 import (
 	"context"
 	"fmt"
+	"strconv"
+
 	tsv1alpha1 "github.com/akyriako/typesense-operator/api/v1alpha1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -12,7 +14,6 @@ import (
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"strconv"
 )
 
 func (r *TypesenseClusterReconciler) ReconcileScraper(ctx context.Context, ts tsv1alpha1.TypesenseCluster) (err error) {
@@ -118,7 +119,7 @@ func (r *TypesenseClusterReconciler) createScraper(ctx context.Context, key clie
 			APIVersion: "batch/v1",
 			Kind:       "CronJob",
 		},
-		ObjectMeta: getObjectMeta(ts, &key.Name, nil),
+		ObjectMeta: getObjectMeta(ts, &key.Name, nil, nil),
 		Spec: batchv1.CronJobSpec{
 			ConcurrencyPolicy:          batchv1.ForbidConcurrent,
 			SuccessfulJobsHistoryLimit: ptr.To[int32](1),

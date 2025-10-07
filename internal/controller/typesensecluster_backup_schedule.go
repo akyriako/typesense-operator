@@ -13,6 +13,7 @@ import (
 
 const (
 	hooksExecutorContainerName = "velero-hooks-exec"
+	IncludeInBackupLabelKey    = "ts.opentelekomcloud.com/include-in-backup"
 )
 
 func (r *TypesenseClusterReconciler) ReconcileBackup(ctx context.Context, ts *tsv1alpha1.TypesenseCluster) error {
@@ -30,7 +31,7 @@ func (r *TypesenseClusterReconciler) ReconcileBackup(ctx context.Context, ts *ts
 		return nil
 	}
 
-	scheduleName := fmt.Sprintf(ClusterBackupSchedule, ts.Name, ts.Namespace, r.getClusterId(ts))
+	scheduleName := fmt.Sprintf(ClusterBackupSchedule, ts.Name, ts.Namespace)
 	scheduleObjectKey := client.ObjectKey{
 		Name:      scheduleName,
 		Namespace: ts.Spec.Backup.Velero.Namespace,
@@ -69,19 +70,8 @@ func (r *TypesenseClusterReconciler) ensureBackupSchedule(ctx context.Context, t
 			return err
 		}
 
-		// We use FSB (pod-volume backups) only for volumes explicitly annotated on pods.
-		// We Disable PV snapshots so the backup doesn't attempt unsupported/unused snapshots.
-		if err := unstructured.SetNestedField(obj.Object, false, "spec", "template", "snapshotVolumes"); err != nil {
-			return err
-		}
-
-		// Declare explicitly that we do NOT back up all pod volumes by default; only annotated ones.
-		if err := unstructured.SetNestedField(obj.Object, false, "spec", "template", "defaultVolumesToFsBackup"); err != nil {
-			return err
-		}
-
 		selector := map[string]any{
-			"matchLabels": toAnyMapString(getLabels(ts)),
+			"matchLabels": toAnyMapString(getIncludeInBackupLabels(ts)),
 		}
 
 		hooks := ts.Spec.GetDefaultBackupHook()
@@ -99,11 +89,40 @@ func (r *TypesenseClusterReconciler) ensureBackupSchedule(ctx context.Context, t
 			}},
 		}
 
+		snapshotVolumes := false // FSB
+		if ts.Spec.Backup.Method == "csi" {
+			snapshotVolumes = true // CSI
+		}
+
+		// set VSLs if provided
+
+		var volumeSnapshotLocations []any
+		if snapshotVolumes && len(ts.Spec.Backup.Velero.VolumeSnapshotLocations) == 0 {
+			return fmt.Errorf("no volume snapshot locations specified. required for csi method")
+		}
+		volumeSnapshotLocations = toAnySlice(ts.Spec.Backup.Velero.VolumeSnapshotLocations)
+
 		template := map[string]any{
-			"includedNamespaces": toAnySlice([]string{ts.Namespace}),
-			"labelSelector":      selector,
-			"ttl":                fmt.Sprintf("%dh", ts.Spec.Backup.RetentionInDays*24),
-			"hooks":              map[string]any{"resources": []any{hooksSpec}},
+			"includedNamespaces":       toAnySlice([]string{ts.Namespace}),
+			"labelSelector":            selector,
+			"snapshotVolumes":          snapshotVolumes, // Use either CSI(true) or FSB(false) method.
+			"storageLocation":          ts.Spec.Backup.Velero.BackupStorageLocation,
+			"volumeSnapshotLocations":  volumeSnapshotLocations,
+			"defaultVolumesToFsBackup": false, // Declare explicitly that we do NOT back up all pod volumes by default, only annotated ones.
+			"includeClusterResources":  false, // Skip other cluster-scoped resources
+			"excludedResources": toAnySlice([]string{ // Skip CRDs as target clusters may differ. Let the operator rebuild the resources.
+				"customresourcedefinitions.apiextensions.k8s.io",
+				"clusterroles.rbac.authorization.k8s.io",
+				"clusterrolebindings.rbac.authorization.k8s.io",
+				"storageclasses.storage.k8s.io",
+				"volumesnapshotclasses.snapshot.storage.k8s.io",
+				"endpoints",
+				"replicasets.apps",
+				"statefulsets.apps/status",
+				"events",
+			}),
+			"ttl":   fmt.Sprintf("%dh", ts.Spec.Backup.RetentionInDays*24),
+			"hooks": map[string]any{"resources": []any{hooksSpec}},
 		}
 
 		return unstructured.SetNestedMap(obj.Object, template, "spec", "template")

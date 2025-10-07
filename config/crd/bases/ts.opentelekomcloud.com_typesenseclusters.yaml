@@ -1138,6 +1138,10 @@ spec:
                       useOwnerReferencesInBackup:
                         default: true
                         type: boolean
+                      volumeSnapshotLocations:
+                        items:
+                          type: string
+                        type: array
                     type: object
                 required:
                 - schedule

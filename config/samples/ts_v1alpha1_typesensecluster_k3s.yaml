@@ -55,9 +55,10 @@ spec:
         memory: "32Mi"
   backup:
     enabled: true
-    schedule: "*/10 * * * *"
+    method: fsb
+    schedule: "*/1 * * * *"
     snapshotStorage:
       auto: false
       storageClassName: nfs
     velero:
-      backupStorageLocation: s3
+      backupStorageLocation: default

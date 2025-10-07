@@ -24,8 +24,6 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
-	"golang.org/x/text/cases"
-	"golang.org/x/text/language"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/discovery"
@@ -121,13 +119,8 @@ func (r *TypesenseClusterReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		return ctrl.Result{}, err
 	}
 
-	err = r.ensureLabels(ctx, &ts)
-	if err != nil {
-		return ctrl.Result{}, err
-	}
-
 	// Update strategy: Admin Secret is Immutable, will not be updated on any future change
-	secret, err := r.ReconcileSecret(ctx, ts)
+	secret, err := r.ReconcileSecret(ctx, &ts)
 	if err != nil {
 		cerr := r.setConditionNotReady(ctx, &ts, ConditionReasonSecretNotReady, err)
 		if cerr != nil {
@@ -202,14 +195,22 @@ func (r *TypesenseClusterReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		if cerr != nil {
 			err = errors.Wrap(err, cerr.Error())
 		}
+
+		r.logger.V(debugLevel).Error(err, "reconciling backup schedule failed")
+		r.Recorder.Eventf(&ts, "Warning", string(ConditionReasonBackupScheduleNotReady), toTitle(err.Error()))
+	} else {
+		if ts.Spec.Backup != nil {
+			r.Recorder.Eventf(&ts, "Normal", string(ConditionReasonBackupScheduleReady), toTitle("backup schedule is ready"))
+		}
+	}
+
+	err = r.ensureLabels(ctx, &ts)
+	if err != nil {
 		return ctrl.Result{}, err
 	}
 
 	terminationGracePeriodSeconds := *sts.Spec.Template.Spec.TerminationGracePeriodSeconds
 	requeueAfter := reconcileRequeuePeriod + (time.Duration(terminationGracePeriodSeconds) * time.Second)
-	toTitle := func(s string) string {
-		return cases.Title(language.Und, cases.NoLower).String(s)
-	}
 
 	cond := ConditionReasonQuorumStateUnknown
 	action := Bootstrapping
