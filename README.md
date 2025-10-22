@@ -175,7 +175,7 @@ Join the conversation:
 ## 📦 Project Status
 
 TyKO is an **independently maintained** project (not affiliated with Typesense, Inc.).
-- Latest version: **0.3.3**
+- Latest version: **0.3.4**
 - Tested on: Kubernetes 1.33 (earliest 1.26), Typesense 29.0 (earliest 26.0)
 - Contributions welcome! See [FAQ](https://akyriako.github.io/typesense-operator-docs/docs/faq) and [Development](https://akyriako.github.io/typesense-operator-docs/docs/development)
 

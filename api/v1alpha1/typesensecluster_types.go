@@ -116,6 +116,9 @@ type TypesenseClusterSpec struct {
 	// +kubebuilder:validation:Optional
 	TopologySpreadConstraints []corev1.TopologySpreadConstraint `json:"topologySpreadConstraints,omitempty"`
 
+	// +kubebuilder:validation:Optional
+	PriorityClassName *string `json:"priorityClassName,omitempty"`
+
 	// +optional
 	// +kubebuilder:default=false
 	// +kubebuilder:validation:Type=boolean

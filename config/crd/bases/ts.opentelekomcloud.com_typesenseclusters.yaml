@@ -3336,6 +3336,8 @@ spec:
                 additionalProperties:
                   type: string
                 type: object
+              priorityClassName:
+                type: string
               replicas:
                 default: 3
                 enum:

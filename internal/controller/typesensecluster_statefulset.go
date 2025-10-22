@@ -222,7 +222,8 @@ func (r *TypesenseClusterReconciler) buildStatefulSet(ctx context.Context, key c
 							ConditionType: QuorumReadinessGateCondition,
 						},
 					},
-					ImagePullSecrets: ts.Spec.ImagePullSecrets,
+					PriorityClassName: ptr.Deref[string](ts.Spec.PriorityClassName, ""),
+					ImagePullSecrets:  ts.Spec.ImagePullSecrets,
 					Containers: []corev1.Container{
 						{
 							Name:            "typesense",
