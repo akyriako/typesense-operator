@@ -558,6 +558,7 @@ func (r *TypesenseClusterReconciler) createIngressDeployment(ctx context.Context
 					Labels: getReverseProxyLabels(ts),
 				},
 				Spec: v1.PodSpec{
+					ImagePullSecrets: ts.Spec.ImagePullSecrets,
 					Containers: []v1.Container{
 						{
 							Name:  fmt.Sprintf(ClusterReverseProxy, ts.Name),

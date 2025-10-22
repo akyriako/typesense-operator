@@ -30,6 +30,9 @@ import (
 type TypesenseClusterSpec struct {
 	Image string `json:"image"`
 
+	// +kubebuilder:validation:Optional
+	ImagePullSecrets []corev1.LocalObjectReference `json:"imagePullSecrets,omitempty"`
+
 	AdminApiKey *corev1.SecretReference `json:"adminApiKey,omitempty"`
 
 	// +optional
