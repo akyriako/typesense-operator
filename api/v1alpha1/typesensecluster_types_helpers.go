@@ -37,36 +37,11 @@ func (s *TypesenseClusterSpec) GetAdditionalServerConfiguration() []corev1.EnvFr
 	return []corev1.EnvFromSource{}
 }
 
-func (s *DocSearchScraperSpec) GetScraperAuthConfiguration() []corev1.EnvFromSource {
-	if s.AuthConfiguration != nil {
-		return []corev1.EnvFromSource{
-			{
-				SecretRef: &corev1.SecretEnvSource{
-					LocalObjectReference: *s.AuthConfiguration,
-				},
-			},
-		}
-	}
-
-	return []corev1.EnvFromSource{}
-}
-
 func (s *TypesenseClusterSpec) GetCorsDomains() string {
 	if s.CorsDomains == nil {
 		return ""
 	}
 	return *s.CorsDomains
-}
-
-func (s *TypesenseClusterSpec) GetStorage() StorageSpec {
-	if s.Storage != nil {
-		return *s.Storage
-	}
-
-	return StorageSpec{
-		Size:             resource.MustParse("100Mi"),
-		StorageClassName: "standard",
-	}
 }
 
 func (s *TypesenseClusterSpec) GetTopologySpreadConstraints(labels map[string]string) []corev1.TopologySpreadConstraint {
@@ -81,77 +56,4 @@ func (s *TypesenseClusterSpec) GetTopologySpreadConstraints(labels map[string]st
 		tscs = append(tscs, tsc)
 	}
 	return tscs
-}
-
-func (s *TypesenseClusterSpec) GetMetricsExporterSpecs() MetricsExporterSpec {
-	if s.Metrics != nil {
-		return *s.Metrics
-	}
-
-	return MetricsExporterSpec{
-		Release:           "promstack",
-		Image:             "akyriako78/typesense-prometheus-exporter:0.1.9",
-		IntervalInSeconds: 15,
-	}
-}
-
-func (s *TypesenseClusterSpec) GetMetricsExporterResources() corev1.ResourceRequirements {
-	if s.Metrics != nil && s.Metrics.Resources != nil {
-		return *s.Metrics.Resources
-	}
-
-	return corev1.ResourceRequirements{
-		Limits: corev1.ResourceList{
-			corev1.ResourceCPU:    resource.MustParse("100m"),
-			corev1.ResourceMemory: resource.MustParse("64Mi"),
-		},
-		Requests: corev1.ResourceList{
-			corev1.ResourceCPU:    resource.MustParse("100m"),
-			corev1.ResourceMemory: resource.MustParse("32Mi"),
-		},
-	}
-}
-
-func (s *TypesenseClusterSpec) GetHealthCheckSidecarSpecs() HealthCheckSpec {
-	if s.HealthCheck != nil {
-		return *s.HealthCheck
-	}
-
-	return HealthCheckSpec{
-		Image: "akyriako78/typesense-healthcheck:0.1.8",
-	}
-}
-
-func (s *TypesenseClusterSpec) GetHealthCheckSidecarResources() corev1.ResourceRequirements {
-	if s.HealthCheck != nil && s.HealthCheck.Resources != nil {
-		return *s.HealthCheck.Resources
-	}
-
-	return corev1.ResourceRequirements{
-		Limits: corev1.ResourceList{
-			corev1.ResourceCPU:    resource.MustParse("100m"),
-			corev1.ResourceMemory: resource.MustParse("64Mi"),
-		},
-		Requests: corev1.ResourceList{
-			corev1.ResourceCPU:    resource.MustParse("100m"),
-			corev1.ResourceMemory: resource.MustParse("32Mi"),
-		},
-	}
-}
-
-func (s *IngressSpec) GetReverseProxyResources() corev1.ResourceRequirements {
-	if s.Resources != nil {
-		return *s.Resources
-	}
-
-	return corev1.ResourceRequirements{
-		Limits: corev1.ResourceList{
-			corev1.ResourceCPU:    resource.MustParse("150m"),
-			corev1.ResourceMemory: resource.MustParse("64Mi"),
-		},
-		Requests: corev1.ResourceList{
-			corev1.ResourceCPU:    resource.MustParse("100m"),
-			corev1.ResourceMemory: resource.MustParse("32Mi"),
-		},
-	}
 }

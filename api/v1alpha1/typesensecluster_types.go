@@ -18,8 +18,6 @@ package v1alpha1
 
 import (
 	corev1 "k8s.io/api/core/v1"
-	networkingv1 "k8s.io/api/networking/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -123,111 +121,6 @@ type TypesenseClusterSpec struct {
 	// +kubebuilder:default=false
 	// +kubebuilder:validation:Type=boolean
 	IncrementalQuorumRecovery bool `json:"incrementalQuorumRecovery,omitempty"`
-}
-
-type StorageSpec struct {
-
-	// +optional
-	// +kubebuilder:default="100Mi"
-	Size resource.Quantity `json:"size,omitempty"`
-
-	StorageClassName string `json:"storageClassName"`
-}
-
-type IngressSpec struct {
-	// +optional
-	// +kubebuilder:validation:Pattern:=`^([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])(\.([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]{0,61}[a-zA-Z0-9]))*$`
-	Referer *string `json:"referer,omitempty"`
-
-	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:Pattern:=`^([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])(\.([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]{0,61}[a-zA-Z0-9]))*$`
-	Host string `json:"host"`
-
-	HttpDirectives     *string `json:"httpDirectives,omitempty"`
-	ServerDirectives   *string `json:"serverDirectives,omitempty"`
-	LocationDirectives *string `json:"locationDirectives,omitempty"`
-
-	// +optional
-	ClusterIssuer *string `json:"clusterIssuer,omitempty"`
-
-	IngressClassName string `json:"ingressClassName"`
-
-	Annotations map[string]string `json:"annotations,omitempty"`
-
-	// +optional
-	TLSSecretName *string `json:"tlsSecretName,omitempty"`
-
-	// +kubebuilder:validation:Optional
-	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
-
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default:="nginx:alpine"
-	Image string `json:"image,omitempty"`
-
-	// +optional
-	ReadOnlyRootFilesystem *ReadOnlyRootFilesystemSpec `json:"readOnlyRootFilesystem,omitempty"`
-
-	// +optional
-	// +kubebuilder:default:="/"
-	Path string `json:"path,omitempty"`
-
-	// +optional
-	// +kubebuilder:default:="ImplementationSpecific"
-	// +kubebuilder:validation:Enum=Exact;Prefix;ImplementationSpecific
-	PathType *networkingv1.PathType `json:"pathType,omitempty"`
-}
-
-type ReadOnlyRootFilesystemSpec struct {
-	// +optional
-	SecurityContext *corev1.SecurityContext `json:"securityContext,omitempty"`
-
-	// +optional
-	Volumes []corev1.Volume `json:"volumes,omitempty"`
-
-	// +optional
-	VolumeMounts []corev1.VolumeMount `json:"volumeMounts,omitempty"`
-}
-
-type DocSearchScraperSpec struct {
-	Name   string `json:"name"`
-	Image  string `json:"image"`
-	Config string `json:"config"`
-
-	// +kubebuilder:validation:Pattern:=`(^((\*\/)?([0-5]?[0-9])((\,|\-|\/)([0-5]?[0-9]))*|\*)\s+((\*\/)?((2[0-3]|1[0-9]|[0-9]|00))((\,|\-|\/)(2[0-3]|1[0-9]|[0-9]|00))*|\*)\s+((\*\/)?([1-9]|[12][0-9]|3[01])((\,|\-|\/)([1-9]|[12][0-9]|3[01]))*|\*)\s+((\*\/)?([1-9]|1[0-2])((\,|\-|\/)([1-9]|1[0-2]))*|\*|(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|des))\s+((\*\/)?[0-6]((\,|\-|\/)[0-6])*|\*|00|(sun|mon|tue|wed|thu|fri|sat))\s*$)|@(annually|yearly|monthly|weekly|daily|hourly|reboot)`
-	// +kubebuilder:validation:Type=string
-	Schedule string `json:"schedule"`
-
-	// +kubebuilder:validation:Optional
-	AuthConfiguration *corev1.LocalObjectReference `json:"authConfiguration,omitempty"`
-}
-
-type MetricsExporterSpec struct {
-	Release string `json:"release"`
-
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default:="akyriako78/typesense-prometheus-exporter:0.1.9"
-	Image string `json:"image,omitempty"`
-
-	// +optional
-	// +kubebuilder:default=15
-	// +kubebuilder:validation:Minimum=15
-	// +kubebuilder:validation:Maximum=60
-	// +kubebuilder:validation:ExclusiveMinimum=false
-	// +kubebuilder:validation:ExclusiveMaximum=false
-	// +kubebuilder:validation:Type=integer
-	IntervalInSeconds int `json:"interval,omitempty"`
-
-	// +kubebuilder:validation:Optional
-	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
-}
-
-type HealthCheckSpec struct {
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default:="akyriako78/typesense-healthcheck:0.1.8"
-	Image string `json:"image,omitempty"`
-
-	// +kubebuilder:validation:Optional
-	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
 }
 
 // TypesenseClusterStatus defines the observed state of TypesenseCluster
