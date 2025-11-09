@@ -3336,6 +3336,9 @@ spec:
                 additionalProperties:
                   type: string
                 type: object
+              podsInheritStatefulSetAnnotations:
+                default: false
+                type: boolean
               priorityClassName:
                 type: string
               replicas:
@@ -3444,6 +3447,10 @@ spec:
                   - schedule
                   type: object
                 type: array
+              statefulSetAnnotations:
+                additionalProperties:
+                  type: string
+                type: object
               storage:
                 properties:
                   size:

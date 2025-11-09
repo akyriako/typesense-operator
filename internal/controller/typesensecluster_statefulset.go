@@ -113,20 +113,6 @@ func (r *TypesenseClusterReconciler) ReconcileStatefulSet(ctx context.Context, t
 				r.logLagThresholds(updatedSts)
 				return updatedSts, nil
 			}
-
-			//if !apiequality.Semantic.DeepEqual(sts.Spec.Template.Annotations, desiredSts.Spec.Template.Annotations){
-			//	r.logger.V(debugLevel).Info("updating statefulset pod annotations", "sts", sts.Name)
-			//
-			//	patch := client.MergeFrom(sts.DeepCopy())
-			//	sts.Spec.Template.Annotations = desiredSts.Spec.Template.Annotations
-			//
-			//	if err := r.Patch(ctx, sts, patch); err != nil {
-			//		return nil, err
-			//	}
-			//
-			//	r.logLagThresholds(sts)
-			//	return sts, nil
-			//}
 		}
 	}
 
@@ -197,10 +183,20 @@ func (r *TypesenseClusterReconciler) buildStatefulSet(ctx context.Context, key c
 		}
 	}
 
+	stsAnnotations := make(map[string]string)
+	if ts.Spec.StatefulSetAnnotations != nil {
+		for k, v := range ts.Spec.StatefulSetAnnotations {
+			stsAnnotations[k] = v
+			if ts.Spec.PodsInheritStatefulSetAnnotations {
+				podAnnotations[k] = v
+			}
+		}
+	}
+
 	clusterName := ts.Name
 	sts := &appsv1.StatefulSet{
 		TypeMeta:   metav1.TypeMeta{},
-		ObjectMeta: getObjectMeta(ts, &key.Name, nil),
+		ObjectMeta: getObjectMeta(ts, &key.Name, stsAnnotations),
 		Spec: appsv1.StatefulSetSpec{
 			ServiceName:         fmt.Sprintf(ClusterHeadlessService, clusterName),
 			PodManagementPolicy: appsv1.ParallelPodManagement,
