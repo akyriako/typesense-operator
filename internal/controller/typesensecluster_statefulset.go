@@ -85,11 +85,22 @@ func (r *TypesenseClusterReconciler) ReconcileStatefulSet(ctx context.Context, t
 				r.logger.Error(err, "building statefulset failed", "sts", stsObjectKey.Name)
 			}
 
-			annotations := sts.Spec.Template.Annotations
-			delete(annotations, restartPodsAnnotationKey)
+			stsAnnotations := sts.ObjectMeta.Annotations
+			podAnnotations := sts.Spec.Template.Annotations
+			delete(podAnnotations, restartPodsAnnotationKey)
 
-			if r.shouldUpdateStatefulSet(sts, desiredSts, ts) || !apiequality.Semantic.DeepEqual(annotations, desiredSts.Spec.Template.Annotations) {
+			if r.shouldUpdateStatefulSet(sts, desiredSts, ts) ||
+				!apiequality.Semantic.DeepEqual(podAnnotations, desiredSts.Spec.Template.Annotations) ||
+				!apiequality.Semantic.DeepEqual(stsAnnotations, desiredSts.ObjectMeta.Annotations) {
+
 				r.logger.V(debugLevel).Info("updating statefulset", "sts", sts.Name)
+
+				oldImage := strings.Replace(sts.Spec.Template.Spec.Containers[0].Image, "typesense/typesense:", "", -1)
+				newImage := strings.Replace(desiredSts.Spec.Template.Spec.Containers[0].Image, "typesense/typesense:", "", -1)
+				if oldImage != newImage {
+					r.logger.V(debugLevel).Info("scheduling typesense update", "current", oldImage, "target", newImage)
+					r.Recorder.Eventf(ts, "Normal", "TypesenseVersionUpdate", "Scheduled update from %s to %s", oldImage, newImage)
+				}
 
 				updatedSts, err := r.updateStatefulSet(ctx, sts, desiredSts)
 				if err != nil {
@@ -157,6 +168,8 @@ func (r *TypesenseClusterReconciler) createStatefulSet(ctx context.Context, key 
 func (r *TypesenseClusterReconciler) updateStatefulSet(ctx context.Context, sts *appsv1.StatefulSet, desired *appsv1.StatefulSet) (*appsv1.StatefulSet, error) {
 	patch := client.MergeFrom(sts.DeepCopy())
 	sts.Spec = desired.Spec
+
+	sts.ObjectMeta.Annotations = desired.ObjectMeta.Annotations
 
 	if sts.Spec.Template.Annotations == nil {
 		sts.Spec.Template.Annotations = map[string]string{}

@@ -34,9 +34,12 @@ metadata:
     app.kubernetes.io/managed-by: kustomize
   name: c-kind-1
 spec:
-  image: typesense/typesense:30.0.rc7-amd64
+  image: typesense/typesense:30.0.rc27-amd64
   replicas: 3
   corsDomains: "http://localhost,https://www.example.de"
+  statefulSetAnnotations:
+    reloader.stakater.com/auto: "false"
+  podsInheritStatefulSetAnnotations: true
   podAnnotations:
     cluster-autoscaler.kubernetes.io/safe-to-evict: "false"
   resources:
