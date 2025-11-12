@@ -1,6 +1,7 @@
 apiVersion: v2
 name: typesense-operator
-description: Manage the lifecycle of Typesense Clusters in Kubernetes
+description: Typesense Kubernetes Operator (TyKO) simplifies deploying, scaling and managing highly-available, self-healing Typesense clusters in Kubernetes
+icon: https://akyriako.github.io/typesense-operator-docs/img/tyko-logo.png
 # A chart can be either an 'application' or a 'library' chart.
 #
 # Application charts are a collection of templates that can be packaged into versioned archives
@@ -19,3 +20,7 @@ version: 0.3.5
 # follow Semantic Versioning. They should reflect the version the application is using.
 # It is recommended to use it with quotes.
 appVersion: "0.3.5"
+
+maintainers:
+  - name: Kyriakos Akriotis
+    url: https://github.com/akyriako
