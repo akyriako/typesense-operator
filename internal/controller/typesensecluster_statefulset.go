@@ -269,6 +269,8 @@ func (r *TypesenseClusterReconciler) buildStatefulSet(ctx context.Context, key c
 									Name:      "data",
 								},
 							},
+							// typesense exits immediately most times but services/ingresses can take time to propagate the fact a pod is going down
+							// this gives 7s for the kubernetes cluster to sync the fact a pod is going away before sending a sigterm
 							Lifecycle: &corev1.Lifecycle{
 								PreStop: &corev1.LifecycleHandler{
 									Sleep: &corev1.SleepAction{
