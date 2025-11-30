@@ -47,6 +47,7 @@ type TypesenseClusterReconciler struct {
 	logger          logr.Logger
 	Recorder        record.EventRecorder
 	DiscoveryClient *discovery.DiscoveryClient
+	InCluster       bool
 }
 
 type TypesenseClusterReconciliationPhase struct {
