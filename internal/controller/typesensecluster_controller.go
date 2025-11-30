@@ -29,6 +29,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/discovery"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
@@ -47,6 +49,8 @@ type TypesenseClusterReconciler struct {
 	logger          logr.Logger
 	Recorder        record.EventRecorder
 	DiscoveryClient *discovery.DiscoveryClient
+	ClientSet       *kubernetes.Clientset
+	Configuration   *rest.Config
 	InCluster       bool
 }
 

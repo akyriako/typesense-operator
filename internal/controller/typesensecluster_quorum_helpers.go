@@ -7,21 +7,27 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
+	"time"
 
 	tsv1alpha1 "github.com/akyriako/typesense-operator/api/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"k8s.io/client-go/rest"
 )
 
 func (r *TypesenseClusterReconciler) getNodeStatus(ctx context.Context, httpClient *http.Client, node NodeEndpoint, ts *tsv1alpha1.TypesenseCluster, secret *v1.Secret) (NodeStatus, error) {
-	fqdn := r.getNodeEndpoint(ts, node.IP.String())
-	url := fmt.Sprintf("http://%s:%d/status", fqdn, ts.Spec.ApiPort)
+	u, err := r.buildUrl(node, ts, ts.Spec.ApiPort, "/status")
+	if err != nil {
+		return NodeStatus{State: UnreachableState}, nil
+	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
 	if err != nil {
 		r.logger.Error(err, "creating request failed")
 		return NodeStatus{State: ErrorState}, nil
@@ -97,10 +103,12 @@ func (r *TypesenseClusterReconciler) getClusterStatus(nodesStatus map[string]Nod
 }
 
 func (r *TypesenseClusterReconciler) getNodeHealth(ctx context.Context, httpClient *http.Client, node NodeEndpoint, ts *tsv1alpha1.TypesenseCluster) (NodeHealth, error) {
-	fqdn := r.getNodeEndpoint(ts, node.IP.String())
-	url := fmt.Sprintf("http://%s:%d/health", fqdn, ts.Spec.ApiPort)
+	u, err := r.buildUrl(node, ts, ts.Spec.ApiPort, "/health")
+	if err != nil {
+		return NodeHealth{Ok: false}, err
+	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
 	if err != nil {
 		r.logger.Error(err, "creating request failed")
 		return NodeHealth{Ok: false}, nil
@@ -266,4 +274,41 @@ func (r *TypesenseClusterReconciler) getHealthyLagThresholds(ctx context.Context
 	write = healthyWriteLag
 
 	return
+}
+
+func (r *TypesenseClusterReconciler) getHttpClient(ts *tsv1alpha1.TypesenseCluster) (*http.Client, error) {
+	if r.InCluster {
+		return &http.Client{
+			Timeout: time.Duration(ts.Spec.HealthProbeTimeoutInMilliseconds) * time.Millisecond,
+		}, nil
+	}
+
+	restConfig := rest.CopyConfig(r.Configuration)
+	httpClient, err := rest.HTTPClientFor(restConfig)
+	if err != nil {
+		r.logger.Error(err, "failed to build kubernetes http client: %v")
+		return nil, err
+	}
+
+	httpClient.Timeout = time.Duration(ts.Spec.HealthProbeTimeoutInMilliseconds) * time.Millisecond
+	r.logger.V(debugLevel).Info("fallback to kube-proxy for http calls")
+
+	return httpClient, nil
+}
+
+func (r *TypesenseClusterReconciler) buildUrl(node NodeEndpoint, ts *tsv1alpha1.TypesenseCluster, port int, path string) (string, error) {
+	if !r.InCluster {
+		req := r.ClientSet.CoreV1().RESTClient().
+			Get().
+			Namespace(ts.Namespace).
+			Resource("pods").
+			Name(fmt.Sprintf("%s:%d", r.getShortName(node.PodName), port)).
+			SubResource("proxy").
+			Suffix(strings.TrimPrefix(path, "/"))
+
+		return req.URL().String(), nil
+	}
+
+	host := r.getNodeEndpoint(ts, node.IP.String())
+	return url.JoinPath(fmt.Sprintf("http://%s:%d", host, port), path)
 }
