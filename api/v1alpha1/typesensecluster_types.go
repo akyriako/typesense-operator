@@ -25,6 +25,7 @@ import (
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
 // TypesenseClusterSpec defines the desired state of TypesenseCluster
+// +kubebuilder:validation:XValidation:rule="!has(self.maintenance) || !has(self.maintenance.schedule) || self.maintenance.scaleDown == false",message="spec.maintenance.scaleDown must be false when spec.maintenance.schedule is set"
 type TypesenseClusterSpec struct {
 	Image string `json:"image"`
 
@@ -129,6 +130,8 @@ type TypesenseClusterSpec struct {
 	// +kubebuilder:default=false
 	// +kubebuilder:validation:Type=boolean
 	IncrementalQuorumRecovery bool `json:"incrementalQuorumRecovery,omitempty"`
+
+	Maintenance *MaintenanceSpec `json:"maintenance,omitempty"`
 }
 
 // TypesenseClusterStatus defines the observed state of TypesenseCluster

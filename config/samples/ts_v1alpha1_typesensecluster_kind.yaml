@@ -61,6 +61,11 @@ spec:
   ingress:
     host: ts.example.com
     ingressClassName: nginx
+#  maintenance:
+#    enabled: true
+#    scaleDown: false
+#    schedule:
+#      cronExpression: 40 * * * *
 
 ---
 #apiVersion: v1
