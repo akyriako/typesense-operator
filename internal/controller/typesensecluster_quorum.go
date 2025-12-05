@@ -35,7 +35,11 @@ func (r *TypesenseClusterReconciler) ReconcileQuorum(ctx context.Context, ts *ts
 		return ConditionReasonQuorumNotReady, 0, err
 	}
 
-	r.logger.Info("calculated quorum", "minRequiredNodes", quorum.MinRequiredNodes, "availableNodes", quorum.AvailableNodes)
+	r.logger.Info("calculated quorum", "minRequiredNodes", quorum.MinRequiredNodes, "availableNodes", quorum.AvailableNodes, "desired", sts.Status.Replicas)
+
+	if quorum.AvailableNodes < quorum.MinRequiredNodes {
+		return ConditionReasonStatefulSetNotReady, 0, nil
+	}
 
 	nodesStatus := make(map[string]NodeStatus)
 	httpClient, err := r.getHttpClient(ts)

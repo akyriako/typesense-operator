@@ -146,8 +146,8 @@ func (r *TypesenseClusterReconciler) getQuorum(ctx context.Context, ts *tsv1alph
 	}
 
 	nodes := strings.Split(cm.Data["nodes"], ",")
-	availableNodes := len(nodes)
-	minRequiredNodes := getMinimumRequiredNodes(availableNodes)
+	availableNodes := sts.Status.ReadyReplicas
+	minRequiredNodes := getMinimumRequiredNodes(int(sts.Status.Replicas))
 
 	var pods v1.PodList
 	labelSelector := labels.SelectorFromSet(sts.Spec.Selector.MatchLabels)
@@ -170,7 +170,7 @@ func (r *TypesenseClusterReconciler) getQuorum(ctx context.Context, ts *tsv1alph
 		}
 	}
 
-	return &Quorum{minRequiredNodes, availableNodes, qn, cm}, nil
+	return &Quorum{minRequiredNodes, int(availableNodes), qn, cm}, nil
 }
 
 func getMinimumRequiredNodes(availableNodes int) int {
