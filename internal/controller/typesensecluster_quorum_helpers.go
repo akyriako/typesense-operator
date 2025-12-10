@@ -146,7 +146,7 @@ func (r *TypesenseClusterReconciler) getQuorum(ctx context.Context, ts *tsv1alph
 	}
 
 	nodes := strings.Split(cm.Data["nodes"], ",")
-	availableNodes := sts.Status.ReadyReplicas
+	availableNodes := len(nodes) //sts.Status.CurrentReplicas
 	minRequiredNodes := getMinimumRequiredNodes(int(sts.Status.Replicas))
 
 	var pods v1.PodList

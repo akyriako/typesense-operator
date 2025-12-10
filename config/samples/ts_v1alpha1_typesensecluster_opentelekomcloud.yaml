@@ -27,7 +27,7 @@ metadata:
   name: c-otc-1
 spec:
   image: typesense/typesense:28.0
-  replicas: 5
+  replicas: 7
   resources:
     limits:
       cpu: "1800m"
@@ -53,20 +53,20 @@ spec:
     name: c-otc-1-server-configuration
   metrics:
     release: promstack
----
-apiVersion: ts.opentelekomcloud.com/v1alpha1
-kind: TypesenseCluster
-metadata:
-  labels:
-    app.kubernetes.io/name: typesense-operator
-    app.kubernetes.io/managed-by: kustomize
-  name: c-otc-2
-spec:
-  image: typesense/typesense:28.0
-  replicas: 1
-  storage:
-    storageClassName: csi-disk
----
+#---
+#apiVersion: ts.opentelekomcloud.com/v1alpha1
+#kind: TypesenseCluster
+#metadata:
+#  labels:
+#    app.kubernetes.io/name: typesense-operator
+#    app.kubernetes.io/managed-by: kustomize
+#  name: c-otc-2
+#spec:
+#  image: typesense/typesense:28.0
+#  replicas: 1
+#  storage:
+#    storageClassName: csi-disk
+#---
 #apiVersion: ts.opentelekomcloud.com/v1alpha1
 #kind: TypesenseCluster
 #metadata:

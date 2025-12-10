@@ -110,7 +110,7 @@ func (r *TypesenseClusterReconciler) updateConfigMap(ctx context.Context, ts *ts
 	}
 
 	if replicas == nil {
-		replicas = sts.Spec.Replicas
+		replicas = &ts.Spec.Replicas
 	}
 
 	nodes, err := r.getNodes(ctx, ts, *replicas, false)

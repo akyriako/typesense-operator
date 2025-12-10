@@ -35,7 +35,11 @@ func (r *TypesenseClusterReconciler) ReconcileQuorum(ctx context.Context, ts *ts
 		return ConditionReasonQuorumNotReady, 0, err
 	}
 
-	r.logger.Info("calculated quorum", "minRequiredNodes", quorum.MinRequiredNodes, "availableNodes", quorum.AvailableNodes, "desired", sts.Status.Replicas)
+	r.logger.Info("calculated quorum", "minRequiredNodes", quorum.MinRequiredNodes, "availableNodes", quorum.AvailableNodes)
+
+	if quorum.AvailableNodes != int(ts.Spec.Replicas) {
+		r.logger.Info("resizing quorum pending", "size", ts.Spec.Replicas)
+	}
 
 	if quorum.AvailableNodes < quorum.MinRequiredNodes {
 		return ConditionReasonStatefulSetNotReady, 0, nil
@@ -157,6 +161,10 @@ func (r *TypesenseClusterReconciler) ReconcileQuorum(ctx context.Context, ts *ts
 		}
 		return r.downgradeQuorum(ctx, ts, quorum.NodesListConfigMap, stsObjectKey, int32(healthyNodes), int32(minRequiredNodes))
 	}
+
+	//if quorum.AvailableNodes < quorum.MinRequiredNodes {
+	//	return ConditionReasonStatefulSetNotReady, 0, nil
+	//}
 
 	if clusterStatus == ClusterStatusNotReady {
 		if availableNodes == 1 {
