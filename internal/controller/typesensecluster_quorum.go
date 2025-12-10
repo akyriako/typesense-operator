@@ -162,10 +162,6 @@ func (r *TypesenseClusterReconciler) ReconcileQuorum(ctx context.Context, ts *ts
 		return r.downgradeQuorum(ctx, ts, quorum.NodesListConfigMap, stsObjectKey, int32(healthyNodes), int32(minRequiredNodes))
 	}
 
-	//if quorum.AvailableNodes < quorum.MinRequiredNodes {
-	//	return ConditionReasonStatefulSetNotReady, 0, nil
-	//}
-
 	if clusterStatus == ClusterStatusNotReady {
 		if availableNodes == 1 {
 
