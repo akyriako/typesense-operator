@@ -40,6 +40,8 @@ spec:
   statefulSetAnnotations:
     reloader.stakater.com/auto: "false"
   podsInheritStatefulSetAnnotations: true
+  serviceAnnotations:
+    cloud.google.com/backend-config: '{"default": "my-backendconfig1"}'
   podAnnotations:
     cluster-autoscaler.kubernetes.io/safe-to-evict: "false"
   resources:

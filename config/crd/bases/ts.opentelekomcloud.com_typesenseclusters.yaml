@@ -3447,6 +3447,10 @@ spec:
                   - schedule
                   type: object
                 type: array
+              serviceAnnotations:
+                additionalProperties:
+                  type: string
+                type: object
               statefulSetAnnotations:
                 additionalProperties:
                   type: string

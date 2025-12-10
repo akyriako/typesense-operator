@@ -99,6 +99,9 @@ type TypesenseClusterSpec struct {
 	AdditionalServerConfiguration *corev1.LocalObjectReference `json:"additionalServerConfiguration,omitempty"`
 
 	// +kubebuilder:validation:Optional
+	ServiceAnnotations map[string]string `json:"serviceAnnotations,omitempty"`
+
+	// +kubebuilder:validation:Optional
 	StatefulSetAnnotations map[string]string `json:"statefulSetAnnotations,omitempty"`
 
 	// +kubebuilder:validation:Optional
