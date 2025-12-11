@@ -6,7 +6,7 @@ metadata:
     app.kubernetes.io/managed-by: kustomize
   name: c-bm-1
 spec:
-  image: typesense/typesense:27.1
+  image: typesense/typesense:30.0.rc7-amd64
   replicas: 3
   storage:
     size: 100Mi
@@ -21,7 +21,8 @@ metadata:
   name: c-bm-2
 spec:
   image: typesense/typesense:30.0.rc7-amd64
-  replicas: 1
+  replicas: 3
   storage:
-    size: 100Mi
+    size: 1Gi
     storageClassName: nfs
+    accessMode: ReadWriteMany
