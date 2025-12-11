@@ -16,6 +16,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -258,6 +259,14 @@ func (r *TypesenseClusterReconciler) ReconcileIngress(ctx context.Context, ts ts
 		if err != nil {
 			r.logger.Error(err, "creating ingress reverse proxy service failed", "service", serviceNameObjectKey.Name)
 			return err
+		}
+	} else {
+		if !apiequality.Semantic.DeepEqual(service.Annotations, ts.Spec.Ingress.ServiceAnnotations) {
+			err = r.updateIngressService(ctx, service, &ts)
+			if err != nil {
+				r.logger.Error(err, "updating ingress reverse proxy service failed", "service", serviceNameObjectKey.Name)
+				return err
+			}
 		}
 	}
 
@@ -592,7 +601,7 @@ func (r *TypesenseClusterReconciler) createIngressDeployment(ctx context.Context
 
 func (r *TypesenseClusterReconciler) createIngressService(ctx context.Context, key client.ObjectKey, ts *tsv1alpha1.TypesenseCluster, ig *networkingv1.Ingress) (*v1.Service, error) {
 	service := &v1.Service{
-		ObjectMeta: getReverseProxyObjectMeta(ts, &key.Name, nil),
+		ObjectMeta: getReverseProxyObjectMeta(ts, &key.Name, ts.Spec.Ingress.ServiceAnnotations),
 		Spec: v1.ServiceSpec{
 			Type:     v1.ServiceTypeNodePort,
 			Selector: getReverseProxyLabels(ts),
@@ -618,4 +627,18 @@ func (r *TypesenseClusterReconciler) createIngressService(ctx context.Context, k
 	}
 
 	return service, nil
+}
+
+func (r *TypesenseClusterReconciler) updateIngressService(ctx context.Context, svc *v1.Service, ts *tsv1alpha1.TypesenseCluster) error {
+	patch := client.MergeFrom(svc.DeepCopy())
+	if svc.ObjectMeta.Annotations == nil {
+		svc.ObjectMeta.Annotations = map[string]string{}
+	}
+	svc.ObjectMeta.Annotations = ts.Spec.Ingress.ServiceAnnotations
+
+	if err := r.Patch(ctx, svc, patch); err != nil {
+		return err
+	}
+
+	return nil
 }

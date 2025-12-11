@@ -24,6 +24,9 @@ type IngressSpec struct {
 
 	IngressClassName string `json:"ingressClassName"`
 
+	// +kubebuilder:validation:Optional
+	ServiceAnnotations map[string]string `json:"serviceAnnotations,omitempty"`
+
 	Annotations map[string]string `json:"annotations,omitempty"`
 
 	// +optional

@@ -95,6 +95,13 @@ func (in *IngressSpec) DeepCopyInto(out *IngressSpec) {
 		*out = new(string)
 		**out = **in
 	}
+	if in.ServiceAnnotations != nil {
+		in, out := &in.ServiceAnnotations, &out.ServiceAnnotations
+		*out = make(map[string]string, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
 	if in.Annotations != nil {
 		in, out := &in.Annotations, &out.Annotations
 		*out = make(map[string]string, len(*in))

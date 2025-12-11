@@ -3245,6 +3245,10 @@ spec:
                     type: object
                   serverDirectives:
                     type: string
+                  serviceAnnotations:
+                    additionalProperties:
+                      type: string
+                    type: object
                   tlsSecretName:
                     type: string
                 required:

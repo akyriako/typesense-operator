@@ -63,7 +63,6 @@ spec:
   ingress:
     host: ts.example.com
     ingressClassName: nginx
-
 ---
 #apiVersion: v1
 #kind: ConfigMap
