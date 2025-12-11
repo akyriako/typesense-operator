@@ -3457,6 +3457,16 @@ spec:
                 type: object
               storage:
                 properties:
+                  accessMode:
+                    default: ReadWriteOnce
+                    enum:
+                    - ReadWriteOnce
+                    - ReadWriteMany
+                    type: string
+                  annotations:
+                    additionalProperties:
+                      type: string
+                    type: object
                   size:
                     anyOf:
                     - type: integer

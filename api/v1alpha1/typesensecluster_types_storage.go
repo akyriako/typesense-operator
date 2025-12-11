@@ -9,6 +9,13 @@ type StorageSpec struct {
 	Size resource.Quantity `json:"size,omitempty"`
 
 	StorageClassName string `json:"storageClassName"`
+
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:Enum=ReadWriteOnce;ReadWriteMany
+	// +kubebuilder:default:=ReadWriteOnce
+	AccessMode string `json:"accessMode,omitempty"`
+
+	Annotations map[string]string `json:"annotations,omitempty"`
 }
 
 func (s *TypesenseClusterSpec) GetStorage() StorageSpec {
@@ -19,5 +26,6 @@ func (s *TypesenseClusterSpec) GetStorage() StorageSpec {
 	return StorageSpec{
 		Size:             resource.MustParse("100Mi"),
 		StorageClassName: "standard",
+		AccessMode:       "ReadWriteOnce",
 	}
 }

@@ -444,12 +444,13 @@ func (r *TypesenseClusterReconciler) buildStatefulSet(ctx context.Context, key c
 			VolumeClaimTemplates: []corev1.PersistentVolumeClaim{
 				{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:   "data",
-						Labels: getLabels(ts),
+						Name:        "data",
+						Labels:      getLabels(ts),
+						Annotations: ts.Spec.GetStorage().Annotations,
 					},
 					Spec: corev1.PersistentVolumeClaimSpec{
 						AccessModes: []corev1.PersistentVolumeAccessMode{
-							corev1.ReadWriteOnce,
+							corev1.PersistentVolumeAccessMode(ts.Spec.GetStorage().AccessMode),
 						},
 						Resources: corev1.VolumeResourceRequirements{
 							Requests: corev1.ResourceList{
