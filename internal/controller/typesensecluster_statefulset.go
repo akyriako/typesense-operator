@@ -225,7 +225,7 @@ func (r *TypesenseClusterReconciler) buildStatefulSet(ctx context.Context, key c
 						FSGroup:      ptr.To[int64](2000),
 						RunAsGroup:   ptr.To[int64](3000),
 						RunAsNonRoot: ptr.To[bool](true)},
-					TerminationGracePeriodSeconds: ptr.To[int64](5),
+					TerminationGracePeriodSeconds: ptr.To[int64](10),
 					ReadinessGates: []corev1.PodReadinessGate{
 						{
 							ConditionType: QuorumReadinessGateCondition,
@@ -302,6 +302,15 @@ func (r *TypesenseClusterReconciler) buildStatefulSet(ctx context.Context, key c
 								{
 									MountPath: "/usr/share/typesense/data",
 									Name:      "data",
+								},
+							},
+							// typesense exits immediately most times but services/ingresses can take time to propagate the fact a pod is going down
+							// this gives 7s for the kubernetes cluster to sync the fact a pod is going away before sending a sigterm
+							Lifecycle: &corev1.Lifecycle{
+								PreStop: &corev1.LifecycleHandler{
+									Sleep: &corev1.SleepAction{
+										Seconds: 7,
+									},
 								},
 							},
 						},
