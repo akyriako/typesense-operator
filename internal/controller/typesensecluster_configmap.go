@@ -29,7 +29,7 @@ func (r *TypesenseClusterReconciler) ReconcileConfigMap(ctx context.Context, ts 
 	configMapExists := true
 	configMapObjectKey := client.ObjectKey{Namespace: ts.Namespace, Name: configMapName}
 
-	var cm = &v1.ConfigMap{}
+	cm := &v1.ConfigMap{}
 	if err := r.Get(ctx, configMapObjectKey, cm); err != nil {
 		if apierrors.IsNotFound(err) {
 			configMapExists = false
@@ -95,7 +95,7 @@ func (r *TypesenseClusterReconciler) updateConfigMap(ctx context.Context, ts *ts
 		Namespace: ts.Namespace,
 	}
 
-	var sts = &appsv1.StatefulSet{}
+	sts := &appsv1.StatefulSet{}
 	if err := r.Get(ctx, stsObjectKey, sts); err != nil {
 		if apierrors.IsNotFound(err) {
 			err := r.deleteConfigMap(ctx, cm)
@@ -124,6 +124,22 @@ func (r *TypesenseClusterReconciler) updateConfigMap(ctx context.Context, ts *ts
 
 	availableNodes := len(nodes)
 	if availableNodes == 0 {
+		if r.allPodsUnscheduleable(ctx, sts) || r.isClusterInitializing(ctx, ts, sts) {
+			reason := "all pods are unscheduleable"
+			if r.isClusterInitializing(ctx, ts, sts) {
+				reason = "cluster is initializing"
+			}
+			r.logger.V(debugLevel).Info("allowing empty quorum configuration", "reason", reason)
+
+			desired := cm.DeepCopy()
+			desired.Data = map[string]string{
+				"nodes":    "",
+				"fallback": "",
+			}
+
+			return desired, 0, false, nil
+		}
+
 		r.logger.V(debugLevel).Info("empty quorum configuration")
 		return nil, 0, false, fmt.Errorf("empty quorum configuration")
 	}
@@ -234,7 +250,7 @@ func (r *TypesenseClusterReconciler) getNodes(ctx context.Context, ts *tsv1alpha
 	for _, s := range slices {
 		for _, e := range s.Endpoints {
 			addr := e.Addresses[0]
-			//r.logger.V(debugLevel).Info("discovered slice endpoint", "slice", s.Name, "endpoint", e.Hostname, "address", addr)
+			// r.logger.V(debugLevel).Info("discovered slice endpoint", "slice", s.Name, "endpoint", e.Hostname, "address", addr)
 			nodes = append(nodes, fmt.Sprintf("%s:%d:%d", addr, ts.Spec.PeeringPort, ts.Spec.ApiPort))
 
 			i++
@@ -324,4 +340,45 @@ func (r *TypesenseClusterReconciler) getShortName(raftNodeEndpoint string) strin
 	}
 
 	return host
+}
+
+func (r *TypesenseClusterReconciler) isClusterInitializing(ctx context.Context, ts *tsv1alpha1.TypesenseCluster, sts *appsv1.StatefulSet) bool {
+	clusterAge := time.Since(ts.CreationTimestamp.Time)
+	if clusterAge < 10*time.Minute && sts.Status.ReadyReplicas == 0 {
+		return true
+	}
+
+	if sts.Status.CurrentReplicas == 0 && sts.Status.ReadyReplicas == 0 {
+		return true
+	}
+
+	return false
+}
+
+func (r *TypesenseClusterReconciler) allPodsUnscheduleable(ctx context.Context, sts *appsv1.StatefulSet) bool {
+	labelSelector := labels.SelectorFromSet(sts.Spec.Selector.MatchLabels)
+	var podList v1.PodList
+	if err := r.List(ctx, &podList, &client.ListOptions{
+		Namespace:     sts.Namespace,
+		LabelSelector: labelSelector,
+	}); err != nil {
+		r.logger.Error(err, "failed to list pods", "statefulset", sts.Name)
+		return false
+	}
+
+	if len(podList.Items) == 0 {
+		return false
+	}
+
+	unscheduleable := 0
+	for _, pod := range podList.Items {
+		for _, condition := range pod.Status.Conditions {
+			if condition.Type == v1.PodScheduled && condition.Status == v1.ConditionFalse && condition.Reason == v1.PodReasonUnschedulable {
+				unscheduleable++
+				break
+			}
+		}
+	}
+
+	return unscheduleable == len(podList.Items)
 }
