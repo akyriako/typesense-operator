@@ -3459,6 +3459,16 @@ spec:
                     x-kubernetes-int-or-string: true
                   storageClassName:
                     type: string
+                  accessMode:
+                    default: ReadWriteOnce
+                    enum:
+                    - ReadWriteOnce
+                    - ReadWriteMany
+                    type: string
+                  annotations:
+                    additionalProperties:
+                      type: string
+                    type: object
                 required:
                 - storageClassName
                 type: object
