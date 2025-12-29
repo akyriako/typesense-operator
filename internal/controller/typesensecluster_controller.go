@@ -52,6 +52,7 @@ type TypesenseClusterReconciler struct {
 	ClientSet       *kubernetes.Clientset
 	Configuration   *rest.Config
 	InCluster       bool
+	IsOpenshift     bool
 }
 
 type TypesenseClusterReconciliationPhase struct {

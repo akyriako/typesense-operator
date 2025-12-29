@@ -5,6 +5,9 @@ controllerManager:
     - --leader-elect
     - --health-probe-bind-address=:8081
     - --zap-log-level=debug
+    # OpenShift is auto-detected at runtime. To explicitly enable/disable OpenShift mode set
+    # openshiftAdaptSecurityContext to "force" or "disabled"
+    openshiftAdaptSecurityContext: auto
     containerSecurityContext:
       allowPrivilegeEscalation: false
       capabilities:

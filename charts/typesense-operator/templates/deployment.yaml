@@ -21,6 +21,11 @@ spec:
     spec:
       containers:
       - args: {{- toYaml .Values.controllerManager.manager.args | nindent 8 }}
+{{- if (eq .Values.controllerManager.manager.openshiftAdaptSecurityContext "force") }}
+        - --is-openshift=true
+{{- else if (eq .Values.controllerManager.manager.openshiftAdaptSecurityContext "disabled") }}
+        - --is-openshift=false
+{{- end }}
         command:
         - /manager
         env:

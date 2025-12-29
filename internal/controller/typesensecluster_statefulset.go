@@ -220,11 +220,17 @@ func (r *TypesenseClusterReconciler) buildStatefulSet(ctx context.Context, key c
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: getObjectMeta(ts, &key.Name, podAnnotations),
 				Spec: corev1.PodSpec{
-					SecurityContext: &corev1.PodSecurityContext{
-						RunAsUser:    ptr.To[int64](10000),
-						FSGroup:      ptr.To[int64](2000),
-						RunAsGroup:   ptr.To[int64](3000),
-						RunAsNonRoot: ptr.To[bool](true)},
+					SecurityContext: func() *corev1.PodSecurityContext {
+						securityContext := &corev1.PodSecurityContext{
+							RunAsGroup:   ptr.To[int64](3000),
+							RunAsNonRoot: ptr.To[bool](true),
+						}
+						if !r.IsOpenshift {
+							securityContext.RunAsUser = ptr.To[int64](10000)
+							securityContext.FSGroup = ptr.To[int64](2000)
+						}
+						return securityContext
+					}(),
 					TerminationGracePeriodSeconds: ptr.To[int64](5),
 					ReadinessGates: []corev1.PodReadinessGate{
 						{

@@ -22,6 +22,7 @@ import (
 	"os"
 
 	"go.uber.org/zap/zapcore"
+	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/kubernetes"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
@@ -29,7 +30,6 @@ import (
 
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 
-	_ "k8s.io/client-go/discovery"
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
 	tsv1alpha1 "github.com/akyriako/typesense-operator/api/v1alpha1"
@@ -69,6 +69,7 @@ func main() {
 	var probeAddr string
 	var secureMetrics bool
 	var enableHTTP2 bool
+	var isOpenshift *bool
 	var tlsOpts []func(*tls.Config)
 	flag.StringVar(&metricsAddr, "metrics-bind-address", "0", "The address the metrics endpoint binds to. "+
 		"Use :8443 for HTTPS or :8080 for HTTP, or leave as 0 to disable the metrics service.")
@@ -80,6 +81,11 @@ func main() {
 		"If set, the metrics endpoint is served securely via HTTPS. Use --metrics-secure=false to use HTTP instead.")
 	flag.BoolVar(&enableHTTP2, "enable-http2", false,
 		"If set, HTTP/2 will be enabled for the metrics and webhook servers")
+	flag.Func("is-openshift", "Explicitly enable or disable OpenShift compatibility mode. If not set, the controller will auto-detect OpenShift at runtime. In this mode RunAsUser and FSGroup security context rules will be omitted. (true|false)", func(s string) error {
+		val := s == "true"
+		isOpenshift = &val
+		return nil
+	})
 
 	opts := zap.Options{
 		Development:     true,
@@ -166,6 +172,31 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Determine final isOpenshift value:
+	// - If flag is not set (nil), auto-detect OpenShift
+	// - If flag is explicitly set to false, keep it false (no detection)
+	// - If flag is explicitly set to true, keep it true (no detection)
+	var finalIsOpenshift bool
+	if isOpenshift == nil {
+		// Flag not set, run auto-detection
+		detected, err := detectOpenShift(clientSet.DiscoveryClient)
+		if err != nil {
+			setupLog.V(1).Info("unable to detect OpenShift, assuming false", "error", err)
+			finalIsOpenshift = false
+		} else {
+			finalIsOpenshift = detected
+			if detected {
+				setupLog.Info("OpenShift cluster detected, enabling OpenShift compatibility mode")
+			}
+		}
+	} else {
+		// Flag was explicitly set, use its value
+		finalIsOpenshift = *isOpenshift
+		if finalIsOpenshift {
+			setupLog.Info("OpenShift compatibility mode enabled")
+		}
+	}
+
 	//discoveryClient, err := discovery.NewDiscoveryClientForConfig(kubeConfig)
 	//if err != nil {
 	//	setupLog.Error(err, "unable to create discovery client")
@@ -179,6 +210,7 @@ func main() {
 		DiscoveryClient: clientSet.DiscoveryClient,
 		Configuration:   mgr.GetConfig(),
 		InCluster:       isInCluster(),
+		IsOpenshift:     finalIsOpenshift,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "TypesenseCluster")
 		os.Exit(1)
@@ -213,4 +245,19 @@ func isInCluster() bool {
 	}
 
 	return inCluster
+}
+
+func detectOpenShift(discoveryClient *discovery.DiscoveryClient) (bool, error) {
+	apiGroupList, err := discoveryClient.ServerGroups()
+	if err != nil {
+		return false, err
+	}
+
+	for _, apiGroup := range apiGroupList.Groups {
+		if apiGroup.Name == "security.openshift.io" {
+			return true, nil
+		}
+	}
+
+	return false, nil
 }
