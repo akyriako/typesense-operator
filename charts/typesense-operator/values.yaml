@@ -24,6 +24,9 @@ controllerManager:
   podSecurityContext:
     runAsNonRoot: true
   replicas: 1
+  affinity: {}
+  nodeSelector: {}
+  tolerations: []
   serviceAccount:
     annotations: {}
 imagePullSecrets: []

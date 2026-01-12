@@ -18,6 +18,29 @@ helm repo update
 helm upgrade --install typesense-operator tyko/typesense-operator -n typesense-system --create-namespace
 ```
 
+## 🏗️ High Availability
+
+Deploy with multiple replicas and pod anti-affinity:
+
+```yaml
+# values.yaml
+controllerManager:
+  replicas: 2
+  affinity:
+    podAntiAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        - labelSelector:
+            matchExpressions:
+              - key: control-plane
+                operator: In
+                values: [controller-manager]
+          topologyKey: kubernetes.io/hostname
+```
+
+For more options, see [Kubernetes Pod Scheduling](https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/).
+
+```
+
 <details>
 <summary>Quick example for Open Telekom Cloud CCE</summary>
 
