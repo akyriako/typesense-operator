@@ -35,6 +35,17 @@ metadata:
   name: c-kind-1
 spec:
   image: typesense/typesense:30.0.rc27-amd64
+  securityContext:
+    pod:
+      runAsUser: 11000
+      fsGroup: 2000
+      runAsGroup: 3000
+      runAsNonRoot: true
+#    healthcheck:
+#      allowPrivilegeEscalation: false
+#      readOnlyRootFilesystem: true
+#      capabilities:
+#        drop: [ "ALL" ]
   replicas: 7
   corsDomains: "http://localhost,https://www.example.de"
   statefulSetAnnotations:

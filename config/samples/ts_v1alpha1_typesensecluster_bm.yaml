@@ -7,6 +7,17 @@ metadata:
   name: c-bm-1
 spec:
   image: typesense/typesense:30.0.rc7-amd64
+  securityContext:
+    pod:
+      runAsUser: 11000
+      fsGroup: 2000
+      runAsGroup: 3000
+      runAsNonRoot: true
+    healthcheck:
+      allowPrivilegeEscalation: false
+      readOnlyRootFilesystem: true
+      capabilities:
+        drop: [ "ALL" ]
   replicas: 3
   storage:
     size: 100Mi

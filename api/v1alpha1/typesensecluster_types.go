@@ -128,6 +128,8 @@ type TypesenseClusterSpec struct {
 	// +kubebuilder:validation:Optional
 	PriorityClassName *string `json:"priorityClassName,omitempty"`
 
+	SecurityContext *SecurityContextSpec `json:"securityContext,omitempty"`
+
 	// +optional
 	// +kubebuilder:default=false
 	// +kubebuilder:validation:Type=boolean
