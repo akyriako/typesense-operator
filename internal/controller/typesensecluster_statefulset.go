@@ -79,7 +79,7 @@ func (r *TypesenseClusterReconciler) ReconcileStatefulSet(ctx context.Context, t
 			string(ConditionReasonQuorumNotReadyWaitATerm),
 		}
 
-		if _, contains := contains(skipConditions, r.getConditionReady(ts).Reason); !contains {
+		if _, contains := contains(skipConditions, r.getConditionReady(ts).Reason); !contains || r.shouldEmergencyUpdateStatefulSet(sts, ts) {
 			desiredSts, err := r.buildStatefulSet(ctx, stsObjectKey, ts)
 			if err != nil {
 				r.logger.Error(err, "building statefulset failed", "sts", stsObjectKey.Name)
@@ -220,11 +220,7 @@ func (r *TypesenseClusterReconciler) buildStatefulSet(ctx context.Context, key c
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: getObjectMeta(ts, &key.Name, podAnnotations),
 				Spec: corev1.PodSpec{
-					SecurityContext: &corev1.PodSecurityContext{
-						RunAsUser:    ptr.To[int64](10000),
-						FSGroup:      ptr.To[int64](2000),
-						RunAsGroup:   ptr.To[int64](3000),
-						RunAsNonRoot: ptr.To[bool](true)},
+					SecurityContext:               ts.Spec.GetPodSecurityContext(),
 					TerminationGracePeriodSeconds: ptr.To[int64](5),
 					ReadinessGates: []corev1.PodReadinessGate{
 						{
@@ -238,6 +234,7 @@ func (r *TypesenseClusterReconciler) buildStatefulSet(ctx context.Context, key c
 							Name:            "typesense",
 							Image:           ts.Spec.Image,
 							ImagePullPolicy: corev1.PullIfNotPresent,
+							SecurityContext: ts.Spec.GetTypesenseSecurityContext(),
 							Ports: []corev1.ContainerPort{
 								{
 									Name:          "http",
@@ -309,6 +306,7 @@ func (r *TypesenseClusterReconciler) buildStatefulSet(ctx context.Context, key c
 							Name:            "metrics-exporter",
 							Image:           ts.Spec.GetMetricsExporterSpecs().Image,
 							ImagePullPolicy: corev1.PullIfNotPresent,
+							SecurityContext: ts.Spec.GetMetricsSecurityContext(),
 							Ports: []corev1.ContainerPort{
 								{
 									Name:          "metrics",
@@ -358,6 +356,7 @@ func (r *TypesenseClusterReconciler) buildStatefulSet(ctx context.Context, key c
 							Name:            "healthcheck",
 							Image:           ts.Spec.GetHealthCheckSidecarSpecs().Image,
 							ImagePullPolicy: corev1.PullIfNotPresent,
+							SecurityContext: ts.Spec.GetHealthcheckSecurityContext(),
 							Ports: []corev1.ContainerPort{
 								{
 									Name:          "healthcheck",
@@ -515,14 +514,40 @@ func (r *TypesenseClusterReconciler) buildStatefulSet(ctx context.Context, key c
 }
 
 func (r *TypesenseClusterReconciler) shouldUpdateStatefulSet(sts *appsv1.StatefulSet, desired *appsv1.StatefulSet, ts *tsv1alpha1.TypesenseCluster) bool {
-	//return false
-
 	if *sts.Spec.Replicas != ts.Spec.Replicas &&
 		(r.getConditionReady(ts).Reason != string(ConditionReasonQuorumDowngraded) || r.getConditionReady(ts).Reason != string(ConditionReasonQuorumQueuedWrites)) {
 		return true
 	}
 
 	if sts.Spec.Template.Annotations[hashAnnotationKey] != desired.Spec.Template.Annotations[hashAnnotationKey] {
+		return true
+	}
+
+	return false
+}
+
+func (r *TypesenseClusterReconciler) shouldEmergencyUpdateStatefulSet(sts *appsv1.StatefulSet, ts *tsv1alpha1.TypesenseCluster) bool {
+	if sts == nil || ts == nil {
+		return false
+	}
+
+	if !apiequality.Semantic.DeepEqual(sts.Spec.Template.Spec.SecurityContext, ts.Spec.GetPodSecurityContext()) {
+		return true
+	}
+
+	if len(sts.Spec.Template.Spec.Containers) < 3 {
+		return true
+	}
+
+	if !apiequality.Semantic.DeepEqual(sts.Spec.Template.Spec.Containers[0].SecurityContext, ts.Spec.GetTypesenseSecurityContext()) {
+		return true
+	}
+
+	if !apiequality.Semantic.DeepEqual(sts.Spec.Template.Spec.Containers[1].SecurityContext, ts.Spec.GetMetricsSecurityContext()) {
+		return true
+	}
+
+	if !apiequality.Semantic.DeepEqual(sts.Spec.Template.Spec.Containers[2].SecurityContext, ts.Spec.GetHealthcheckSecurityContext()) {
 		return true
 	}
 
