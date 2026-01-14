@@ -150,7 +150,7 @@ func (r *TypesenseClusterReconciler) ReconcileQuorum(ctx context.Context, ts *ts
 
 	r.logger.Info("evaluated quorum", "minRequiredNodes", minRequiredNodes, "availableNodes", availableNodes, "healthyNodes", healthyNodes)
 
-	if queuedWrites > healthyWriteLagThreshold {
+	if (queuedWrites > healthyWriteLagThreshold) && healthyNodes > 0 {
 		return ConditionReasonQuorumNeedsAttentionClusterIsLagging, 0, nil
 	}
 
@@ -171,7 +171,7 @@ func (r *TypesenseClusterReconciler) ReconcileQuorum(ctx context.Context, ts *ts
 
 			if state == ErrorState || state == UnreachableState {
 				r.logger.Info("purging quorum")
-				err := r.PurgeStatefulSetPods(ctx, sts)
+				err := r.PurgeStatefulSetPods(ctx, sts, ts)
 				if err != nil {
 					return ConditionReasonQuorumNotReady, 0, err
 				}
@@ -196,6 +196,10 @@ func (r *TypesenseClusterReconciler) ReconcileQuorum(ctx context.Context, ts *ts
 	}
 
 	if healthyNodes < minRequiredNodes {
+		if clusterStatus == ClusterStatusOK {
+			return r.downgradeQuorum(ctx, ts, quorum.NodesListConfigMap, stsObjectKey, int32(healthyNodes), int32(minRequiredNodes))
+		}
+
 		return ConditionReasonQuorumNotReady, 0, nil
 	}
 
@@ -216,29 +220,39 @@ func (r *TypesenseClusterReconciler) downgradeQuorum(
 		return ConditionReasonQuorumNotReady, 0, err
 	}
 
-	if healthyNodes == 0 && minRequiredNodes == 1 {
-		r.logger.Info("purging quorum")
-		err := r.PurgeStatefulSetPods(ctx, sts)
+	scaleDownStatefulSet := func(objKey client.ObjectKey) (ConditionQuorum, int, error) {
+		desiredReplicas := int32(1)
+
+		err = r.ScaleStatefulSet(ctx, objKey, desiredReplicas)
 		if err != nil {
 			return ConditionReasonQuorumNotReady, 0, err
 		}
 
-		return ConditionReasonQuorumNotReady, 0, nil
+		_, size, _, err := r.updateConfigMap(ctx, ts, cm, ptr.To[int32](desiredReplicas), true)
+		if err != nil {
+			return ConditionReasonQuorumNotReady, 0, err
+		}
+
+		return ConditionReasonQuorumDowngraded, size, nil
 	}
 
-	desiredReplicas := int32(1)
+	if healthyNodes == 0 && minRequiredNodes == 1 {
+		r.logger.Info("purging quorum")
 
-	err = r.ScaleStatefulSet(ctx, stsObjectKey, desiredReplicas)
-	if err != nil {
-		return ConditionReasonQuorumNotReady, 0, err
+		condition, size, err := scaleDownStatefulSet(stsObjectKey)
+		if err != nil {
+			return condition, size, err
+		}
+
+		err = r.PurgeStatefulSetPods(ctx, sts, ts)
+		if err != nil {
+			return ConditionReasonQuorumNotReady, 0, err
+		}
+
+		return ConditionReasonQuorumDowngraded, size, nil
 	}
 
-	_, size, _, err := r.updateConfigMap(ctx, ts, cm, ptr.To[int32](desiredReplicas), true)
-	if err != nil {
-		return ConditionReasonQuorumNotReady, 0, err
-	}
-
-	return ConditionReasonQuorumDowngraded, size, nil
+	return scaleDownStatefulSet(stsObjectKey)
 }
 
 func (r *TypesenseClusterReconciler) upgradeQuorum(

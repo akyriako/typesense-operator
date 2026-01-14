@@ -27,6 +27,7 @@ const (
 	ConditionReasonQuorumNotReadyWaitATerm               ConditionQuorum = "QuorumNotReadyWaitATerm"
 	ConditionReasonQuorumDowngraded                      ConditionQuorum = "QuorumDowngraded"
 	ConditionReasonQuorumUpgraded                        ConditionQuorum = "QuorumUpgraded"
+	ConditionReasonQuorumPurged                          ConditionQuorum = "QuorumPurged"
 	ConditionReasonQuorumNeedsAttentionMemoryOrDiskIssue ConditionQuorum = "QuorumNeedsAttentionMemoryOrDiskIssue"
 	ConditionReasonQuorumNeedsAttentionClusterIsLagging  ConditionQuorum = "QuorumNeedsAttentionClusterIsLagging"
 	ConditionReasonQuorumQueuedWrites                    ConditionQuorum = "QuorumQueuedWrites"
