@@ -150,7 +150,7 @@ func (r *TypesenseClusterReconciler) ReconcileQuorum(ctx context.Context, ts *ts
 
 	r.logger.Info("evaluated quorum", "minRequiredNodes", minRequiredNodes, "availableNodes", availableNodes, "healthyNodes", healthyNodes)
 
-	if queuedWrites > healthyWriteLagThreshold {
+	if (queuedWrites > healthyWriteLagThreshold) && healthyNodes > 0 {
 		return ConditionReasonQuorumNeedsAttentionClusterIsLagging, 0, nil
 	}
 
@@ -171,7 +171,7 @@ func (r *TypesenseClusterReconciler) ReconcileQuorum(ctx context.Context, ts *ts
 
 			if state == ErrorState || state == UnreachableState {
 				r.logger.Info("purging quorum")
-				err := r.PurgeStatefulSetPods(ctx, sts)
+				err := r.PurgeStatefulSetPods(ctx, sts, ts)
 				if err != nil {
 					return ConditionReasonQuorumNotReady, 0, err
 				}
@@ -196,6 +196,10 @@ func (r *TypesenseClusterReconciler) ReconcileQuorum(ctx context.Context, ts *ts
 	}
 
 	if healthyNodes < minRequiredNodes {
+		if clusterStatus == ClusterStatusOK {
+			return r.downgradeQuorum(ctx, ts, quorum.NodesListConfigMap, stsObjectKey, int32(healthyNodes), int32(minRequiredNodes))
+		}
+
 		return ConditionReasonQuorumNotReady, 0, nil
 	}
 
@@ -240,7 +244,7 @@ func (r *TypesenseClusterReconciler) downgradeQuorum(
 			return condition, size, err
 		}
 
-		err = r.PurgeStatefulSetPods(ctx, sts)
+		err = r.PurgeStatefulSetPods(ctx, sts, ts)
 		if err != nil {
 			return ConditionReasonQuorumNotReady, 0, err
 		}

@@ -8,6 +8,8 @@ import (
 	"sort"
 
 	tsv1alpha1 "github.com/akyriako/typesense-operator/api/v1alpha1"
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -180,4 +182,8 @@ var ip4Prefix = regexp.MustCompile(
 
 func hasIP4Prefix(s string) bool {
 	return ip4Prefix.MatchString(s)
+}
+
+func toTitle(s string) string {
+	return cases.Title(language.Und, cases.NoLower).String(s)
 }
