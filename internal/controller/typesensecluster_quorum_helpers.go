@@ -334,7 +334,7 @@ func (r *TypesenseClusterReconciler) getPodLogs(ctx context.Context, node NodeEn
 	req := r.ClientSet.CoreV1().Pods(namespace).GetLogs(node.PodName, opts)
 	raw, err := req.DoRaw(ctx)
 	if err != nil {
-		r.logger.Error(err, "failed to get pod logs: %v")
+		r.logger.Error(err, "failed to get pod logs", "pod", node.PodName, "ip", node.IP)
 		return "", err
 	}
 

@@ -6,7 +6,7 @@ metadata:
     app.kubernetes.io/managed-by: kustomize
   name: c-bm-1
 spec:
-  image: typesense/typesense:30.0.rc7-amd64
+  image: typesense/typesense:30.0.rca39-amd64
   securityContext:
     pod:
       runAsUser: 11000
@@ -42,5 +42,5 @@ spec:
       cpu: "1000m"
       memory: "131072Mi"
     requests:
-      cpu: "100m"
-      memory: "256Mi"
+      cpu: "1000m"
+      memory: "131072Mi"
