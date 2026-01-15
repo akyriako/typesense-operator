@@ -201,8 +201,7 @@ func (r *TypesenseClusterReconciler) forcePodsConfigMapUpdate(ctx context.Contex
 
 func (r *TypesenseClusterReconciler) getNodes(ctx context.Context, ts *tsv1alpha1.TypesenseCluster, replicas int32, bootstrapping bool) ([]string, error) {
 	nodes := make([]string, 0)
-
-	if bootstrapping {
+	getFallbackNodes := func(nodes []string) ([]string, error) {
 		for i := 0; i < int(replicas); i++ {
 			nodeName := fmt.Sprintf("%s-sts-%d.%s-sts-svc", ts.Name, i, ts.Name)
 			if len(nodeName) > nodeNameLenLimit {
@@ -215,6 +214,10 @@ func (r *TypesenseClusterReconciler) getNodes(ctx context.Context, ts *tsv1alpha
 		return nodes, nil
 	}
 
+	unscheduledPods := int32(0)
+	targetReplicas := replicas
+
+	stsExists := true
 	stsName := fmt.Sprintf(ClusterStatefulSet, ts.Name)
 	stsObjectKey := client.ObjectKey{
 		Name:      stsName,
@@ -222,7 +225,37 @@ func (r *TypesenseClusterReconciler) getNodes(ctx context.Context, ts *tsv1alpha
 	}
 	sts, err := r.GetFreshStatefulSet(ctx, stsObjectKey)
 	if err != nil {
-		return nil, err
+		stsExists = false
+		unscheduledPods = replicas
+	}
+
+	if stsExists {
+		labelSelector := labels.SelectorFromSet(sts.Spec.Selector.MatchLabels)
+
+		var pods v1.PodList
+		if err := r.List(ctx, &pods, &client.ListOptions{
+			Namespace:     sts.Namespace,
+			LabelSelector: labelSelector,
+		}); err != nil {
+			r.logger.Error(err, "failed to list pods", "statefulset", sts.Name)
+			return getFallbackNodes(nodes)
+		}
+
+		for _, pod := range pods.Items {
+			if pod.Status.Phase == v1.PodPending {
+				for _, cond := range pod.Status.Conditions {
+					if cond.Type == v1.PodScheduled && cond.Status == v1.ConditionFalse && cond.Reason == v1.PodReasonUnschedulable {
+						unscheduledPods++
+					}
+				}
+			}
+		}
+
+		targetReplicas = *sts.Spec.Replicas
+	}
+
+	if bootstrapping || unscheduledPods == targetReplicas {
+		return getFallbackNodes(nodes)
 	}
 
 	slices, err := r.getEndpointSlicesForStatefulSet(ctx, sts)

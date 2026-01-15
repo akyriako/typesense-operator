@@ -41,6 +41,11 @@ func (r *TypesenseClusterReconciler) ReconcileQuorum(ctx context.Context, ts *ts
 		r.logger.Info("resizing quorum pending", "size", ts.Spec.Replicas)
 	}
 
+	unscheduledPods, _ := r.GetUnscheduledPods(ctx, sts)
+	if len(unscheduledPods) > 0 {
+		_ = r.RestartUnscheduledPods(ctx, unscheduledPods, ts)
+	}
+
 	if quorum.AvailableNodes < quorum.MinRequiredNodes {
 		return ConditionReasonStatefulSetNotReady, 0, nil
 	}
@@ -108,7 +113,7 @@ func (r *TypesenseClusterReconciler) ReconcileQuorum(ctx context.Context, ts *ts
 	clusterNeedsAttention := false
 	nodesHealth := make(map[string]bool)
 
-	for o, key := range nodeKeys {
+	for _, key := range nodeKeys {
 		node := key
 		ip := quorum.Nodes[key]
 		ne := NodeEndpoint{
@@ -124,7 +129,9 @@ func (r *TypesenseClusterReconciler) ReconcileQuorum(ctx context.Context, ts *ts
 
 		nodesHealth[node], _ = strconv.ParseBool(string(condition.Status))
 
-		podName := fmt.Sprintf("%s-%d", fmt.Sprintf(ClusterStatefulSet, ts.Name), o)
+		podPrefix := fmt.Sprintf(ClusterStatefulSet, ts.Name)
+		podIndex := strings.Replace(key, fmt.Sprintf("%s-", podPrefix), "", -1)
+		podName := fmt.Sprintf("%s-%s", podPrefix, podIndex)
 		podObjectKey := client.ObjectKey{Namespace: ts.Namespace, Name: podName}
 
 		err = r.updatePodReadinessGate(ctx, podObjectKey, condition)
@@ -196,9 +203,9 @@ func (r *TypesenseClusterReconciler) ReconcileQuorum(ctx context.Context, ts *ts
 	}
 
 	if healthyNodes < minRequiredNodes {
-		if clusterStatus == ClusterStatusOK {
-			return r.downgradeQuorum(ctx, ts, quorum.NodesListConfigMap, stsObjectKey, int32(healthyNodes), int32(minRequiredNodes))
-		}
+		//if clusterStatus == ClusterStatusOK {
+		//	return r.downgradeQuorum(ctx, ts, quorum.NodesListConfigMap, stsObjectKey, int32(healthyNodes), int32(minRequiredNodes))
+		//}
 
 		return ConditionReasonQuorumNotReady, 0, nil
 	}
@@ -332,7 +339,6 @@ func (r *TypesenseClusterReconciler) calculatePodReadinessGate(ctx context.Conte
 }
 
 func (r *TypesenseClusterReconciler) updatePodReadinessGate(ctx context.Context, podObjectKey client.ObjectKey, condition *v1.PodCondition) error {
-
 	pod := &v1.Pod{}
 	err := r.Get(ctx, podObjectKey, pod)
 	if err != nil {
@@ -365,5 +371,6 @@ func (r *TypesenseClusterReconciler) updatePodReadinessGate(ctx context.Context,
 		return err
 	}
 
+	//r.logger.V(debugLevel).Info("updating pod readiness gate condition", "pod", pod.Name, "condition", condition.Type, "conditionStatus", condition.Status)
 	return nil
 }

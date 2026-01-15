@@ -37,3 +37,10 @@ spec:
     size: 1Gi
     storageClassName: nfs
     accessMode: ReadWriteMany
+  resources:
+    limits:
+      cpu: "1000m"
+      memory: "131072Mi"
+    requests:
+      cpu: "1000m"
+      memory: "131072Mi"
