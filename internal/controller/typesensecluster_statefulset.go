@@ -79,7 +79,8 @@ func (r *TypesenseClusterReconciler) ReconcileStatefulSet(ctx context.Context, t
 			string(ConditionReasonQuorumNotReadyWaitATerm),
 		}
 
-		if _, contains := contains(skipConditions, r.getConditionReady(ts).Reason); !contains || r.shouldEmergencyUpdateStatefulSet(sts, ts) {
+		emergencyUpdateRequired := r.shouldEmergencyUpdateStatefulSet(sts, ts)
+		if _, contains := contains(skipConditions, r.getConditionReady(ts).Reason); !contains || emergencyUpdateRequired {
 			desiredSts, err := r.buildStatefulSet(ctx, stsObjectKey, ts)
 			if err != nil {
 				r.logger.Error(err, "building statefulset failed", "sts", stsObjectKey.Name)
@@ -91,7 +92,8 @@ func (r *TypesenseClusterReconciler) ReconcileStatefulSet(ctx context.Context, t
 
 			if r.shouldUpdateStatefulSet(sts, desiredSts, ts) ||
 				!apiequality.Semantic.DeepEqual(podAnnotations, desiredSts.Spec.Template.Annotations) ||
-				!apiequality.Semantic.DeepEqual(stsAnnotations, desiredSts.ObjectMeta.Annotations) {
+				!apiequality.Semantic.DeepEqual(stsAnnotations, desiredSts.ObjectMeta.Annotations) ||
+				emergencyUpdateRequired {
 
 				r.logger.V(debugLevel).Info("updating statefulset", "sts", sts.Name)
 
@@ -531,6 +533,10 @@ func (r *TypesenseClusterReconciler) shouldEmergencyUpdateStatefulSet(sts *appsv
 		return false
 	}
 
+	if !apiequality.Semantic.DeepEqual(sts.Spec.Template.Spec.Containers[0].Resources, ts.Spec.GetResources()) {
+		return true
+	}
+
 	if !apiequality.Semantic.DeepEqual(sts.Spec.Template.Spec.SecurityContext, ts.Spec.GetPodSecurityContext()) {
 		return true
 	}
@@ -596,6 +602,95 @@ func (r *TypesenseClusterReconciler) PurgeStatefulSetPods(ctx context.Context, s
 	}
 
 	r.Recorder.Eventf(ts, "Warning", string(ConditionReasonQuorumPurged), toTitle("quorum has been purged"))
+
+	return nil
+}
+
+func (r *TypesenseClusterReconciler) GetUnscheduledPods(ctx context.Context, sts *appsv1.StatefulSet) ([]*corev1.Pod, error) {
+	labelSelector := labels.SelectorFromSet(sts.Spec.Selector.MatchLabels)
+
+	var pods corev1.PodList
+	if err := r.List(ctx, &pods, &client.ListOptions{
+		Namespace:     sts.Namespace,
+		LabelSelector: labelSelector,
+	}); err != nil {
+		r.logger.Error(err, "retrieving unscheduled pods: failed to list pods", "statefulset", sts.Name)
+		return nil, err
+	}
+
+	unscheduledPods := make([]*corev1.Pod, 0, len(pods.Items))
+	for _, pod := range pods.Items {
+		if pod.Status.Phase == corev1.PodPending {
+			for _, cond := range pod.Status.Conditions {
+				if cond.Type == corev1.PodScheduled && cond.Status == corev1.ConditionFalse && cond.Reason == corev1.PodReasonUnschedulable {
+					unscheduledPods = append(unscheduledPods, &pod)
+				}
+			}
+		}
+	}
+
+	return unscheduledPods, nil
+}
+
+func (r *TypesenseClusterReconciler) RestartUnscheduledPods(ctx context.Context, pods []*corev1.Pod, ts *tsv1alpha1.TypesenseCluster) error {
+	removedAny := false
+	for _, pod := range pods {
+		if pod.Status.Phase == corev1.PodPending {
+			for _, cond := range pod.Status.Conditions {
+				if cond.Type == corev1.PodScheduled && cond.Status == corev1.ConditionFalse && cond.Reason == corev1.PodReasonUnschedulable {
+					propagation := metav1.DeletePropagationBackground
+					err := r.Delete(ctx, pod, &client.DeleteOptions{
+						PropagationPolicy: &propagation,
+					})
+
+					if !removedAny {
+						removedAny = err == nil
+					}
+				}
+			}
+		}
+	}
+
+	if removedAny {
+		r.Recorder.Eventf(ts, "Warning", ConditionReasonStatefulSetNotReady, toTitle("removed unscheduled pods"))
+	}
+
+	return nil
+}
+
+func (r *TypesenseClusterReconciler) RestartAllUnscheduledPods(ctx context.Context, sts *appsv1.StatefulSet, ts *tsv1alpha1.TypesenseCluster) error {
+	labelSelector := labels.SelectorFromSet(sts.Spec.Selector.MatchLabels)
+
+	var pods corev1.PodList
+	if err := r.List(ctx, &pods, &client.ListOptions{
+		Namespace:     sts.Namespace,
+		LabelSelector: labelSelector,
+	}); err != nil {
+		r.logger.Error(err, "deleting unscheduled pods: failed to list pods", "statefulset", sts.Name)
+		return err
+	}
+
+	removedAny := false
+	for _, pod := range pods.Items {
+		if pod.Status.Phase == corev1.PodPending {
+			for _, cond := range pod.Status.Conditions {
+				if cond.Type == corev1.PodScheduled && cond.Status == corev1.ConditionFalse && cond.Reason == corev1.PodReasonUnschedulable {
+					propagation := metav1.DeletePropagationBackground
+					err := r.Delete(ctx, &pod, &client.DeleteOptions{
+						PropagationPolicy: &propagation,
+					})
+
+					if !removedAny {
+						removedAny = err == nil
+					}
+				}
+			}
+		}
+	}
+
+	if removedAny {
+		r.Recorder.Eventf(ts, "Warning", ConditionReasonStatefulSetNotReady, toTitle("removed unscheduled pods"))
+	}
 
 	return nil
 }
