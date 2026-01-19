@@ -42,12 +42,65 @@ metadata:
   labels:
     app.kubernetes.io/name: typesense-operator
     app.kubernetes.io/managed-by: kustomize
-  name: ts-cce
+  name: ts-otc-1
 spec:
   image: typesense/typesense:29.0
   replicas: 3
   storage:
     storageClassName: csi-disk
+```
+</details>
+
+<details>
+<summary>Quick example for Open Telekom Cloud CCE with OBS S3 support</summary>
+
+```yaml
+apiVersion: ts.opentelekomcloud.com/v1alpha1
+kind: TypesenseCluster
+metadata:
+  labels:
+    app.kubernetes.io/name: typesense-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: ts-otc-2
+spec:
+  image: typesense/typesense:29.0
+  replicas: 3
+  storage:
+    storageClassName: csi-obs
+    accessMode: ReadWriteMany
+    annotations:
+      csi.storage.k8s.io/fstype: obsfs
+      volume.beta.kubernetes.io/storage-provisioner: everest-csi-provisioner
+      csi.storage.k8s.io/node-publish-secret-name: otc-aksk
+      csi.storage.k8s.io/node-publish-secret-namespace: default
+      everest.io/csi.volume-name-prefix: c-otc-2
+```
+</details>
+
+<details>
+<summary>Quick example for Open Telekom Cloud CCE with SFS Turbo S3 support</summary>
+
+```yaml
+apiVersion: ts.opentelekomcloud.com/v1alpha1
+kind: TypesenseCluster
+metadata:
+  labels:
+    app.kubernetes.io/name: typesense-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: ts-otc-3
+spec:
+  image: typesense/typesense:29.0
+  replicas: 3
+  storage:
+    storageClassName: csi-obs
+    accessMode: ReadWriteMany
+    annotations:
+      everest.io/obs-volume-type: STANDARD
+      csi.storage.k8s.io/fstype: s3fs
+      volume.beta.kubernetes.io/storage-provisioner: everest-csi-provisioner
+      csi.storage.k8s.io/node-publish-secret-name: otc-aksk
+      csi.storage.k8s.io/node-publish-secret-namespace: default
+      everest.io/csi.volume-name-prefix: c-otc-3
 ```
 </details>
 
@@ -175,8 +228,8 @@ Join the conversation:
 ## 📦 Project Status
 
 TyKO is an **independently maintained** project (not affiliated with Typesense, Inc.).
-- Latest version: **0.3.5**
-- Tested on: Kubernetes 1.33 (earliest 1.26), Typesense 29.0 (earliest 26.0)
+- Latest version: **0.3.6**
+- Tested on: Kubernetes 1.34 (earliest 1.26), Typesense 29.0 (earliest 26.0)
 - Contributions welcome! See [FAQ](https://akyriako.github.io/typesense-operator-docs/docs/faq) and [Development](https://akyriako.github.io/typesense-operator-docs/docs/development)
 
 ## ⭐ Help us Grow
