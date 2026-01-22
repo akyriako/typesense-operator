@@ -202,7 +202,7 @@ func (r *TypesenseClusterReconciler) forcePodsConfigMapUpdate(ctx context.Contex
 func (r *TypesenseClusterReconciler) getNodes(ctx context.Context, ts *tsv1alpha1.TypesenseCluster, replicas int32, bootstrapping bool) ([]string, error) {
 	nodes := make([]string, 0)
 	getFallbackNodes := func(nodes []string) ([]string, error) {
-		for i := 0; i < int(replicas); i++ {
+		for i := 0; i < int(ts.Spec.Replicas); i++ {
 			nodeName := fmt.Sprintf("%s-sts-%d.%s-sts-svc", ts.Name, i, ts.Name)
 			if len(nodeName) > nodeNameLenLimit {
 				return nil, fmt.Errorf("raft error: node name should not exceed %d characters: %s", nodeNameLenLimit, nodeName)
@@ -225,6 +225,9 @@ func (r *TypesenseClusterReconciler) getNodes(ctx context.Context, ts *tsv1alpha
 	}
 	sts, err := r.GetFreshStatefulSet(ctx, stsObjectKey)
 	if err != nil {
+		if !apierrors.IsNotFound(err) {
+			return nil, err
+		}
 		stsExists = false
 		unscheduledPods = replicas
 	}
@@ -242,35 +245,38 @@ func (r *TypesenseClusterReconciler) getNodes(ctx context.Context, ts *tsv1alpha
 		}
 
 		for _, pod := range pods.Items {
-			if pod.Status.Phase == v1.PodPending {
-				for _, cond := range pod.Status.Conditions {
-					if cond.Type == v1.PodScheduled && cond.Status == v1.ConditionFalse && cond.Reason == v1.PodReasonUnschedulable {
-						unscheduledPods++
-					}
+			if pod.Status.Phase != v1.PodPending {
+				continue
+			}
+			for _, cond := range pod.Status.Conditions {
+				if cond.Type == v1.PodScheduled &&
+					cond.Status == v1.ConditionFalse &&
+					cond.Reason == v1.PodReasonUnschedulable {
+					unscheduledPods++
+					break
 				}
 			}
 		}
 
-		targetReplicas = *sts.Spec.Replicas
+		targetReplicas = ptr.Deref[int32](sts.Spec.Replicas, 1)
 	}
 
 	if bootstrapping || unscheduledPods == targetReplicas {
 		return getFallbackNodes(nodes)
 	}
 
-	slices, err := r.getEndpointSlicesForStatefulSet(ctx, sts)
+	eps, err := r.getEndpointSlicesForStatefulSet(ctx, sts)
 	if err != nil {
 		return nil, err
 	}
 
-	i := 0
-	for _, s := range slices {
+	for _, s := range eps {
 		for _, e := range s.Endpoints {
-			addr := e.Addresses[0]
-			//r.logger.V(debugLevel).Info("discovered slice endpoint", "slice", s.Name, "endpoint", e.Hostname, "address", addr)
-			nodes = append(nodes, fmt.Sprintf("%s:%d:%d", addr, ts.Spec.PeeringPort, ts.Spec.ApiPort))
-
-			i++
+			if len(e.Addresses) > 0 {
+				addr := e.Addresses[0]
+				//r.logger.V(debugLevel).Info("discovered slice endpoint", "slice", s.Name, "endpoint", e.Hostname, "address", addr)
+				nodes = append(nodes, fmt.Sprintf("%s:%d:%d", addr, ts.Spec.PeeringPort, ts.Spec.ApiPort))
+			}
 		}
 	}
 
