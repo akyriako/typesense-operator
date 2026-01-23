@@ -44,3 +44,17 @@ spec:
     requests:
       cpu: "1000m"
       memory: "131072Mi"
+---
+apiVersion: ts.opentelekomcloud.com/v1alpha1
+kind: TypesenseCluster
+metadata:
+  labels:
+    app.kubernetes.io/name: typesense-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: c-bm-3
+spec:
+  image: typesense/typesense:30.0.rca39-amd64
+  replicas: 3
+  storage:
+    size: 100Mi
+    storageClassName: iscsi
