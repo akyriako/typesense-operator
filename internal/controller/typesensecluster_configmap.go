@@ -188,7 +188,7 @@ func (r *TypesenseClusterReconciler) forcePodsConfigMapUpdate(ctx context.Contex
 		pod := &podList.Items[i]
 		original := pod.DeepCopy()
 
-		if pod.DeletionTimestamp.IsZero() {
+		if !pod.DeletionTimestamp.IsZero() {
 			continue
 		}
 

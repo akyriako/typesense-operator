@@ -26,6 +26,7 @@ import (
 	"github.com/pkg/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -215,7 +216,13 @@ func (r *TypesenseClusterReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	if *configMapUpdated {
 		err = r.forcePodsConfigMapUpdate(ctx, &ts)
 		if err != nil {
-			r.logger.Error(err, "failed to force pods configmap update", "configmap", fmt.Sprintf(ClusterNodesConfigMap, ts.Name))
+			if agg, ok := err.(utilerrors.Aggregate); ok {
+				for _, e := range agg.Errors() {
+					r.logger.Error(e, "failed to force configmap update", "configmap", fmt.Sprintf(ClusterNodesConfigMap, ts.Name))
+				}
+			} else {
+				r.logger.Error(err, "failed to force pods configmap update", "configmap", fmt.Sprintf(ClusterNodesConfigMap, ts.Name))
+			}
 		}
 
 		cond = ConditionReasonQuorumNotReadyWaitATerm
