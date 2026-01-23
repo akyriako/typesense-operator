@@ -13,6 +13,7 @@ import (
 	discoveryv1 "k8s.io/api/discovery/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -182,21 +183,28 @@ func (r *TypesenseClusterReconciler) forcePodsConfigMapUpdate(ctx context.Contex
 		return err
 	}
 
+	var errs []error
 	for i := range podList.Items {
 		pod := &podList.Items[i]
+		original := pod.DeepCopy()
+
+		if pod.DeletionTimestamp.IsZero() {
+			continue
+		}
 
 		if pod.Annotations == nil {
 			pod.Annotations = map[string]string{}
 		}
 		pod.Annotations[forceConfigMapUpdateAnnotationKey] = time.Now().Format(time.RFC3339)
 
-		if err := r.Patch(ctx, pod, client.MergeFrom(pod.DeepCopy())); err != nil {
-			r.logger.Error(err, "patching to pod annotations failed", "pod", pod.Name)
-			return err
+		if err := r.Patch(ctx, pod, client.MergeFrom(original)); err != nil {
+			r.logger.Error(err, "patching pod annotations failed", "pod", pod.Name)
+			errs = append(errs, fmt.Errorf("pod %s: %w", pod.Name, err))
+			continue
 		}
 	}
 
-	return nil
+	return utilerrors.NewAggregate(errs)
 }
 
 func (r *TypesenseClusterReconciler) getNodes(ctx context.Context, ts *tsv1alpha1.TypesenseCluster, replicas int32, bootstrapping bool) ([]string, error) {
