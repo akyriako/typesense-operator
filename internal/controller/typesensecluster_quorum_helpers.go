@@ -95,6 +95,9 @@ func (r *TypesenseClusterReconciler) getClusterStatus(nodesStatus map[string]Nod
 		if availableNodes <= 1 {
 			return ClusterStatusNotReady
 		} // here is setting as not ready even if the single node returns state ERROR
+		if availableNodes == notReadyNodes {
+			return ClusterStatusNotReady
+		}
 		return ClusterStatusElectionDeadlock
 	}
 
