@@ -44,7 +44,7 @@ metadata:
     app.kubernetes.io/managed-by: kustomize
   name: ts-otc-1
 spec:
-  image: typesense/typesense:29.0
+  image: typesense/typesense:30.0
   replicas: 3
   storage:
     storageClassName: csi-disk
@@ -63,7 +63,7 @@ metadata:
     app.kubernetes.io/managed-by: kustomize
   name: ts-otc-2
 spec:
-  image: typesense/typesense:29.0
+  image: typesense/typesense:30.0
   replicas: 3
   storage:
     storageClassName: csi-obs
@@ -89,7 +89,7 @@ metadata:
     app.kubernetes.io/managed-by: kustomize
   name: ts-otc-3
 spec:
-  image: typesense/typesense:29.0
+  image: typesense/typesense:30.0
   replicas: 3
   storage:
     storageClassName: csi-obs
@@ -116,7 +116,7 @@ metadata:
     app.kubernetes.io/managed-by: kustomize
   name: ts-bm-k3s
 spec:
-  image: typesense/typesense:29.0
+  image: typesense/typesense:30.0
   replicas: 3
   storage:
     storageClassName: nfs
@@ -144,7 +144,7 @@ metadata:
     app.kubernetes.io/managed-by: kustomize
   name: ts-kind
 spec:
-  image: typesense/typesense:29.0
+  image: typesense/typesense:30.0
   replicas: 3
   storage:
     size: 150Mi
@@ -164,7 +164,7 @@ metadata:
     app.kubernetes.io/managed-by: kustomize
   name: ts-aws
 spec:
-  image: typesense/typesense:29.0
+  image: typesense/typesense:30.0
   replicas: 3
   storage:
     size: 100Mi
@@ -184,7 +184,7 @@ metadata:
     app.kubernetes.io/managed-by: kustomize
   name: ts-azure
 spec:
-  image: typesense/typesense:29.0
+  image: typesense/typesense:30.0
   replicas: 3
   storage:
     storageClassName: managed-csi
@@ -203,7 +203,7 @@ metadata:
     app.kubernetes.io/managed-by: kustomize
   name: ts-gcp
 spec:
-  image: typesense/typesense:29.0
+  image: typesense/typesense:30.0
   replicas: 3
   storage:
     storageClassName: standard-rwo
@@ -228,8 +228,8 @@ Join the conversation:
 ## 📦 Project Status
 
 TyKO is an **independently maintained** project (not affiliated with Typesense, Inc.).
-- Latest version: **0.3.6-1**
-- Tested on: Kubernetes 1.35 (earliest 1.26), Typesense 29.0 (earliest 26.0)
+- Latest version: **0.3.7**
+- Tested on: Kubernetes 1.35 (earliest 1.26), Typesense 30.0 (earliest 26.0)
 - Contributions welcome! See [FAQ](https://akyriako.github.io/typesense-operator-docs/docs/faq) and [Development](https://akyriako.github.io/typesense-operator-docs/docs/development)
 
 ## ⭐ Help us Grow
