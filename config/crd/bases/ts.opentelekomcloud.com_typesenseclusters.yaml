@@ -1022,6 +1022,9 @@ spec:
               enableCors:
                 default: false
                 type: boolean
+              forceResetPeersConfigOnUpdate:
+                default: true
+                type: boolean
               healthProbeTimeoutInMilliseconds:
                 default: 500
                 maximum: 60000

@@ -65,35 +65,31 @@ func (r *TypesenseClusterReconciler) ReconcileQuorum(ctx context.Context, ts *ts
 	}
 	sort.Strings(nodeKeys)
 
-	logs := make(map[string]string, len(quorum.Nodes))
+	nodeEndpoints := make([]NodeEndpoint, 0, len(quorum.Nodes))
 	for _, key := range nodeKeys {
-		node := key
-		ip := quorum.Nodes[key]
 		ne := NodeEndpoint{
-			PodName: node,
-			IP:      ip,
+			PodName: key,
+			IP:      quorum.Nodes[key],
 		}
 
-		l, err := r.getPodLogs(ctx, ne, ts.Namespace)
-		if err != nil {
-			r.logger.Error(err, "fetching pod logs failed", "node", r.getShortName(node), "ip", ip)
-		}
-
-		logs[key] = l
+		nodeEndpoints = append(nodeEndpoints, ne)
 	}
 
-	//quorum.Nodes is coming straight from the PodList of Statefulset
-	for _, key := range nodeKeys {
-		node := key
-		ip := quorum.Nodes[key]
-		ne := NodeEndpoint{
-			PodName: node,
-			IP:      ip,
+	logs := make(map[string]string, len(quorum.Nodes))
+	for _, ne := range nodeEndpoints {
+		l, err := r.getPodLogs(ctx, ne, ts.Namespace)
+		if err != nil {
+			r.logger.Error(err, "fetching pod logs failed", "node", r.getShortName(ne.PodName), "ip", ne.IP)
 		}
 
-		status, err := r.getNodeStatus(ctx, httpClient, ne, ts, secret, logs[key])
+		logs[ne.PodName] = l
+	}
+
+	//quorum.Nodes are coming straight from the PodList of Statefulset
+	for _, ne := range nodeEndpoints {
+		status, err := r.getNodeStatus(ctx, httpClient, ne, ts, secret, logs[ne.PodName])
 		if err != nil {
-			r.logger.Error(err, "fetching node status failed", "node", r.getShortName(node), "ip", ip)
+			r.logger.Error(err, "fetching node status failed", "node", r.getShortName(ne.PodName), "ip", ne.IP)
 		}
 
 		if status.QueuedWrites > 0 && queuedWrites < status.QueuedWrites {
@@ -103,17 +99,17 @@ func (r *TypesenseClusterReconciler) ReconcileQuorum(ctx context.Context, ts *ts
 		r.logger.V(debugLevel).Info(
 			"reporting node status",
 			"node",
-			r.getShortName(node),
+			r.getShortName(ne.PodName),
 			"state",
 			status.State,
 			"ip",
-			ip,
+			ne.IP,
 			"queued_writes",
 			status.QueuedWrites,
 			"commited_index",
 			status.CommittedIndex,
 		)
-		nodesStatus[node] = status
+		nodesStatus[ne.PodName] = status
 	}
 
 	clusterStatus := r.getClusterStatus(nodesStatus)
@@ -130,21 +126,16 @@ func (r *TypesenseClusterReconciler) ReconcileQuorum(ctx context.Context, ts *ts
 	clusterNeedsAttention := false
 	nodesHealth := make(map[string]bool)
 
-	for _, key := range nodeKeys {
-		node := key
-		ip := quorum.Nodes[key]
-		ne := NodeEndpoint{
-			PodName: node,
-			IP:      ip,
-		}
-		nodeStatus := nodesStatus[node]
+	for _, ne := range nodeEndpoints {
+		key := ne.PodName
+		nodeStatus := nodesStatus[key]
 
 		condition := r.calculatePodReadinessGate(ctx, httpClient, ne, nodeStatus, ts, logs[key])
 		if condition.Reason == string(nodeNotRecoverable) {
 			clusterNeedsAttention = true
 		}
 
-		nodesHealth[node], _ = strconv.ParseBool(string(condition.Status))
+		nodesHealth[key], _ = strconv.ParseBool(string(condition.Status))
 
 		podPrefix := fmt.Sprintf(ClusterStatefulSet, ts.Name)
 		podIndex := strings.Replace(key, fmt.Sprintf("%s-", podPrefix), "", -1)
@@ -164,7 +155,6 @@ func (r *TypesenseClusterReconciler) ReconcileQuorum(ctx context.Context, ts *ts
 
 	minRequiredNodes := quorum.MinRequiredNodes
 	availableNodes := quorum.AvailableNodes
-	//healthyNodes := availableNodes
 	healthyNodes := 0
 
 	for _, healthy := range nodesHealth {
@@ -189,7 +179,6 @@ func (r *TypesenseClusterReconciler) ReconcileQuorum(ctx context.Context, ts *ts
 
 	if clusterStatus == ClusterStatusNotReady {
 		if availableNodes == 1 {
-
 			podName := fmt.Sprintf("%s-%d", fmt.Sprintf(ClusterStatefulSet, ts.Name), 0)
 			nodeStatus := nodesStatus[podName]
 			state := nodeStatus.State
@@ -221,10 +210,6 @@ func (r *TypesenseClusterReconciler) ReconcileQuorum(ctx context.Context, ts *ts
 	}
 
 	if healthyNodes < minRequiredNodes {
-		//if clusterStatus == ClusterStatusOK {
-		//	return r.downgradeQuorum(ctx, ts, quorum.NodesListConfigMap, stsObjectKey, int32(healthyNodes), int32(minRequiredNodes))
-		//}
-
 		return ConditionReasonQuorumNotReady, 0, nil
 	}
 
@@ -245,39 +230,32 @@ func (r *TypesenseClusterReconciler) downgradeQuorum(
 		return ConditionReasonQuorumNotReady, 0, err
 	}
 
-	scaleDownStatefulSet := func(objKey client.ObjectKey) (ConditionQuorum, int, error) {
-		desiredReplicas := int32(1)
+	desiredReplicas := int32(1)
 
-		err = r.ScaleStatefulSet(ctx, objKey, desiredReplicas)
-		if err != nil {
-			return ConditionReasonQuorumNotReady, 0, err
-		}
-
-		_, size, _, err := r.updateConfigMap(ctx, ts, cm, ptr.To[int32](desiredReplicas), true)
-		if err != nil {
-			return ConditionReasonQuorumNotReady, 0, err
-		}
-
-		return ConditionReasonQuorumDowngraded, size, nil
+	err = r.ScaleStatefulSet(ctx, stsObjectKey, desiredReplicas)
+	if err != nil {
+		return ConditionReasonQuorumNotReady, 0, err
 	}
 
 	if healthyNodes == 0 && minRequiredNodes == 1 {
 		r.logger.Info("purging quorum")
 
-		condition, size, err := scaleDownStatefulSet(stsObjectKey)
-		if err != nil {
-			return condition, size, err
-		}
-
 		err = r.PurgeStatefulSetPods(ctx, sts, ts)
 		if err != nil {
 			return ConditionReasonQuorumNotReady, 0, err
 		}
-
-		return ConditionReasonQuorumDowngraded, size, nil
 	}
 
-	return scaleDownStatefulSet(stsObjectKey)
+	_, size, updated, err := r.updateConfigMap(ctx, ts, cm, ptr.To[int32](desiredReplicas), true)
+	if err != nil {
+		return ConditionReasonQuorumNotReady, 0, err
+	}
+
+	if updated && ts.Spec.ForceResetPeersConfigOnUpdate {
+		_ = r.forcePodsConfigMapUpdate(ctx, ts)
+	}
+
+	return ConditionReasonQuorumDowngraded, size, nil
 }
 
 func (r *TypesenseClusterReconciler) upgradeQuorum(
@@ -302,9 +280,13 @@ func (r *TypesenseClusterReconciler) upgradeQuorum(
 		return ConditionReasonQuorumNotReady, 0, err
 	}
 
-	_, _, _, err = r.updateConfigMap(ctx, ts, cm, &size, true)
+	_, _, updated, err := r.updateConfigMap(ctx, ts, cm, &size, true)
 	if err != nil {
 		return ConditionReasonQuorumNotReady, 0, err
+	}
+
+	if updated && ts.Spec.ForceResetPeersConfigOnUpdate {
+		_ = r.forcePodsConfigMapUpdate(ctx, ts)
 	}
 
 	return ConditionReasonQuorumUpgraded, int(size), nil
