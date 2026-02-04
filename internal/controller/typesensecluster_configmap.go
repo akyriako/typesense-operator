@@ -202,6 +202,8 @@ func (r *TypesenseClusterReconciler) forcePodsConfigMapUpdate(ctx context.Contex
 			errs = append(errs, fmt.Errorf("pod %s: %w", pod.Name, err))
 			continue
 		}
+
+		r.logger.V(debugLevel).Info("patching pod annotations", "pod", pod.Name, "annotation", forceConfigMapUpdateAnnotationKey)
 	}
 
 	return utilerrors.NewAggregate(errs)

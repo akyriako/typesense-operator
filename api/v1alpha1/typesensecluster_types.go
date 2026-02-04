@@ -84,6 +84,11 @@ type TypesenseClusterSpec struct {
 	// +kubebuilder:validation:Type=string
 	CorsDomains *string `json:"corsDomains,omitempty"`
 
+	// +optional
+	// +kubebuilder:default=true
+	// +kubebuilder:validation:Type=boolean
+	ForceResetPeersConfigOnUpdate bool `json:"forceResetPeersConfigOnUpdate,omitempty"`
+
 	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
 
 	// +kubebuilder:validation:Optional

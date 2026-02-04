@@ -118,9 +118,13 @@ func (r *TypesenseClusterReconciler) ReconcileStatefulSet(ctx context.Context, t
 					r.logger.V(debugLevel).Error(err, fmt.Sprintf("unable to fetch config map: %s", configMapName))
 				}
 
-				_, _, _, err = r.updateConfigMap(ctx, ts, cm, updatedSts.Spec.Replicas, true)
+				_, _, updated, err := r.updateConfigMap(ctx, ts, cm, updatedSts.Spec.Replicas, true)
 				if err != nil {
 					r.logger.V(debugLevel).Error(err, fmt.Sprintf("unable to update config map: %s", configMapName))
+				}
+
+				if updated && ts.Spec.ForceResetPeersConfigOnUpdate {
+					_ = r.forcePodsConfigMapUpdate(ctx, ts)
 				}
 
 				r.logLagThresholds(updatedSts)
