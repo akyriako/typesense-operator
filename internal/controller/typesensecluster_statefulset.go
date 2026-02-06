@@ -89,16 +89,9 @@ func (r *TypesenseClusterReconciler) ReconcileStatefulSet(ctx context.Context, t
 					r.logger.Error(err, "building statefulset failed", "sts", stsObjectKey.Name)
 				}
 
-				stsAnnotations := sts.ObjectMeta.Annotations
-				podAnnotations := sts.Spec.Template.Annotations
-				delete(podAnnotations, restartPodsAnnotationKey)
-
-				if r.shouldUpdateStatefulSet(sts, desiredSts, ts) ||
-					!apiequality.Semantic.DeepEqual(podAnnotations, desiredSts.Spec.Template.Annotations) ||
-					!apiequality.Semantic.DeepEqual(stsAnnotations, desiredSts.ObjectMeta.Annotations) ||
-					emergencyUpdateRequired {
-
-					r.logger.V(debugLevel).Info("updating statefulset", "sts", sts.Name)
+				update, triggers := r.shouldUpdateStatefulSet(sts, desiredSts, ts)
+				if update {
+					r.logger.V(debugLevel).Info("updating statefulset", "sts", sts.Name, "trigger", triggers)
 
 					oldImage := strings.Replace(sts.Spec.Template.Spec.Containers[0].Image, "typesense/typesense:", "", -1)
 					newImage := strings.Replace(desiredSts.Spec.Template.Spec.Containers[0].Image, "typesense/typesense:", "", -1)
@@ -523,22 +516,97 @@ func (r *TypesenseClusterReconciler) buildStatefulSet(ctx context.Context, key c
 	return sts, nil
 }
 
-func (r *TypesenseClusterReconciler) shouldUpdateStatefulSet(sts *appsv1.StatefulSet, desired *appsv1.StatefulSet, ts *tsv1alpha1.TypesenseCluster) bool {
+type UpdateStatefulSetTrigger string
+
+var (
+	BelowSpecReplicas               UpdateStatefulSetTrigger = "BelowSpecReplicas"
+	HashAnnotationChanged           UpdateStatefulSetTrigger = "HashAnnotationChanged"
+	PodAnnotationsChanged           UpdateStatefulSetTrigger = "PodAnnotationsChanged"
+	StatefulSetAnnotationsChanged   UpdateStatefulSetTrigger = "StatefulSetAnnotationsChanged"
+	SpecResourcesChanged            UpdateStatefulSetTrigger = "SpecResourcesChanged"
+	PodSecurityContextChanged       UpdateStatefulSetTrigger = "PodSecurityContextChanged"
+	InvalidContainerCount           UpdateStatefulSetTrigger = "InvalidContainerCount"
+	ContainerSecurityContextChanged UpdateStatefulSetTrigger = "ContainerSecurityContextChanged"
+)
+
+func (r *TypesenseClusterReconciler) shouldUpdateStatefulSet(sts *appsv1.StatefulSet, desired *appsv1.StatefulSet, ts *tsv1alpha1.TypesenseCluster) (update bool, triggers []UpdateStatefulSetTrigger) {
+	update = false
+
+	if sts == nil || ts == nil {
+		return false, nil
+	}
+
 	condition := r.getConditionReady(ts)
 	if condition == nil {
-		return false
+		return false, nil
 	}
 
+	// BelowSpecReplicas
 	if *sts.Spec.Replicas != ts.Spec.Replicas &&
 		(condition.Reason != string(ConditionReasonQuorumDowngraded) || condition.Reason != string(ConditionReasonQuorumQueuedWrites)) {
-		return true
+		triggers = append(triggers, BelowSpecReplicas)
+		update = true
 	}
 
+	// HashAnnotationChanged
 	if sts.Spec.Template.Annotations[hashAnnotationKey] != desired.Spec.Template.Annotations[hashAnnotationKey] {
-		return true
+		triggers = append(triggers, HashAnnotationChanged)
+		update = true
 	}
 
-	return false
+	stsAnnotations := sts.ObjectMeta.Annotations
+	podAnnotations := sts.Spec.Template.Annotations
+	delete(podAnnotations, restartPodsAnnotationKey)
+
+	// PodAnnotationsChanged
+	if !apiequality.Semantic.DeepEqual(podAnnotations, desired.Spec.Template.Annotations) {
+		triggers = append(triggers, PodAnnotationsChanged)
+		update = true
+	}
+
+	// StatefulSetAnnotationsChanged
+	if !apiequality.Semantic.DeepEqual(stsAnnotations, desired.ObjectMeta.Annotations) {
+		triggers = append(triggers, StatefulSetAnnotationsChanged)
+		update = true
+	}
+
+	// SpecResourcesChanged
+	if !apiequality.Semantic.DeepEqual(sts.Spec.Template.Spec.Containers[0].Resources, ts.Spec.GetResources()) {
+		triggers = append(triggers, SpecResourcesChanged)
+		update = true
+	}
+
+	// PodSecurityContextChanged
+	if !apiequality.Semantic.DeepEqual(sts.Spec.Template.Spec.SecurityContext, ts.Spec.GetPodSecurityContext()) {
+		triggers = append(triggers, PodSecurityContextChanged)
+		update = true
+	}
+
+	// InvalidContainerCount
+	if len(sts.Spec.Template.Spec.Containers) < 3 {
+		triggers = append(triggers, InvalidContainerCount)
+		update = true
+	}
+
+	// ContainerSecurityContextChanged
+	if !apiequality.Semantic.DeepEqual(sts.Spec.Template.Spec.Containers[0].SecurityContext, ts.Spec.GetTypesenseSecurityContext()) {
+		triggers = append(triggers, ContainerSecurityContextChanged)
+		update = true
+	}
+
+	// ContainerSecurityContextChanged
+	if !apiequality.Semantic.DeepEqual(sts.Spec.Template.Spec.Containers[1].SecurityContext, ts.Spec.GetMetricsSecurityContext()) {
+		triggers = append(triggers, ContainerSecurityContextChanged)
+		update = true
+	}
+
+	// ContainerSecurityContextChanged
+	if !apiequality.Semantic.DeepEqual(sts.Spec.Template.Spec.Containers[2].SecurityContext, ts.Spec.GetHealthcheckSecurityContext()) {
+		triggers = append(triggers, ContainerSecurityContextChanged)
+		update = true
+	}
+
+	return update, triggers
 }
 
 func (r *TypesenseClusterReconciler) shouldEmergencyUpdateStatefulSet(sts *appsv1.StatefulSet, ts *tsv1alpha1.TypesenseCluster) bool {
@@ -546,26 +614,32 @@ func (r *TypesenseClusterReconciler) shouldEmergencyUpdateStatefulSet(sts *appsv
 		return false
 	}
 
+	// ResourcesChanged
 	if !apiequality.Semantic.DeepEqual(sts.Spec.Template.Spec.Containers[0].Resources, ts.Spec.GetResources()) {
 		return true
 	}
 
+	// PodSecurityContextChanged
 	if !apiequality.Semantic.DeepEqual(sts.Spec.Template.Spec.SecurityContext, ts.Spec.GetPodSecurityContext()) {
 		return true
 	}
 
+	// InvalidContainerCount
 	if len(sts.Spec.Template.Spec.Containers) < 3 {
 		return true
 	}
 
+	// ContainerSecurityContextChanged
 	if !apiequality.Semantic.DeepEqual(sts.Spec.Template.Spec.Containers[0].SecurityContext, ts.Spec.GetTypesenseSecurityContext()) {
 		return true
 	}
 
+	// ContainerSecurityContextChanged
 	if !apiequality.Semantic.DeepEqual(sts.Spec.Template.Spec.Containers[1].SecurityContext, ts.Spec.GetMetricsSecurityContext()) {
 		return true
 	}
 
+	// ContainerSecurityContextChanged
 	if !apiequality.Semantic.DeepEqual(sts.Spec.Template.Spec.Containers[2].SecurityContext, ts.Spec.GetHealthcheckSecurityContext()) {
 		return true
 	}
