@@ -79,56 +79,60 @@ func (r *TypesenseClusterReconciler) ReconcileStatefulSet(ctx context.Context, t
 			string(ConditionReasonQuorumNotReadyWaitATerm),
 		}
 
-		emergencyUpdateRequired := r.shouldEmergencyUpdateStatefulSet(sts, ts)
-		if _, contains := contains(skipConditions, r.getConditionReady(ts).Reason); !contains || emergencyUpdateRequired {
-			desiredSts, err := r.buildStatefulSet(ctx, stsObjectKey, ts)
-			if err != nil {
-				r.logger.Error(err, "building statefulset failed", "sts", stsObjectKey.Name)
-			}
+		condition := r.getConditionReady(ts)
 
-			stsAnnotations := sts.ObjectMeta.Annotations
-			podAnnotations := sts.Spec.Template.Annotations
-			delete(podAnnotations, restartPodsAnnotationKey)
-
-			if r.shouldUpdateStatefulSet(sts, desiredSts, ts) ||
-				!apiequality.Semantic.DeepEqual(podAnnotations, desiredSts.Spec.Template.Annotations) ||
-				!apiequality.Semantic.DeepEqual(stsAnnotations, desiredSts.ObjectMeta.Annotations) ||
-				emergencyUpdateRequired {
-
-				r.logger.V(debugLevel).Info("updating statefulset", "sts", sts.Name)
-
-				oldImage := strings.Replace(sts.Spec.Template.Spec.Containers[0].Image, "typesense/typesense:", "", -1)
-				newImage := strings.Replace(desiredSts.Spec.Template.Spec.Containers[0].Image, "typesense/typesense:", "", -1)
-				if oldImage != newImage {
-					r.logger.V(debugLevel).Info("scheduling typesense update", "current", oldImage, "target", newImage)
-					r.Recorder.Eventf(ts, "Normal", "TypesenseVersionUpdate", "Scheduled update from %s to %s", oldImage, newImage)
-				}
-
-				updatedSts, err := r.updateStatefulSet(ctx, sts, desiredSts)
+		if condition != nil {
+			emergencyUpdateRequired := r.shouldEmergencyUpdateStatefulSet(sts, ts)
+			if _, contains := contains(skipConditions, condition.Reason); !contains || emergencyUpdateRequired {
+				desiredSts, err := r.buildStatefulSet(ctx, stsObjectKey, ts)
 				if err != nil {
-					r.logger.Error(err, "updating statefulset failed", "sts", stsObjectKey.Name)
-					return nil, err
+					r.logger.Error(err, "building statefulset failed", "sts", stsObjectKey.Name)
 				}
 
-				configMapName := fmt.Sprintf(ClusterNodesConfigMap, ts.Name)
-				configMapObjectKey := client.ObjectKey{Namespace: ts.Namespace, Name: configMapName}
+				stsAnnotations := sts.ObjectMeta.Annotations
+				podAnnotations := sts.Spec.Template.Annotations
+				delete(podAnnotations, restartPodsAnnotationKey)
 
-				var cm = &corev1.ConfigMap{}
-				if err := r.Get(ctx, configMapObjectKey, cm); err != nil {
-					r.logger.V(debugLevel).Error(err, fmt.Sprintf("unable to fetch config map: %s", configMapName))
+				if r.shouldUpdateStatefulSet(sts, desiredSts, ts) ||
+					!apiequality.Semantic.DeepEqual(podAnnotations, desiredSts.Spec.Template.Annotations) ||
+					!apiequality.Semantic.DeepEqual(stsAnnotations, desiredSts.ObjectMeta.Annotations) ||
+					emergencyUpdateRequired {
+
+					r.logger.V(debugLevel).Info("updating statefulset", "sts", sts.Name)
+
+					oldImage := strings.Replace(sts.Spec.Template.Spec.Containers[0].Image, "typesense/typesense:", "", -1)
+					newImage := strings.Replace(desiredSts.Spec.Template.Spec.Containers[0].Image, "typesense/typesense:", "", -1)
+					if oldImage != newImage {
+						r.logger.V(debugLevel).Info("scheduling typesense update", "current", oldImage, "target", newImage)
+						r.Recorder.Eventf(ts, "Normal", "TypesenseVersionUpdate", "Scheduled update from %s to %s", oldImage, newImage)
+					}
+
+					updatedSts, err := r.updateStatefulSet(ctx, sts, desiredSts)
+					if err != nil {
+						r.logger.Error(err, "updating statefulset failed", "sts", stsObjectKey.Name)
+						return nil, err
+					}
+
+					configMapName := fmt.Sprintf(ClusterNodesConfigMap, ts.Name)
+					configMapObjectKey := client.ObjectKey{Namespace: ts.Namespace, Name: configMapName}
+
+					var cm = &corev1.ConfigMap{}
+					if err := r.Get(ctx, configMapObjectKey, cm); err != nil {
+						r.logger.V(debugLevel).Error(err, fmt.Sprintf("unable to fetch config map: %s", configMapName))
+					}
+
+					_, _, updated, err := r.updateConfigMap(ctx, ts, cm, updatedSts.Spec.Replicas, true)
+					if err != nil {
+						r.logger.V(debugLevel).Error(err, fmt.Sprintf("unable to update config map: %s", configMapName))
+					}
+
+					if updated && ts.Spec.ForceResetPeersConfigOnUpdate {
+						_ = r.forcePodsConfigMapUpdate(ctx, ts)
+					}
+
+					r.logLagThresholds(updatedSts)
+					return updatedSts, nil
 				}
-
-				_, _, updated, err := r.updateConfigMap(ctx, ts, cm, updatedSts.Spec.Replicas, true)
-				if err != nil {
-					r.logger.V(debugLevel).Error(err, fmt.Sprintf("unable to update config map: %s", configMapName))
-				}
-
-				if updated && ts.Spec.ForceResetPeersConfigOnUpdate {
-					_ = r.forcePodsConfigMapUpdate(ctx, ts)
-				}
-
-				r.logLagThresholds(updatedSts)
-				return updatedSts, nil
 			}
 		}
 	}
@@ -520,8 +524,13 @@ func (r *TypesenseClusterReconciler) buildStatefulSet(ctx context.Context, key c
 }
 
 func (r *TypesenseClusterReconciler) shouldUpdateStatefulSet(sts *appsv1.StatefulSet, desired *appsv1.StatefulSet, ts *tsv1alpha1.TypesenseCluster) bool {
+	condition := r.getConditionReady(ts)
+	if condition == nil {
+		return false
+	}
+
 	if *sts.Spec.Replicas != ts.Spec.Replicas &&
-		(r.getConditionReady(ts).Reason != string(ConditionReasonQuorumDowngraded) || r.getConditionReady(ts).Reason != string(ConditionReasonQuorumQueuedWrites)) {
+		(condition.Reason != string(ConditionReasonQuorumDowngraded) || condition.Reason != string(ConditionReasonQuorumQueuedWrites)) {
 		return true
 	}
 
