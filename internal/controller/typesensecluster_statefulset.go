@@ -642,10 +642,13 @@ func (r *TypesenseClusterReconciler) RestartUnscheduledPods(ctx context.Context,
 		if pod.Status.Phase == corev1.PodPending {
 			for _, cond := range pod.Status.Conditions {
 				if cond.Type == corev1.PodScheduled && cond.Status == corev1.ConditionFalse && cond.Reason == corev1.PodReasonUnschedulable {
+					r.logger.V(debugLevel).Info("removing unscheduled pod", "pod", pod.Name)
+
 					propagation := metav1.DeletePropagationBackground
-					err := r.Delete(ctx, pod, &client.DeleteOptions{
-						PropagationPolicy: &propagation,
-					})
+					err := r.Delete(ctx, pod, &client.DeleteOptions{PropagationPolicy: &propagation})
+					if err != nil {
+						r.logger.Error(err, "failed to remove unscheduled pod", "pod", pod.Name)
+					}
 
 					if !removedAny {
 						removedAny = err == nil
@@ -702,7 +705,9 @@ func (r *TypesenseClusterReconciler) RestartAllUnscheduledPods(ctx context.Conte
 func (r *TypesenseClusterReconciler) GetFreshStatefulSet(ctx context.Context, stsObjectKey client.ObjectKey) (*appsv1.StatefulSet, error) {
 	sts := &appsv1.StatefulSet{}
 	if err := r.Get(ctx, stsObjectKey, sts); err != nil {
-		r.logger.Error(err, fmt.Sprintf("unable to fetch statefulset: %s", stsObjectKey.Name))
+		if !apierrors.IsNotFound(err) {
+			r.logger.Error(err, fmt.Sprintf("unable to fetch statefulset: %s", stsObjectKey.Name))
+		}
 		return nil, err
 	}
 
