@@ -529,6 +529,22 @@ var (
 	ContainerSecurityContextChanged UpdateStatefulSetTrigger = "ContainerSecurityContextChanged"
 )
 
+func filterStatefulSetAnnotations(annotations map[string]string) map[string]string {
+	if len(annotations) == 0 {
+		return annotations
+	}
+
+	filtered := make(map[string]string, len(annotations))
+	for key, value := range annotations {
+		if strings.HasPrefix(key, "field.cattle.io/") {
+			continue
+		}
+		filtered[key] = value
+	}
+
+	return filtered
+}
+
 func (r *TypesenseClusterReconciler) shouldUpdateStatefulSet(sts *appsv1.StatefulSet, desired *appsv1.StatefulSet, ts *tsv1alpha1.TypesenseCluster) (update bool, triggers []UpdateStatefulSetTrigger) {
 	update = false
 
@@ -554,7 +570,8 @@ func (r *TypesenseClusterReconciler) shouldUpdateStatefulSet(sts *appsv1.Statefu
 		update = true
 	}
 
-	stsAnnotations := sts.ObjectMeta.Annotations
+	stsAnnotations := filterStatefulSetAnnotations(sts.ObjectMeta.Annotations)
+	desiredStsAnnotations := filterStatefulSetAnnotations(desired.ObjectMeta.Annotations)
 	podAnnotations := sts.Spec.Template.Annotations
 	delete(podAnnotations, restartPodsAnnotationKey)
 
@@ -565,7 +582,7 @@ func (r *TypesenseClusterReconciler) shouldUpdateStatefulSet(sts *appsv1.Statefu
 	}
 
 	// StatefulSetAnnotationsChanged
-	if !apiequality.Semantic.DeepEqual(stsAnnotations, desired.ObjectMeta.Annotations) {
+	if !apiequality.Semantic.DeepEqual(stsAnnotations, desiredStsAnnotations) {
 		triggers = append(triggers, StatefulSetAnnotationsChanged)
 		update = true
 	}
