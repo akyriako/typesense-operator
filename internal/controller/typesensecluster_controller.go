@@ -206,10 +206,10 @@ func (r *TypesenseClusterReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	}
 
 	if configMapUpdated == nil {
-		r.logger.Info(fmt.Sprintf("%s cluster completed", string(action)), "condition", cond, "requeueAfter", requeueAfter)
 		if action == Bootstrapping {
 			requeueAfter = 15 * time.Second
 		}
+		r.logger.Info(fmt.Sprintf("%s cluster completed", string(action)), "condition", cond, "requeueAfter", requeueAfter)
 		return ctrl.Result{RequeueAfter: requeueAfter}, nil
 	}
 

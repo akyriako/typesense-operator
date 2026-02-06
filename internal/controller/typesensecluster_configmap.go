@@ -224,6 +224,11 @@ func (r *TypesenseClusterReconciler) getNodes(ctx context.Context, ts *tsv1alpha
 		return nodes, nil
 	}
 
+	if bootstrapping {
+		fallbackNodes := make([]string, 0)
+		return getFallbackNodes(fallbackNodes)
+	}
+
 	unscheduledPods := int32(0)
 	targetReplicas := replicas
 
@@ -271,8 +276,9 @@ func (r *TypesenseClusterReconciler) getNodes(ctx context.Context, ts *tsv1alpha
 		targetReplicas = ptr.Deref[int32](sts.Spec.Replicas, 1)
 	}
 
-	if bootstrapping || unscheduledPods == targetReplicas {
-		return getFallbackNodes(nodes)
+	if unscheduledPods == targetReplicas {
+		fallbackNodes := make([]string, 0)
+		return getFallbackNodes(fallbackNodes)
 	}
 
 	eps, err := r.getEndpointSlicesForStatefulSet(ctx, sts)
