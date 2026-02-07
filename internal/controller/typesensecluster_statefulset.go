@@ -30,6 +30,7 @@ const (
 	readLagAnnotationKey               = "ts.opentelekomcloud.com/read-lag-threshold"
 	writeLagAnnotationKey              = "ts.opentelekomcloud.com/write-lag-threshold"
 	restartPodsAnnotationKey           = "kubectl.kubernetes.io/restartedAt"
+	rancherDomainAnnotationKey         = "cattle.io"
 )
 
 func (r *TypesenseClusterReconciler) ReconcileStatefulSet(ctx context.Context, ts *tsv1alpha1.TypesenseCluster) (*appsv1.StatefulSet, error) {
@@ -91,7 +92,7 @@ func (r *TypesenseClusterReconciler) ReconcileStatefulSet(ctx context.Context, t
 
 				update, triggers := r.shouldUpdateStatefulSet(sts, desiredSts, ts)
 				if update {
-					r.logger.V(debugLevel).Info("updating statefulset", "sts", sts.Name, "trigger", triggers)
+					r.logger.V(debugLevel).Info("updating statefulset", "sts", sts.Name, "triggers", triggers)
 
 					oldImage := strings.Replace(sts.Spec.Template.Spec.Containers[0].Image, "typesense/typesense:", "", -1)
 					newImage := strings.Replace(desiredSts.Spec.Template.Spec.Containers[0].Image, "typesense/typesense:", "", -1)
@@ -529,22 +530,6 @@ var (
 	ContainerSecurityContextChanged UpdateStatefulSetTrigger = "ContainerSecurityContextChanged"
 )
 
-func filterStatefulSetAnnotations(annotations map[string]string) map[string]string {
-	if len(annotations) == 0 {
-		return annotations
-	}
-
-	filtered := make(map[string]string, len(annotations))
-	for key, value := range annotations {
-		if strings.HasPrefix(key, "field.cattle.io") {
-			continue
-		}
-		filtered[key] = value
-	}
-
-	return filtered
-}
-
 func (r *TypesenseClusterReconciler) shouldUpdateStatefulSet(sts *appsv1.StatefulSet, desired *appsv1.StatefulSet, ts *tsv1alpha1.TypesenseCluster) (update bool, triggers []UpdateStatefulSetTrigger) {
 	update = false
 
@@ -570,9 +555,8 @@ func (r *TypesenseClusterReconciler) shouldUpdateStatefulSet(sts *appsv1.Statefu
 		update = true
 	}
 
-	stsAnnotations := filterStatefulSetAnnotations(sts.ObjectMeta.Annotations)
-	podAnnotations := filterStatefulSetAnnotations(sts.Spec.Template.Annotations)
-	delete(podAnnotations, restartPodsAnnotationKey)
+	stsAnnotations := filterAnnotations(sts.ObjectMeta.Annotations, rancherDomainAnnotationKey)
+	podAnnotations := filterAnnotations(sts.Spec.Template.Annotations, restartPodsAnnotationKey, rancherDomainAnnotationKey)
 
 	// PodAnnotationsChanged
 	if !apiequality.Semantic.DeepEqual(podAnnotations, desired.Spec.Template.Annotations) {
