@@ -10,8 +10,6 @@ import (
 	"text/template"
 	"time"
 
-	"reflect"
-
 	tsv1alpha1 "github.com/akyriako/typesense-operator/api/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -57,6 +55,8 @@ const (
 					}`
 )
 
+const clusterIssuerAnnotationKey = "cert-manager.io/cluster-issuer"
+
 func (r *TypesenseClusterReconciler) ReconcileIngress(ctx context.Context, ts tsv1alpha1.TypesenseCluster) (err error) {
 	r.logger.V(debugLevel).Info("reconciling ingress")
 
@@ -90,8 +90,8 @@ func (r *TypesenseClusterReconciler) ReconcileIngress(ctx context.Context, ts ts
 		}
 	} else {
 		if ts.Spec.Ingress.Host != ig.Spec.Rules[0].Host ||
-			(ts.Spec.Ingress.ClusterIssuer != nil && *ts.Spec.Ingress.ClusterIssuer != ig.Annotations["cert-manager.io/cluster-issuer"]) ||
-			!reflect.DeepEqual(ts.Spec.Ingress.Annotations, r.getIngressAnnotations(ig)) ||
+			(ts.Spec.Ingress.ClusterIssuer != nil && *ts.Spec.Ingress.ClusterIssuer != ig.Annotations[clusterIssuerAnnotationKey]) ||
+			!apiequality.Semantic.DeepEqual(ts.Spec.Ingress.Annotations, r.getIngressAnnotations(ig)) ||
 			(ts.Spec.Ingress.TLSSecretName != nil && *ts.Spec.Ingress.TLSSecretName != ig.Spec.TLS[0].SecretName) ||
 			ts.Spec.Ingress.IngressClassName != *ig.Spec.IngressClassName ||
 			ts.Spec.Ingress.Path != ig.Spec.Rules[0].IngressRuleValue.HTTP.Paths[0].Path ||
@@ -173,12 +173,12 @@ func (r *TypesenseClusterReconciler) ReconcileIngress(ctx context.Context, ts ts
 		}
 	} else {
 		desiredResources := ts.Spec.Ingress.GetReverseProxyResources()
-		deploymentResourcesNeedUpdate := !reflect.DeepEqual(desiredResources, deployment.Spec.Template.Spec.Containers[0].Resources)
+		deploymentResourcesNeedUpdate := !apiequality.Semantic.DeepEqual(desiredResources, deployment.Spec.Template.Spec.Containers[0].Resources)
 		if deploymentResourcesNeedUpdate {
 			deployment.Spec.Template.Spec.Containers[0].Resources = desiredResources
 		}
 
-		deploymentImageNeedUpdate := !reflect.DeepEqual(ts.Spec.Ingress.Image, deployment.Spec.Template.Spec.Containers[0].Image)
+		deploymentImageNeedUpdate := !apiequality.Semantic.DeepEqual(ts.Spec.Ingress.Image, deployment.Spec.Template.Spec.Containers[0].Image)
 		if deploymentImageNeedUpdate {
 			deployment.Spec.Template.Spec.Containers[0].Image = ts.Spec.Ingress.Image
 		}
@@ -199,7 +199,7 @@ func (r *TypesenseClusterReconciler) ReconcileIngress(ctx context.Context, ts ts
 				}
 			}
 
-			if !reflect.DeepEqual(securityContext, deployment.Spec.Template.Spec.Containers[0].SecurityContext) {
+			if !apiequality.Semantic.DeepEqual(securityContext, deployment.Spec.Template.Spec.Containers[0].SecurityContext) {
 				readOnlyRootFilesystemSpecsNeedUpdate = true
 				deployment.Spec.Template.Spec.Containers[0].SecurityContext = securityContext
 			}
@@ -282,7 +282,7 @@ func (r *TypesenseClusterReconciler) createIngress(ctx context.Context, key clie
 	var tlsSecretName string
 
 	if ts.Spec.Ingress.ClusterIssuer != nil {
-		annotations["cert-manager.io/cluster-issuer"] = *ts.Spec.Ingress.ClusterIssuer
+		annotations[clusterIssuerAnnotationKey] = *ts.Spec.Ingress.ClusterIssuer
 		tlsSecretName = fmt.Sprintf("%s-reverse-proxy-%s-certificate-tls", ts.Name, *ts.Spec.Ingress.ClusterIssuer)
 	}
 
@@ -358,7 +358,7 @@ func (r *TypesenseClusterReconciler) updateIngress(ctx context.Context, ig netwo
 	var tlsSecretName string
 
 	if ts.Spec.Ingress.ClusterIssuer != nil {
-		annotations["cert-manager.io/cluster-issuer"] = *ts.Spec.Ingress.ClusterIssuer
+		annotations[clusterIssuerAnnotationKey] = *ts.Spec.Ingress.ClusterIssuer
 		tlsSecretName = fmt.Sprintf("%s-reverse-proxy-%s-certificate-tls", ts.Name, *ts.Spec.Ingress.ClusterIssuer)
 	}
 
@@ -389,17 +389,8 @@ func (r *TypesenseClusterReconciler) deleteIngress(ctx context.Context, ig *netw
 }
 
 func (r *TypesenseClusterReconciler) getIngressAnnotations(ig *networkingv1.Ingress) map[string]string {
-	annotations := make(map[string]string, len(ig.Annotations))
-	for k, v := range ig.Annotations {
-		annotations[k] = v
-	}
-
-	delete(annotations, "cert-manager.io/cluster-issuer")
-	if len(annotations) == 0 {
-		annotations = nil
-	}
-
-	return annotations
+	filtered := filterAnnotations(ig.Annotations, clusterIssuerAnnotationKey, rancherDomainAnnotationKey)
+	return filtered
 }
 
 func (r *TypesenseClusterReconciler) createIngressConfigMap(ctx context.Context, key client.ObjectKey, ts *tsv1alpha1.TypesenseCluster, ig *networkingv1.Ingress) (*v1.ConfigMap, error) {

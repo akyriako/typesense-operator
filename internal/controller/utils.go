@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"regexp"
 	"sort"
+	"strings"
 
 	tsv1alpha1 "github.com/akyriako/typesense-operator/api/v1alpha1"
 	"golang.org/x/text/cases"
@@ -186,4 +187,27 @@ func hasIP4Prefix(s string) bool {
 
 func toTitle(s string) string {
 	return cases.Title(language.Und, cases.NoLower).String(s)
+}
+
+func filterAnnotations(annotations map[string]string, filters ...string) map[string]string {
+	if len(annotations) == 0 {
+		return annotations
+	}
+
+	filtered := make(map[string]string, len(annotations))
+	for key, value := range annotations {
+		skip := false
+		for _, f := range filters {
+			if strings.Contains(key, f) {
+				skip = true
+				break
+			}
+		}
+		if skip {
+			continue
+		}
+		filtered[key] = value
+	}
+
+	return filtered
 }
