@@ -211,3 +211,11 @@ func filterAnnotations(annotations map[string]string, filters ...string) map[str
 
 	return filtered
 }
+
+func getImageTag(image string) string {
+	pos := strings.LastIndex(image, ":")
+	if pos == -1 {
+		return image
+	}
+	return image[pos+1:]
+}

@@ -94,8 +94,8 @@ func (r *TypesenseClusterReconciler) ReconcileStatefulSet(ctx context.Context, t
 				if update {
 					r.logger.V(debugLevel).Info("updating statefulset", "sts", sts.Name, "triggers", triggers)
 
-					oldImage := strings.Replace(sts.Spec.Template.Spec.Containers[0].Image, "typesense/typesense:", "", -1)
-					newImage := strings.Replace(desiredSts.Spec.Template.Spec.Containers[0].Image, "typesense/typesense:", "", -1)
+					oldImage := getImageTag(sts.Spec.Template.Spec.Containers[0].Image)
+					newImage := getImageTag(desiredSts.Spec.Template.Spec.Containers[0].Image)
 					if oldImage != newImage {
 						r.logger.V(debugLevel).Info("scheduling typesense update", "current", oldImage, "target", newImage)
 						r.Recorder.Eventf(ts, "Normal", "TypesenseVersionUpdate", "Scheduled update from %s to %s", oldImage, newImage)
