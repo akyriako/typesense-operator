@@ -31,6 +31,8 @@ const (
 	writeLagAnnotationKey              = "ts.opentelekomcloud.com/write-lag-threshold"
 	restartPodsAnnotationKey           = "kubectl.kubernetes.io/restartedAt"
 	rancherDomainAnnotationKey         = "cattle.io"
+	autopilotAnnotationKey             = "autopilot.gke.io"
+	wardenAnnotationKey                = "autopilot.gke.io/warden-version"
 )
 
 func (r *TypesenseClusterReconciler) ReconcileStatefulSet(ctx context.Context, ts *tsv1alpha1.TypesenseCluster) (*appsv1.StatefulSet, error) {
@@ -92,7 +94,8 @@ func (r *TypesenseClusterReconciler) ReconcileStatefulSet(ctx context.Context, t
 
 				update, triggers := r.shouldUpdateStatefulSet(sts, desiredSts, ts)
 				if update {
-					r.logger.V(debugLevel).Info("updating statefulset", "sts", sts.Name, "triggers", triggers)
+					restartPods := triggersRequireRestart(triggers)
+					r.logger.V(debugLevel).Info("updating statefulset", "sts", sts.Name, "triggers", triggers, "restartPods", restartPods)
 
 					oldImage := strings.Replace(sts.Spec.Template.Spec.Containers[0].Image, "typesense/typesense:", "", -1)
 					newImage := strings.Replace(desiredSts.Spec.Template.Spec.Containers[0].Image, "typesense/typesense:", "", -1)
@@ -101,7 +104,7 @@ func (r *TypesenseClusterReconciler) ReconcileStatefulSet(ctx context.Context, t
 						r.Recorder.Eventf(ts, "Normal", "TypesenseVersionUpdate", "Scheduled update from %s to %s", oldImage, newImage)
 					}
 
-					updatedSts, err := r.updateStatefulSet(ctx, sts, desiredSts)
+					updatedSts, err := r.updateStatefulSet(ctx, sts, desiredSts, restartPods)
 					if err != nil {
 						r.logger.Error(err, "updating statefulset failed", "sts", stsObjectKey.Name)
 						return nil, err
@@ -169,7 +172,7 @@ func (r *TypesenseClusterReconciler) createStatefulSet(ctx context.Context, key 
 	return sts, nil
 }
 
-func (r *TypesenseClusterReconciler) updateStatefulSet(ctx context.Context, sts *appsv1.StatefulSet, desired *appsv1.StatefulSet) (*appsv1.StatefulSet, error) {
+func (r *TypesenseClusterReconciler) updateStatefulSet(ctx context.Context, sts *appsv1.StatefulSet, desired *appsv1.StatefulSet, restartPods bool) (*appsv1.StatefulSet, error) {
 	patch := client.MergeFrom(sts.DeepCopy())
 	sts.Spec = desired.Spec
 
@@ -178,7 +181,9 @@ func (r *TypesenseClusterReconciler) updateStatefulSet(ctx context.Context, sts 
 	if sts.Spec.Template.Annotations == nil {
 		sts.Spec.Template.Annotations = map[string]string{}
 	}
-	sts.Spec.Template.Annotations[restartPodsAnnotationKey] = time.Now().Format(time.RFC3339)
+	if restartPods {
+		sts.Spec.Template.Annotations[restartPodsAnnotationKey] = time.Now().Format(time.RFC3339)
+	}
 	sts.Spec.Template.Annotations[hashAnnotationKey] = desired.Spec.Template.Annotations[hashAnnotationKey]
 
 	if err := r.Patch(ctx, sts, patch); err != nil {
@@ -259,7 +264,7 @@ func (r *TypesenseClusterReconciler) buildStatefulSet(ctx context.Context, key c
 								},
 								{
 									Name:  "TYPESENSE_NODES",
-									Value: "/usr/share/typesense/nodes",
+									Value: "/usr/share/typesense/fallback",
 								},
 								{
 									Name:  "TYPESENSE_DATA_DIR",
@@ -530,6 +535,28 @@ var (
 	ContainerSecurityContextChanged UpdateStatefulSetTrigger = "ContainerSecurityContextChanged"
 )
 
+// specLevelTriggers are triggers that indicate a genuine pod template spec change
+// which requires restarting pods to take effect.
+var specLevelTriggers = map[UpdateStatefulSetTrigger]struct{}{
+	BelowSpecReplicas:               {},
+	HashAnnotationChanged:           {},
+	SpecResourcesChanged:            {},
+	PodSecurityContextChanged:       {},
+	InvalidContainerCount:           {},
+	ContainerSecurityContextChanged: {},
+}
+
+// triggersRequireRestart returns true if any of the triggers indicate a spec-level
+// change that requires restarting pods.
+func triggersRequireRestart(triggers []UpdateStatefulSetTrigger) bool {
+	for _, t := range triggers {
+		if _, ok := specLevelTriggers[t]; ok {
+			return true
+		}
+	}
+	return false
+}
+
 func (r *TypesenseClusterReconciler) shouldUpdateStatefulSet(sts *appsv1.StatefulSet, desired *appsv1.StatefulSet, ts *tsv1alpha1.TypesenseCluster) (update bool, triggers []UpdateStatefulSetTrigger) {
 	update = false
 
@@ -555,11 +582,21 @@ func (r *TypesenseClusterReconciler) shouldUpdateStatefulSet(sts *appsv1.Statefu
 		update = true
 	}
 
-	stsAnnotations := filterAnnotations(sts.ObjectMeta.Annotations, rancherDomainAnnotationKey)
-	podAnnotations := filterAnnotations(sts.Spec.Template.Annotations, restartPodsAnnotationKey, rancherDomainAnnotationKey)
+	// Filter out annotations injected by external tools (Rancher, GKE Autopilot, operator itself)
+	// so that external mutations do not trigger unnecessary StatefulSet updates and pod restarts.
+	annotationFilters := []string{
+		rancherDomainAnnotationKey,
+		autopilotAnnotationKey,
+		forceConfigMapUpdateAnnotationKey,
+	}
+	podAnnotationFilters := append([]string{restartPodsAnnotationKey, hashAnnotationKey}, annotationFilters...)
+
+	stsAnnotations := filterAnnotations(sts.ObjectMeta.Annotations, annotationFilters...)
+	podAnnotations := filterAnnotations(sts.Spec.Template.Annotations, podAnnotationFilters...)
+	desiredPodAnnotations := filterAnnotations(desired.Spec.Template.Annotations, hashAnnotationKey)
 
 	// PodAnnotationsChanged
-	if !apiequality.Semantic.DeepEqual(podAnnotations, desired.Spec.Template.Annotations) {
+	if !apiequality.Semantic.DeepEqual(podAnnotations, desiredPodAnnotations) {
 		triggers = append(triggers, PodAnnotationsChanged)
 		update = true
 	}
@@ -570,39 +607,16 @@ func (r *TypesenseClusterReconciler) shouldUpdateStatefulSet(sts *appsv1.Statefu
 		update = true
 	}
 
-	// SpecResourcesChanged
-	if !apiequality.Semantic.DeepEqual(sts.Spec.Template.Spec.Containers[0].Resources, ts.Spec.GetResources()) {
-		triggers = append(triggers, SpecResourcesChanged)
-		update = true
-	}
-
-	// PodSecurityContextChanged
-	if !apiequality.Semantic.DeepEqual(sts.Spec.Template.Spec.SecurityContext, ts.Spec.GetPodSecurityContext()) {
-		triggers = append(triggers, PodSecurityContextChanged)
-		update = true
-	}
+	// NOTE: SpecResourcesChanged, PodSecurityContextChanged, and ContainerSecurityContextChanged
+	// are intentionally NOT checked here. These comparisons cause infinite update loops when
+	// admission webhooks (GKE Autopilot, Kyverno, Gatekeeper) mutate the StatefulSet by adding
+	// fields like ephemeral-storage to resources or seccompProfile to securityContext.
+	// The HashAnnotationChanged trigger already covers genuine CR spec changes since the hash
+	// is computed from the desired pod template spec built from the CR.
 
 	// InvalidContainerCount
 	if len(sts.Spec.Template.Spec.Containers) < 3 {
 		triggers = append(triggers, InvalidContainerCount)
-		update = true
-	}
-
-	// ContainerSecurityContextChanged
-	if !apiequality.Semantic.DeepEqual(sts.Spec.Template.Spec.Containers[0].SecurityContext, ts.Spec.GetTypesenseSecurityContext()) {
-		triggers = append(triggers, ContainerSecurityContextChanged)
-		update = true
-	}
-
-	// ContainerSecurityContextChanged
-	if !apiequality.Semantic.DeepEqual(sts.Spec.Template.Spec.Containers[1].SecurityContext, ts.Spec.GetMetricsSecurityContext()) {
-		triggers = append(triggers, ContainerSecurityContextChanged)
-		update = true
-	}
-
-	// ContainerSecurityContextChanged
-	if !apiequality.Semantic.DeepEqual(sts.Spec.Template.Spec.Containers[2].SecurityContext, ts.Spec.GetHealthcheckSecurityContext()) {
-		triggers = append(triggers, ContainerSecurityContextChanged)
 		update = true
 	}
 
@@ -614,39 +628,18 @@ func (r *TypesenseClusterReconciler) shouldEmergencyUpdateStatefulSet(sts *appsv
 		return false
 	}
 
-	// ResourcesChanged
-	if !apiequality.Semantic.DeepEqual(sts.Spec.Template.Spec.Containers[0].Resources, ts.Spec.GetResources()) {
-		return true
-	}
-
-	// PodSecurityContextChanged
-	if !apiequality.Semantic.DeepEqual(sts.Spec.Template.Spec.SecurityContext, ts.Spec.GetPodSecurityContext()) {
-		return true
-	}
+	// NOTE: Resource and SecurityContext comparisons are intentionally removed here.
+	// Admission webhooks (GKE Autopilot, Kyverno, Gatekeeper) mutate these fields on the
+	// live StatefulSet, causing permanent diffs against the CR spec and infinite update loops.
+	// Genuine CR spec changes are detected via HashAnnotationChanged in shouldUpdateStatefulSet.
 
 	// InvalidContainerCount
 	if len(sts.Spec.Template.Spec.Containers) < 3 {
 		return true
 	}
 
-	// ContainerSecurityContextChanged
-	if !apiequality.Semantic.DeepEqual(sts.Spec.Template.Spec.Containers[0].SecurityContext, ts.Spec.GetTypesenseSecurityContext()) {
-		return true
-	}
-
-	// ContainerSecurityContextChanged
-	if !apiequality.Semantic.DeepEqual(sts.Spec.Template.Spec.Containers[1].SecurityContext, ts.Spec.GetMetricsSecurityContext()) {
-		return true
-	}
-
-	// ContainerSecurityContextChanged
-	if !apiequality.Semantic.DeepEqual(sts.Spec.Template.Spec.Containers[2].SecurityContext, ts.Spec.GetHealthcheckSecurityContext()) {
-		return true
-	}
-
 	return false
 }
-
 func (r *TypesenseClusterReconciler) ScaleStatefulSet(ctx context.Context, stsObjectKey client.ObjectKey, desiredReplicas int32) error {
 	sts, err := r.GetFreshStatefulSet(ctx, stsObjectKey)
 	if err != nil {
