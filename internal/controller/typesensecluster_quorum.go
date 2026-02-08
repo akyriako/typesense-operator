@@ -216,6 +216,11 @@ func (r *TypesenseClusterReconciler) ReconcileQuorum(ctx context.Context, ts *ts
 	return ConditionReasonQuorumReady, 0, nil
 }
 
+var (
+	QuorumDowngraded UpdateStatefulSetTrigger = "QuorumDowngraded"
+	QuorumUpgraded   UpdateStatefulSetTrigger = "QuorumUpgraded"
+)
+
 func (r *TypesenseClusterReconciler) downgradeQuorum(
 	ctx context.Context,
 	ts *tsv1alpha1.TypesenseCluster,
@@ -223,7 +228,8 @@ func (r *TypesenseClusterReconciler) downgradeQuorum(
 	stsObjectKey client.ObjectKey,
 	healthyNodes, minRequiredNodes int32,
 ) (ConditionQuorum, int, error) {
-	r.logger.Info("downgrading quorum")
+	//r.logger.Info("downgrading quorum")
+	r.logger.V(debugLevel).Info("scaling statefulset", "sts", stsObjectKey.Name, "triggers", QuorumDowngraded)
 
 	sts, err := r.GetFreshStatefulSet(ctx, stsObjectKey)
 	if err != nil {
@@ -264,7 +270,8 @@ func (r *TypesenseClusterReconciler) upgradeQuorum(
 	cm *v1.ConfigMap,
 	stsObjectKey client.ObjectKey,
 ) (ConditionQuorum, int, error) {
-	r.logger.Info("upgrading quorum", "incremental", ts.Spec.IncrementalQuorumRecovery)
+	//r.logger.Info("upgrading quorum", "incremental", ts.Spec.IncrementalQuorumRecovery)
+	r.logger.V(debugLevel).Info("scaling statefulset", "sts", stsObjectKey.Name, "triggers", QuorumUpgraded, "incremental", ts.Spec.IncrementalQuorumRecovery)
 
 	sts, err := r.GetFreshStatefulSet(ctx, stsObjectKey)
 	if err != nil {

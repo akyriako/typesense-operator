@@ -92,14 +92,14 @@ func (r *TypesenseClusterReconciler) ReconcileStatefulSet(ctx context.Context, t
 
 				update, scaleOnly, triggers := r.shouldUpdateStatefulSet(sts, desiredSts, ts)
 				if update {
-					r.logger.V(debugLevel).Info("updating statefulset", "sts", sts.Name, "triggers", triggers)
-
 					oldImage := getImageTag(sts.Spec.Template.Spec.Containers[0].Image)
 					newImage := getImageTag(desiredSts.Spec.Template.Spec.Containers[0].Image)
 					if oldImage != newImage {
-						r.logger.V(debugLevel).Info("scheduling typesense update", "current", oldImage, "target", newImage)
+						triggers = append(triggers, SpecTypesenseVersionChanged)
 						r.Recorder.Eventf(ts, "Normal", "TypesenseVersionUpdate", "Scheduled update from %s to %s", oldImage, newImage)
 					}
+
+					r.logger.V(debugLevel).Info("updating statefulset", "sts", sts.Name, "triggers", triggers)
 
 					updatedSts, err := r.updateStatefulSet(ctx, sts, desiredSts)
 					if err != nil {
@@ -127,7 +127,7 @@ func (r *TypesenseClusterReconciler) ReconcileStatefulSet(ctx context.Context, t
 					r.logLagThresholds(updatedSts)
 					return updatedSts, nil
 				} else if !update && scaleOnly {
-					r.logger.V(debugLevel).Info("scaling statefulset", "sts", sts.Name)
+					r.logger.V(debugLevel).Info("scaling statefulset", "sts", sts.Name, "triggers", triggers)
 
 					size := ts.Spec.Replicas
 					err = r.ScaleStatefulSet(ctx, stsObjectKey, size)
@@ -547,7 +547,7 @@ func (r *TypesenseClusterReconciler) buildStatefulSet(ctx context.Context, key c
 type UpdateStatefulSetTrigger string
 
 var (
-	BelowSpecReplicas               UpdateStatefulSetTrigger = "BelowSpecReplicas"
+	SpecReplicasChanged             UpdateStatefulSetTrigger = "SpecReplicasChanged"
 	HashAnnotationChanged           UpdateStatefulSetTrigger = "HashAnnotationChanged"
 	PodAnnotationsChanged           UpdateStatefulSetTrigger = "PodAnnotationsChanged"
 	StatefulSetAnnotationsChanged   UpdateStatefulSetTrigger = "StatefulSetAnnotationsChanged"
@@ -555,6 +555,7 @@ var (
 	PodSecurityContextChanged       UpdateStatefulSetTrigger = "PodSecurityContextChanged"
 	InvalidContainerCount           UpdateStatefulSetTrigger = "InvalidContainerCount"
 	ContainerSecurityContextChanged UpdateStatefulSetTrigger = "ContainerSecurityContextChanged"
+	SpecTypesenseVersionChanged     UpdateStatefulSetTrigger = "SpecTypesenseVersionChanged"
 )
 
 func (r *TypesenseClusterReconciler) shouldUpdateStatefulSet(sts *appsv1.StatefulSet, desired *appsv1.StatefulSet, ts *tsv1alpha1.TypesenseCluster) (update bool, scaleOnly bool, triggers []UpdateStatefulSetTrigger) {
@@ -570,11 +571,10 @@ func (r *TypesenseClusterReconciler) shouldUpdateStatefulSet(sts *appsv1.Statefu
 		return false, false, nil
 	}
 
-	// BelowSpecReplicas
+	// SpecReplicasChanged
 	if *sts.Spec.Replicas != ts.Spec.Replicas &&
 		(condition.Reason != string(ConditionReasonQuorumDowngraded) || condition.Reason != string(ConditionReasonQuorumQueuedWrites)) {
-		//triggers = append(triggers, BelowSpecReplicas)
-		update = false
+		triggers = append(triggers, SpecReplicasChanged)
 		scaleOnly = true
 	}
 
