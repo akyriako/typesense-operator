@@ -117,7 +117,8 @@ func (r *TypesenseClusterReconciler) ReconcileQuorum(ctx context.Context, ts *ts
 
 	if clusterStatus == ClusterStatusSplitBrain {
 		nodeslist := strings.Split(quorum.NodesListConfigMap.Data["fallback"], ",")
-		if _, c := contains(nodeslist, fmt.Sprintf(ClusterStatefulSet, ts.Name)); c {
+		stsPrefix := fmt.Sprintf(ClusterStatefulSet, ts.Name)
+		if containsPrefix(nodeslist, stsPrefix) {
 			return ConditionReasonQuorumNotReadyWaitATerm, 0, nil
 		}
 		return r.downgradeQuorum(ctx, ts, quorum.NodesListConfigMap, stsObjectKey, sts.Status.ReadyReplicas, int32(quorum.MinRequiredNodes))
@@ -171,34 +172,18 @@ func (r *TypesenseClusterReconciler) ReconcileQuorum(ctx context.Context, ts *ts
 
 	if clusterStatus == ClusterStatusElectionDeadlock {
 		nodeslist := strings.Split(quorum.NodesListConfigMap.Data["fallback"], ",")
-		if _, c := contains(nodeslist, fmt.Sprintf(ClusterStatefulSet, ts.Name)); c {
+		stsPrefix := fmt.Sprintf(ClusterStatefulSet, ts.Name)
+		if containsPrefix(nodeslist, stsPrefix) {
 			return ConditionReasonQuorumNotReadyWaitATerm, 0, nil
 		}
 		return r.downgradeQuorum(ctx, ts, quorum.NodesListConfigMap, stsObjectKey, int32(healthyNodes), int32(minRequiredNodes))
 	}
 
 	if clusterStatus == ClusterStatusNotReady {
-		if availableNodes == 1 {
-			podName := fmt.Sprintf("%s-%d", fmt.Sprintf(ClusterStatefulSet, ts.Name), 0)
-			nodeStatus := nodesStatus[podName]
-			state := nodeStatus.State
-
-			if state == ErrorState || state == UnreachableState {
-				r.logger.Info("purging quorum")
-				err := r.PurgeStatefulSetPods(ctx, sts, ts)
-				if err != nil {
-					return ConditionReasonQuorumNotReady, 0, err
-				}
-
-				return ConditionReasonQuorumNotReady, 0, nil
-			}
-
-			return ConditionReasonQuorumNotReadyWaitATerm, 0, nil
-		}
-
-		if minRequiredNodes > healthyNodes {
-			return ConditionReasonQuorumNotReadyWaitATerm, 0, nil
-		}
+		// Never purge all pods — killing the last pod makes recovery impossible
+		// and defeats the purpose of running a multi-node cluster.
+		// Instead, wait for the pod(s) to recover on their own.
+		return ConditionReasonQuorumNotReadyWaitATerm, 0, nil
 	}
 
 	if clusterStatus == ClusterStatusOK && *sts.Spec.Replicas < ts.Spec.Replicas {
@@ -225,26 +210,29 @@ func (r *TypesenseClusterReconciler) downgradeQuorum(
 ) (ConditionQuorum, int, error) {
 	r.logger.Info("downgrading quorum")
 
-	sts, err := r.GetFreshStatefulSet(ctx, stsObjectKey)
+	_, err := r.GetFreshStatefulSet(ctx, stsObjectKey)
 	if err != nil {
 		return ConditionReasonQuorumNotReady, 0, err
 	}
 
-	desiredReplicas := int32(1)
+	// Never scale below the minimum required nodes for quorum.
+	// For a 3-node cluster, minRequiredNodes = 2. Scaling to 1 destroys
+	// quorum and makes Raft leader election impossible, leaving the cluster
+	// in an unrecoverable state.
+	desiredReplicas := minRequiredNodes
+	if desiredReplicas < 1 {
+		desiredReplicas = 1
+	}
+
+	r.logger.Info("downgrade target", "desiredReplicas", desiredReplicas, "minRequiredNodes", minRequiredNodes)
 
 	err = r.ScaleStatefulSet(ctx, stsObjectKey, desiredReplicas)
 	if err != nil {
 		return ConditionReasonQuorumNotReady, 0, err
 	}
 
-	if healthyNodes == 0 && minRequiredNodes == 1 {
-		r.logger.Info("purging quorum")
-
-		err = r.PurgeStatefulSetPods(ctx, sts, ts)
-		if err != nil {
-			return ConditionReasonQuorumNotReady, 0, err
-		}
-	}
+	// Never purge all pods — this kills every running instance and defeats
+	// the purpose of running a multi-node cluster for high availability.
 
 	_, size, updated, err := r.updateConfigMap(ctx, ts, cm, ptr.To[int32](desiredReplicas), true)
 	if err != nil {

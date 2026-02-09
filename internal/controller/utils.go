@@ -130,6 +130,15 @@ func contains(values []string, value string) (int, bool) {
 	return -1, false
 }
 
+func containsPrefix(values []string, prefix string) bool {
+	for _, v := range values {
+		if strings.HasPrefix(v, prefix) {
+			return true
+		}
+	}
+	return false
+}
+
 func normalizeVolumes(vols []corev1.Volume) []corev1.Volume {
 	if vols == nil {
 		vols = []corev1.Volume{}

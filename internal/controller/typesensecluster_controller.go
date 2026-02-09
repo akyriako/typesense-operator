@@ -286,6 +286,15 @@ func (r *TypesenseClusterReconciler) Reconcile(ctx context.Context, req ctrl.Req
 
 	cond = condition
 
+	// Use a shorter requeue for transient conditions that should resolve quickly
+	// (e.g. Raft election in progress after pod restart). The default 90s is too
+	// slow — pods stay at 0/1 readiness gates while waiting for the next reconcile.
+	if condition == ConditionReasonQuorumNotReadyWaitATerm ||
+		condition == ConditionReasonQuorumDowngraded ||
+		condition == ConditionReasonQuorumNotReady {
+		requeueAfter = 15 * time.Second
+	}
+
 	r.logger.Info(fmt.Sprintf("%s cluster completed", string(action)), "condition", cond, "requeueAfter", requeueAfter)
 	return ctrl.Result{RequeueAfter: requeueAfter}, nil
 }
