@@ -116,8 +116,8 @@ func (r *TypesenseClusterReconciler) ReconcileQuorum(ctx context.Context, ts *ts
 	r.logger.V(debugLevel).Info("reporting cluster status", "status", clusterStatus)
 
 	if clusterStatus == ClusterStatusSplitBrain {
-		nodeslist := strings.Split(quorum.NodesListConfigMap.Data["nodeslist"], ",")
-		if _, c := contains(nodeslist, fmt.Sprintf(ClusterStatefulSet, ts.Name)); c == true {
+		nodeslist := strings.Split(quorum.NodesListConfigMap.Data["fallback"], ",")
+		if _, c := contains(nodeslist, fmt.Sprintf(ClusterStatefulSet, ts.Name)); c {
 			return ConditionReasonQuorumNotReadyWaitATerm, 0, nil
 		}
 		return r.downgradeQuorum(ctx, ts, quorum.NodesListConfigMap, stsObjectKey, sts.Status.ReadyReplicas, int32(quorum.MinRequiredNodes))
@@ -170,8 +170,8 @@ func (r *TypesenseClusterReconciler) ReconcileQuorum(ctx context.Context, ts *ts
 	}
 
 	if clusterStatus == ClusterStatusElectionDeadlock {
-		nodeslist := strings.Split(quorum.NodesListConfigMap.Data["nodeslist"], ",")
-		if _, c := contains(nodeslist, fmt.Sprintf(ClusterStatefulSet, ts.Name)); c == true {
+		nodeslist := strings.Split(quorum.NodesListConfigMap.Data["fallback"], ",")
+		if _, c := contains(nodeslist, fmt.Sprintf(ClusterStatefulSet, ts.Name)); c {
 			return ConditionReasonQuorumNotReadyWaitATerm, 0, nil
 		}
 		return r.downgradeQuorum(ctx, ts, quorum.NodesListConfigMap, stsObjectKey, int32(healthyNodes), int32(minRequiredNodes))

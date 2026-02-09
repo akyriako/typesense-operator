@@ -71,6 +71,26 @@ func (r *TypesenseClusterReconciler) ReconcileStatefulSet(ctx context.Context, t
 		r.logLagThresholds(sts)
 		return sts, nil
 	} else {
+		// Always scale up if below spec replicas, regardless of quorum condition.
+		// This prevents the STS from getting stuck at a reduced replica count when
+		// the condition is in a skip state (e.g. QuorumNotReadyWaitATerm).
+		if sts.Spec.Replicas != nil && *sts.Spec.Replicas < ts.Spec.Replicas {
+			r.logger.V(debugLevel).Info("scaling statefulset to match spec replicas",
+				"sts", sts.Name, "current", *sts.Spec.Replicas, "desired", ts.Spec.Replicas)
+			desiredSts, err := r.buildStatefulSet(ctx, stsObjectKey, ts)
+			if err != nil {
+				r.logger.Error(err, "building statefulset failed", "sts", stsObjectKey.Name)
+			} else {
+				updatedSts, err := r.updateStatefulSet(ctx, sts, desiredSts, false)
+				if err != nil {
+					r.logger.Error(err, "scaling statefulset failed", "sts", stsObjectKey.Name)
+					return nil, err
+				}
+				r.logLagThresholds(updatedSts)
+				return updatedSts, nil
+			}
+		}
+
 		skipConditions := []string{
 			string(ConditionReasonQuorumDowngraded),
 			string(ConditionReasonQuorumUpgraded),

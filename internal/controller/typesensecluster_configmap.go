@@ -125,8 +125,8 @@ func (r *TypesenseClusterReconciler) updateConfigMap(ctx context.Context, ts *ts
 
 	availableNodes := len(nodes)
 	if availableNodes == 0 {
-		r.logger.V(debugLevel).Info("empty quorum configuration")
-		return nil, 0, false, fmt.Errorf("empty quorum configuration")
+		r.logger.V(debugLevel).Info("empty quorum configuration, skipping configmap update")
+		return cm, 0, false, nil
 	}
 
 	desired := cm.DeepCopy()
