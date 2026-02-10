@@ -45,6 +45,25 @@ func generateSecureRandomString(length int) (string, error) {
 	return string(result), nil
 }
 
+func getMergedLabels(def map[string]string, scoped map[string]string) map[string]string {
+	merged := make(map[string]string, len(def)+len(scoped))
+	for k, v := range def {
+		merged[k] = v
+	}
+	for k, v := range scoped {
+		merged[k] = v
+	}
+	return merged
+}
+
+func getDefaultLabels(ts *tsv1alpha1.TypesenseCluster) map[string]string {
+	return map[string]string{
+		"app.kubernetes.io/managed-by": "typesense-operator",
+		"app.kubernetes.io/name":       "typesense",
+		"app.kubernetes.io/instance":   ts.Name,
+	}
+}
+
 func getLabels(ts *tsv1alpha1.TypesenseCluster) map[string]string {
 	return map[string]string{
 		"app": fmt.Sprintf(ClusterAppLabel, ts.Name),
@@ -59,7 +78,7 @@ func getObjectMeta(ts *tsv1alpha1.TypesenseCluster, name *string, annotations ma
 	return metav1.ObjectMeta{
 		Name:        *name,
 		Namespace:   ts.Namespace,
-		Labels:      getLabels(ts),
+		Labels:      getMergedLabels(getDefaultLabels(ts), getLabels(ts)),
 		Annotations: annotations,
 	}
 }
@@ -78,7 +97,7 @@ func getReverseProxyObjectMeta(ts *tsv1alpha1.TypesenseCluster, name *string, an
 	return metav1.ObjectMeta{
 		Name:        *name,
 		Namespace:   ts.Namespace,
-		Labels:      getReverseProxyLabels(ts),
+		Labels:      getMergedLabels(getDefaultLabels(ts), getReverseProxyLabels(ts)),
 		Annotations: annotations,
 	}
 }
@@ -97,7 +116,7 @@ func getPodMonitorObjectMeta(ts *tsv1alpha1.TypesenseCluster, name *string, anno
 	return metav1.ObjectMeta{
 		Name:        *name,
 		Namespace:   ts.Namespace,
-		Labels:      getPodMonitorLabels(ts),
+		Labels:      getMergedLabels(getDefaultLabels(ts), getPodMonitorLabels(ts)),
 		Annotations: annotations,
 	}
 }
