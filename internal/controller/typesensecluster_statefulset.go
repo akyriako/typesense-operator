@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"strconv"
-	"strings"
 	"time"
 
 	tsv1alpha1 "github.com/akyriako/typesense-operator/api/v1alpha1"
@@ -33,7 +32,7 @@ const (
 	rancherDomainAnnotationKey         = "cattle.io"
 )
 
-func (r *TypesenseClusterReconciler) ReconcileStatefulSet(ctx context.Context, ts *tsv1alpha1.TypesenseCluster) (*appsv1.StatefulSet, error) {
+func (r *TypesenseClusterReconciler) ReconcileStatefulSet(ctx context.Context, ts *tsv1alpha1.TypesenseCluster) (*appsv1.StatefulSet, bool, error) {
 	r.logger.V(debugLevel).Info("reconciling statefulset")
 
 	stsName := fmt.Sprintf(ClusterStatefulSet, ts.Name)
@@ -49,7 +48,7 @@ func (r *TypesenseClusterReconciler) ReconcileStatefulSet(ctx context.Context, t
 			stsExists = false
 		} else {
 			r.logger.Error(err, fmt.Sprintf("unable to fetch statefulset: %s", stsName))
-			return nil, err
+			return nil, false, err
 		}
 	}
 
@@ -63,11 +62,11 @@ func (r *TypesenseClusterReconciler) ReconcileStatefulSet(ctx context.Context, t
 		)
 		if err != nil {
 			r.logger.Error(err, "creating statefulset failed", "sts", stsObjectKey.Name)
-			return nil, err
+			return nil, false, err
 		}
 
 		r.logLagThresholds(sts)
-		return sts, nil
+		return sts, false, nil
 	} else {
 		skipConditions := []string{
 			string(ConditionReasonQuorumDowngraded),
@@ -91,7 +90,7 @@ func (r *TypesenseClusterReconciler) ReconcileStatefulSet(ctx context.Context, t
 				}
 
 				update, scaleOnly, triggers := r.shouldUpdateStatefulSet(sts, desiredSts, ts)
-				if update {
+				if update && !scaleOnly {
 					oldImage := getImageTag(sts.Spec.Template.Spec.Containers[0].Image)
 					newImage := getImageTag(desiredSts.Spec.Template.Spec.Containers[0].Image)
 					if oldImage != newImage {
@@ -104,7 +103,7 @@ func (r *TypesenseClusterReconciler) ReconcileStatefulSet(ctx context.Context, t
 					updatedSts, err := r.updateStatefulSet(ctx, sts, desiredSts)
 					if err != nil {
 						r.logger.Error(err, "updating statefulset failed", "sts", stsObjectKey.Name)
-						return nil, err
+						return nil, false, err
 					}
 
 					configMapName := fmt.Sprintf(ClusterNodesConfigMap, ts.Name)
@@ -125,14 +124,14 @@ func (r *TypesenseClusterReconciler) ReconcileStatefulSet(ctx context.Context, t
 					}
 
 					r.logLagThresholds(updatedSts)
-					return updatedSts, nil
+					return updatedSts, true, nil
 				} else if !update && scaleOnly {
 					r.logger.V(debugLevel).Info("scaling statefulset", "sts", sts.Name, "triggers", triggers)
 
 					size := ts.Spec.Replicas
 					err = r.ScaleStatefulSet(ctx, stsObjectKey, size)
 					if err != nil {
-						return desiredSts, nil
+						return desiredSts, true, err
 					}
 
 					configMapName := fmt.Sprintf(ClusterNodesConfigMap, ts.Name)
@@ -144,7 +143,7 @@ func (r *TypesenseClusterReconciler) ReconcileStatefulSet(ctx context.Context, t
 					}
 					_, _, updated, err := r.updateConfigMap(ctx, ts, cm, &size, true)
 					if err != nil {
-						return desiredSts, nil
+						return desiredSts, true, err
 					}
 
 					if updated && ts.Spec.ForceResetPeersConfigOnUpdate {
@@ -152,14 +151,14 @@ func (r *TypesenseClusterReconciler) ReconcileStatefulSet(ctx context.Context, t
 					}
 
 					r.logLagThresholds(desiredSts)
-					return desiredSts, nil
+					return desiredSts, true, nil
 				}
 			}
 		}
 	}
 
 	r.logLagThresholds(sts)
-	return sts, nil
+	return sts, false, nil
 }
 
 func (r *TypesenseClusterReconciler) logLagThresholds(sts *appsv1.StatefulSet) {
@@ -494,54 +493,114 @@ func (r *TypesenseClusterReconciler) buildStatefulSet(ctx context.Context, key c
 		},
 	}
 
-	podTemplateHash, err := hashstructure.Hash(sts.Spec.Template.Spec, hashstructure.FormatV2, nil)
+	//podTemplateHash, err := hashstructure.Hash(sts.Spec.Template.Spec, hashstructure.FormatV2, nil)
+	//if err != nil {
+	//	return nil, err
+	//}
+	//
+	//b, err := json.Marshal(sts.Spec.Template.Spec.Containers[0].Resources)
+	//if err != nil {
+	//	return nil, err
+	//}
+	//resourcesHash, err := hashstructure.Hash(
+	//	string(b),
+	//	hashstructure.FormatV2,
+	//	nil,
+	//)
+	//
+	//specsHash := fmt.Sprintf("%d%d", podTemplateHash, resourcesHash)
+	//
+	//if additionalConfiguration := ts.Spec.GetAdditionalServerConfiguration(); additionalConfiguration != nil {
+	//	for _, ac := range additionalConfiguration {
+	//		if ac.ConfigMapRef != nil {
+	//			configMapObjectKey := client.ObjectKey{Namespace: ts.Namespace, Name: ac.ConfigMapRef.Name}
+	//			var cm = &corev1.ConfigMap{}
+	//			if err = r.Get(ctx, configMapObjectKey, cm); err != nil {
+	//				return nil, err
+	//			}
+	//
+	//			data := fmt.Sprintf("%v", cm.Data)
+	//			if strings.TrimSpace(data) != "" {
+	//				dataHash, err := hashstructure.Hash(data, hashstructure.FormatV2, nil)
+	//				if err != nil {
+	//					return nil, err
+	//				}
+	//
+	//				specsHash = fmt.Sprintf("%s%d", specsHash, dataHash)
+	//			}
+	//		}
+	//	}
+	//}
+	//
+	//base16Hash := fmt.Sprintf("%x", sha256.Sum256([]byte(specsHash)))
+
+	base16Hash, err := r.buildStatefulSetHash(ctx, sts, ts)
 	if err != nil {
 		return nil, err
 	}
 
-	b, err := json.Marshal(sts.Spec.Template.Spec.Containers[0].Resources)
-	if err != nil {
-		return nil, err
-	}
-	resourcesHash, err := hashstructure.Hash(
-		string(b),
-		hashstructure.FormatV2,
-		nil,
-	)
-
-	specsHash := fmt.Sprintf("%d%d", podTemplateHash, resourcesHash)
-
-	if additionalConfiguration := ts.Spec.GetAdditionalServerConfiguration(); additionalConfiguration != nil {
-		for _, ac := range additionalConfiguration {
-			if ac.ConfigMapRef != nil {
-				configMapObjectKey := client.ObjectKey{Namespace: ts.Namespace, Name: ac.ConfigMapRef.Name}
-				var cm = &corev1.ConfigMap{}
-				if err = r.Get(ctx, configMapObjectKey, cm); err != nil {
-					return nil, err
-				}
-
-				data := fmt.Sprintf("%v", cm.Data)
-				if strings.TrimSpace(data) != "" {
-					dataHash, err := hashstructure.Hash(data, hashstructure.FormatV2, nil)
-					if err != nil {
-						return nil, err
-					}
-
-					specsHash = fmt.Sprintf("%s%d", specsHash, dataHash)
-				}
-			}
-		}
-	}
-
-	base16Hash := fmt.Sprintf("%x", sha256.Sum256([]byte(specsHash)))
 	r.logger.V(debugLevel).Info("calculated hash", "hash", base16Hash)
 
 	if sts.Spec.Template.Annotations == nil {
 		sts.Spec.Template.Annotations = map[string]string{}
 	}
-	sts.Spec.Template.Annotations[hashAnnotationKey] = base16Hash
+	sts.Spec.Template.Annotations[hashAnnotationKey] = *base16Hash
 
 	return sts, nil
+}
+
+func (r *TypesenseClusterReconciler) buildStatefulSetHash(ctx context.Context, sts *appsv1.StatefulSet, ts *tsv1alpha1.TypesenseCluster) (*string, error) {
+	stsTemplate := sts.Spec.Template.DeepCopy()
+	if stsTemplate.Annotations == nil {
+		delete(stsTemplate.Annotations, hashAnnotationKey)
+	}
+	podTemplate := stsTemplate.Spec.DeepCopy()
+
+	var additionalConfData map[string]map[string]string
+	if additionalConfiguration := ts.Spec.GetAdditionalServerConfiguration(); additionalConfiguration != nil {
+		for _, ac := range additionalConfiguration {
+			if ac.ConfigMapRef != nil {
+				configMapObjectKey := client.ObjectKey{Namespace: ts.Namespace, Name: ac.ConfigMapRef.Name}
+				var cm = &corev1.ConfigMap{}
+				if err := r.Get(ctx, configMapObjectKey, cm); err != nil {
+					return nil, err
+				}
+
+				additionalConfData[cm.Name] = cm.Data
+			}
+		}
+	}
+
+	type specsHashInput struct {
+		StsSpecAnnotations            map[string]string
+		PodSpecTemplate               corev1.PodSpec
+		TypesenseContainerResources   []byte
+		MetricsContainerResources     []byte
+		HealthcheckContainerResources []byte
+		AdditionalConfigurationData   map[string]map[string]string
+	}
+
+	c0, _ := json.Marshal(sts.Spec.Template.Spec.Containers[0].Resources)
+	c1, _ := json.Marshal(sts.Spec.Template.Spec.Containers[1].Resources)
+	c2, _ := json.Marshal(sts.Spec.Template.Spec.Containers[2].Resources)
+
+	shi := specsHashInput{
+		StsSpecAnnotations:            stsTemplate.Annotations,
+		PodSpecTemplate:               *podTemplate,
+		TypesenseContainerResources:   c0,
+		MetricsContainerResources:     c1,
+		HealthcheckContainerResources: c2,
+		AdditionalConfigurationData:   additionalConfData,
+	}
+
+	h, err := hashstructure.Hash(shi, hashstructure.FormatV2, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	dh := fmt.Sprintf("%d", h)
+	b16h := fmt.Sprintf("%x", sha256.Sum256([]byte(dh)))
+	return &b16h, nil
 }
 
 type UpdateStatefulSetTrigger string
@@ -575,6 +634,7 @@ func (r *TypesenseClusterReconciler) shouldUpdateStatefulSet(sts *appsv1.Statefu
 	if *sts.Spec.Replicas != ts.Spec.Replicas &&
 		(condition.Reason != string(ConditionReasonQuorumDowngraded) || condition.Reason != string(ConditionReasonQuorumQueuedWrites)) {
 		triggers = append(triggers, SpecReplicasChanged)
+		update = false
 		scaleOnly = true
 	}
 
@@ -584,8 +644,9 @@ func (r *TypesenseClusterReconciler) shouldUpdateStatefulSet(sts *appsv1.Statefu
 		update = true
 	}
 
-	stsAnnotations := filterAnnotations(sts.ObjectMeta.Annotations, rancherDomainAnnotationKey)
-	podAnnotations := filterAnnotations(sts.Spec.Template.Annotations, restartPodsAnnotationKey, rancherDomainAnnotationKey)
+	mutatedAnnotations := ts.Spec.IgnoreAnnotationsExternalMutations
+	stsAnnotations := filterAnnotations(sts.ObjectMeta.Annotations, append([]string{rancherDomainAnnotationKey}, mutatedAnnotations...)...)
+	podAnnotations := filterAnnotations(sts.Spec.Template.Annotations, append([]string{restartPodsAnnotationKey, rancherDomainAnnotationKey}, mutatedAnnotations...)...)
 
 	// PodAnnotationsChanged
 	if !apiequality.Semantic.DeepEqual(podAnnotations, desired.Spec.Template.Annotations) {
@@ -599,11 +660,11 @@ func (r *TypesenseClusterReconciler) shouldUpdateStatefulSet(sts *appsv1.Statefu
 		update = true
 	}
 
-	// SpecResourcesChanged
-	if !apiequality.Semantic.DeepEqual(sts.Spec.Template.Spec.Containers[0].Resources, ts.Spec.GetResources()) {
-		triggers = append(triggers, SpecResourcesChanged)
-		update = true
-	}
+	//// SpecResourcesChanged
+	//if !apiequality.Semantic.DeepEqual(sts.Spec.Template.Spec.Containers[0].Resources, ts.Spec.GetResources()) {
+	//	triggers = append(triggers, SpecResourcesChanged)
+	//	update = true
+	//}
 
 	// PodSecurityContextChanged
 	if !apiequality.Semantic.DeepEqual(sts.Spec.Template.Spec.SecurityContext, ts.Spec.GetPodSecurityContext()) {

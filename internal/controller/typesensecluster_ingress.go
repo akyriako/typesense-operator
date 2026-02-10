@@ -57,7 +57,7 @@ const (
 
 const clusterIssuerAnnotationKey = "cert-manager.io/cluster-issuer"
 
-func (r *TypesenseClusterReconciler) ReconcileIngress(ctx context.Context, ts tsv1alpha1.TypesenseCluster) (err error) {
+func (r *TypesenseClusterReconciler) ReconcileIngress(ctx context.Context, ts *tsv1alpha1.TypesenseCluster) (err error) {
 	r.logger.V(debugLevel).Info("reconciling ingress")
 
 	ingressName := fmt.Sprintf(ClusterReverseProxyIngress, ts.Name)
@@ -83,7 +83,7 @@ func (r *TypesenseClusterReconciler) ReconcileIngress(ctx context.Context, ts ts
 	if !ingressExists {
 		r.logger.V(debugLevel).Info("creating ingress", "ingress", ingressObjectKey.Name)
 
-		ig, err = r.createIngress(ctx, ingressObjectKey, &ts)
+		ig, err = r.createIngress(ctx, ingressObjectKey, ts)
 		if err != nil {
 			r.logger.Error(err, "creating ingress failed", "ingress", ingressObjectKey.Name)
 			return err
@@ -91,7 +91,7 @@ func (r *TypesenseClusterReconciler) ReconcileIngress(ctx context.Context, ts ts
 	} else {
 		if ts.Spec.Ingress.Host != ig.Spec.Rules[0].Host ||
 			(ts.Spec.Ingress.ClusterIssuer != nil && *ts.Spec.Ingress.ClusterIssuer != ig.Annotations[clusterIssuerAnnotationKey]) ||
-			!apiequality.Semantic.DeepEqual(ts.Spec.Ingress.Annotations, r.getIngressAnnotations(ig)) ||
+			!apiequality.Semantic.DeepEqual(ts.Spec.Ingress.Annotations, r.getIngressAnnotations(ig, ts)) ||
 			(ts.Spec.Ingress.TLSSecretName != nil && *ts.Spec.Ingress.TLSSecretName != ig.Spec.TLS[0].SecretName) ||
 			ts.Spec.Ingress.IngressClassName != *ig.Spec.IngressClassName ||
 			ts.Spec.Ingress.Path != ig.Spec.Rules[0].IngressRuleValue.HTTP.Paths[0].Path ||
@@ -99,7 +99,7 @@ func (r *TypesenseClusterReconciler) ReconcileIngress(ctx context.Context, ts ts
 
 			r.logger.V(debugLevel).Info("updating ingress", "ingress", ingressObjectKey.Name)
 
-			ig, err = r.updateIngress(ctx, *ig, &ts)
+			ig, err = r.updateIngress(ctx, *ig, ts)
 			if err != nil {
 				r.logger.Error(err, "updating ingress failed", "ingress", ingressObjectKey.Name)
 				return err
@@ -126,13 +126,13 @@ func (r *TypesenseClusterReconciler) ReconcileIngress(ctx context.Context, ts ts
 	if !configMapExists {
 		r.logger.V(debugLevel).Info("creating ingress config map", "configmap", configMapObjectKey.Name)
 
-		_, err = r.createIngressConfigMap(ctx, configMapObjectKey, &ts, ig)
+		_, err = r.createIngressConfigMap(ctx, configMapObjectKey, ts, ig)
 		if err != nil {
 			r.logger.Error(err, "creating ingress config map failed", "configmap", configMapObjectKey.Name)
 			return err
 		}
 	} else {
-		shouldUpdate, err := r.shouldUpdateIngressConfigMap(cm, &ts)
+		shouldUpdate, err := r.shouldUpdateIngressConfigMap(cm, ts)
 		if err != nil {
 			return err
 		}
@@ -140,7 +140,7 @@ func (r *TypesenseClusterReconciler) ReconcileIngress(ctx context.Context, ts ts
 		if shouldUpdate {
 			r.logger.V(debugLevel).Info("updating ingress config map", "configmap", configMapObjectKey.Name)
 
-			_, err = r.updateIngressConfigMap(ctx, cm, &ts)
+			_, err = r.updateIngressConfigMap(ctx, cm, ts)
 			if err != nil {
 				return err
 			}
@@ -166,7 +166,7 @@ func (r *TypesenseClusterReconciler) ReconcileIngress(ctx context.Context, ts ts
 	if !deploymentExists {
 		r.logger.V(debugLevel).Info("creating ingress reverse proxy deployment", "deployment", deploymentObjectKey.Name)
 
-		_, err = r.createIngressDeployment(ctx, deploymentObjectKey, &ts, ig)
+		_, err = r.createIngressDeployment(ctx, deploymentObjectKey, ts, ig)
 		if err != nil {
 			r.logger.Error(err, "creating ingress reverse proxy deployment failed", "deployment", deploymentObjectKey.Name)
 			return err
@@ -255,14 +255,14 @@ func (r *TypesenseClusterReconciler) ReconcileIngress(ctx context.Context, ts ts
 	if !serviceExists {
 		r.logger.V(debugLevel).Info("creating ingress reverse proxy service", "service", serviceNameObjectKey.Name)
 
-		_, err = r.createIngressService(ctx, serviceNameObjectKey, &ts, ig)
+		_, err = r.createIngressService(ctx, serviceNameObjectKey, ts, ig)
 		if err != nil {
 			r.logger.Error(err, "creating ingress reverse proxy service failed", "service", serviceNameObjectKey.Name)
 			return err
 		}
 	} else {
 		if !apiequality.Semantic.DeepEqual(service.Annotations, ts.Spec.Ingress.ServiceAnnotations) {
-			err = r.updateIngressService(ctx, service, &ts)
+			err = r.updateIngressService(ctx, service, ts)
 			if err != nil {
 				r.logger.Error(err, "updating ingress reverse proxy service failed", "service", serviceNameObjectKey.Name)
 				return err
@@ -388,8 +388,9 @@ func (r *TypesenseClusterReconciler) deleteIngress(ctx context.Context, ig *netw
 	return nil
 }
 
-func (r *TypesenseClusterReconciler) getIngressAnnotations(ig *networkingv1.Ingress) map[string]string {
-	filtered := filterAnnotations(ig.Annotations, clusterIssuerAnnotationKey, rancherDomainAnnotationKey)
+func (r *TypesenseClusterReconciler) getIngressAnnotations(ig *networkingv1.Ingress, ts *tsv1alpha1.TypesenseCluster) map[string]string {
+	filters := append([]string{clusterIssuerAnnotationKey, rancherDomainAnnotationKey}, ts.Spec.IgnoreAnnotationsExternalMutations...)
+	filtered := filterAnnotations(ig.Annotations, filters...)
 	return filtered
 }
 
