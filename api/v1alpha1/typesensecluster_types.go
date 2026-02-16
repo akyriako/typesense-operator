@@ -135,6 +135,10 @@ type TypesenseClusterSpec struct {
 
 	SecurityContext *SecurityContextSpec `json:"securityContext,omitempty"`
 
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:Items:Type=string
+	IgnoreAnnotationsFromExternalMutations []string `json:"ignoreAnnotationsFromExternalMutations,omitempty"`
+
 	// +optional
 	// +kubebuilder:default=false
 	// +kubebuilder:validation:Type=boolean
