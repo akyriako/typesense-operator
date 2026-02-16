@@ -573,7 +573,7 @@ func (r *TypesenseClusterReconciler) shouldUpdateStatefulSet(sts *appsv1.Statefu
 
 	// SpecReplicasChanged
 	if *sts.Spec.Replicas != ts.Spec.Replicas &&
-		(condition.Reason != string(ConditionReasonQuorumDowngraded) || condition.Reason != string(ConditionReasonQuorumQueuedWrites)) {
+		(condition.Reason != string(ConditionReasonQuorumDowngraded) && condition.Reason != string(ConditionReasonQuorumQueuedWrites)) {
 		triggers = append(triggers, SpecReplicasChanged)
 		scaleOnly = true
 	}

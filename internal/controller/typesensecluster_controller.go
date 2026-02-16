@@ -294,5 +294,6 @@ func (r *TypesenseClusterReconciler) Reconcile(ctx context.Context, req ctrl.Req
 func (r *TypesenseClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&tsv1alpha1.TypesenseCluster{}, eventFilters).
+		Named("typesense-kubernetes-operator").
 		Complete(r)
 }
