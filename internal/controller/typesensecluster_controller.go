@@ -157,7 +157,7 @@ func (r *TypesenseClusterReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	}
 
 	// Update strategy: Update the existing objects, if changes are identified in api and peering ports
-	err = r.ReconcileIngress(ctx, ts)
+	err = r.ReconcileIngress(ctx, &ts)
 	if err != nil {
 		cerr := r.setConditionNotReady(ctx, &ts, ConditionReasonIngressNotReady, err)
 		if cerr != nil {
@@ -187,7 +187,7 @@ func (r *TypesenseClusterReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	}
 
 	// Update strategy: Update the whole specs when changes are identified
-	sts, err := r.ReconcileStatefulSet(ctx, &ts)
+	sts, _, err := r.ReconcileStatefulSet(ctx, &ts)
 	if err != nil {
 		cerr := r.setConditionNotReady(ctx, &ts, ConditionReasonStatefulSetNotReady, err)
 		if cerr != nil {

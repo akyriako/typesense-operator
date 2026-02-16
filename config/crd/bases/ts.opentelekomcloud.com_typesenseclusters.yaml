@@ -1086,6 +1086,10 @@ spec:
                         type: object
                     type: object
                 type: object
+              ignoreAnnotationsFromExternalMutations:
+                items:
+                  type: string
+                type: array
               image:
                 type: string
               imagePullSecrets:

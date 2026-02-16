@@ -349,7 +349,7 @@ func (r *TypesenseClusterReconciler) updatePodReadinessGate(ctx context.Context,
 	pod := &v1.Pod{}
 	err := r.Get(ctx, podObjectKey, pod)
 	if err != nil {
-		r.logger.Error(err, fmt.Sprintf("unable to fetch statefulset pod: %s", podObjectKey.Name))
+		r.logger.Error(err, fmt.Sprintf("unable to fetch pod: %s", podObjectKey.Name))
 		return nil
 	}
 
