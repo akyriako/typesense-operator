@@ -1092,7 +1092,7 @@ spec:
                         type: object
                     type: object
                 type: object
-              ignoreAnnotationsExternalMutations:
+              ignoreAnnotationsFromExternalMutations:
                 items:
                   type: string
                 type: array

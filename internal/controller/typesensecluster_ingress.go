@@ -389,7 +389,7 @@ func (r *TypesenseClusterReconciler) deleteIngress(ctx context.Context, ig *netw
 }
 
 func (r *TypesenseClusterReconciler) getIngressAnnotations(ig *networkingv1.Ingress, ts *tsv1alpha1.TypesenseCluster) map[string]string {
-	filters := append([]string{clusterIssuerAnnotationKey, rancherDomainAnnotationKey}, ts.Spec.IgnoreAnnotationsExternalMutations...)
+	filters := append([]string{clusterIssuerAnnotationKey, rancherDomainAnnotationKey}, ts.Spec.IgnoreAnnotationsFromExternalMutations...)
 	filtered := filterAnnotations(ig.Annotations, filters...)
 	return filtered
 }

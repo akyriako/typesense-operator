@@ -55,7 +55,7 @@ func (r *TypesenseClusterReconciler) shouldUpdateStatefulSet(sts *appsv1.Statefu
 		update = true
 	}
 
-	mutatedAnnotations := ts.Spec.IgnoreAnnotationsExternalMutations
+	mutatedAnnotations := ts.Spec.IgnoreAnnotationsFromExternalMutations
 	stsAnnotations := filterAnnotations(sts.ObjectMeta.Annotations, append([]string{rancherDomainAnnotationKey}, mutatedAnnotations...)...)
 	podAnnotations := filterAnnotations(sts.Spec.Template.Annotations, append([]string{restartPodsAnnotationKey, rancherDomainAnnotationKey}, mutatedAnnotations...)...)
 
@@ -157,6 +157,7 @@ func (r *TypesenseClusterReconciler) buildStatefulSetHash(ctx context.Context, s
 
 	var additionalConfData map[string]map[string]string
 	if additionalConfiguration := ts.Spec.GetAdditionalServerConfiguration(); additionalConfiguration != nil {
+		additionalConfData = make(map[string]map[string]string)
 		for _, ac := range additionalConfiguration {
 			if ac.ConfigMapRef != nil {
 				configMapObjectKey := client.ObjectKey{Namespace: ts.Namespace, Name: ac.ConfigMapRef.Name}

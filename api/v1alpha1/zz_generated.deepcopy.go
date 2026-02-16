@@ -424,8 +424,8 @@ func (in *TypesenseClusterSpec) DeepCopyInto(out *TypesenseClusterSpec) {
 		*out = new(SecurityContextSpec)
 		(*in).DeepCopyInto(*out)
 	}
-	if in.IgnoreAnnotationsExternalMutations != nil {
-		in, out := &in.IgnoreAnnotationsExternalMutations, &out.IgnoreAnnotationsExternalMutations
+	if in.IgnoreAnnotationsFromExternalMutations != nil {
+		in, out := &in.IgnoreAnnotationsFromExternalMutations, &out.IgnoreAnnotationsFromExternalMutations
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
