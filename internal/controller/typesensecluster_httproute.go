@@ -96,6 +96,15 @@ func (r *TypesenseClusterReconciler) ReconcileHttpRoute(ctx context.Context, ts 
 				return err
 			}
 		} else {
+			if !hrt.Enabled {
+				err = r.deleteHttpRoute(ctx, httpRoute)
+				if err != nil {
+					gerr := fmt.Errorf("deleting http route failed: %w", err)
+					r.logger.Error(gerr, "reconciling http routes failed")
+					return gerr
+				}
+			}
+
 			annotations := r.getHttpRouteAnnotations(httpRoute, ts)
 			pRef := hrt.ParentRef
 			kind := gatewayv1.Kind("Gateway")
