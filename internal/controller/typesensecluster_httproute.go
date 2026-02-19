@@ -15,19 +15,30 @@ import (
 
 const (
 	minimumSupportedVersionForGateway = "1.26.0"
+	gatewayApiGroup                   = "gateway.networking.k8s.io"
 )
 
-func (r *TypesenseClusterReconciler) ReconcileGateway(ctx context.Context, ts *tsv1alpha1.TypesenseCluster) (err error) {
+func (r *TypesenseClusterReconciler) ReconcileHttpRoute(ctx context.Context, ts *tsv1alpha1.TypesenseCluster) (err error) {
 	if supported, ver, err := r.IsFeatureSupported(minimumSupportedVersionForGateway); !supported || err != nil {
 		if err != nil {
 			return err
 		}
-
-		r.logger.Info("gateway is not supported in kubernetes current version", "current", ver, "minimum_required", fmt.Sprintf("v%s", minimumSupportedVersionForGateway))
+		if ts.Spec.Gateway != nil {
+			notSupportedErr := fmt.Errorf("gateway is not supported in kubernetes current version")
+			r.logger.Error(notSupportedErr, "reconciling http route skipped", "current", ver, "minimum_required", fmt.Sprintf("v%s", minimumSupportedVersionForGateway))
+		}
 		return nil
 	}
 
-	r.logger.V(debugLevel).Info("reconciling gateway")
+	if deployed, err := r.IsApiGroupDeployed(gatewayApiGroup); err != nil || !deployed {
+		if ts.Spec.Gateway != nil {
+			err := fmt.Errorf("gateway api group %s was not found in cluster", gatewayApiGroup)
+			r.logger.Error(err, "reconciling http route skipped")
+		}
+		return nil
+	}
+
+	r.logger.V(debugLevel).Info("reconciling http route")
 
 	httpRouteName := fmt.Sprintf(ClusterHttpRoute, ts.Name)
 	httpRouteExists := true

@@ -168,7 +168,7 @@ func (r *TypesenseClusterReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	}
 
 	// Update strategy: TBD
-	err = r.ReconcileGateway(ctx, &ts)
+	err = r.ReconcileHttpRoute(ctx, &ts)
 	if err != nil {
 		cerr := r.setConditionNotReady(ctx, &ts, ConditionReasonHttpRouteNotReady, err)
 		if cerr != nil {

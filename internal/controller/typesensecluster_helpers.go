@@ -44,3 +44,18 @@ func (r *TypesenseClusterReconciler) IsFeatureSupported(minimum string) (bool, s
 
 	return ver.AtLeast(req), info.GitVersion, nil
 }
+
+func (r *TypesenseClusterReconciler) IsApiGroupDeployed(apiGroup string) (bool, error) {
+	apiGroupList, err := r.DiscoveryClient.ServerGroups()
+	if err != nil {
+		return false, err
+	}
+
+	for _, ag := range apiGroupList.Groups {
+		if ag.Name == apiGroup {
+			return true, nil
+		}
+	}
+
+	return false, nil
+}

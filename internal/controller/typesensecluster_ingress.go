@@ -74,9 +74,13 @@ func (r *TypesenseClusterReconciler) ReconcileIngress(ctx context.Context, ts *t
 		}
 	}
 
-	if ingressExists && ts.Spec.Ingress == nil {
+	if ingressExists && (ts.Spec.Ingress == nil || ts.Spec.Gateway != nil) {
 		return r.deleteIngress(ctx, ig)
 	} else if !ingressExists && ts.Spec.Ingress == nil {
+		return nil
+	}
+
+	if ts.Spec.Gateway != nil {
 		return nil
 	}
 
