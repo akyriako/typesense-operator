@@ -4,7 +4,14 @@ import (
 	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 )
 
-type GatewaySpec struct {
+type HttpRouteSpec struct {
+	// +optional
+	// +kubebuilder:default=true
+	// +kubebuilder:validation:Type=boolean
+	Enabled bool `json:"enabled,omitempty"`
+
+	Name string `json:"name"`
+
 	ParentRef GatewayParentRef `json:"parentRef"`
 
 	// +kubebuilder:validation:MinItems=1
@@ -26,7 +33,19 @@ type GatewaySpec struct {
 	//UseReverseProxy *bool `json:"useReverseProxy,omitempty"`
 
 	// +optional
+	Labels map[string]string `json:"labels,omitempty"`
+
+	// +optional
 	Annotations map[string]string `json:"annotations,omitempty"`
+
+	// +optional
+	ReferenceGrant *ReferenceGrantSpec `json:"referenceGrant,omitempty"`
+}
+
+type ReferenceGrantSpec struct {
+	In   string `json:"in"`
+	From string `json:"from"`
+	To   string `json:"to"`
 }
 
 type GatewayParentRef struct {
