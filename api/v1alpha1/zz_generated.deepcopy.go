@@ -87,11 +87,6 @@ func (in *GatewaySpec) DeepCopyInto(out *GatewaySpec) {
 		*out = new(apisv1.PathMatchType)
 		**out = **in
 	}
-	if in.UseReverseProxy != nil {
-		in, out := &in.UseReverseProxy, &out.UseReverseProxy
-		*out = new(bool)
-		**out = **in
-	}
 	if in.Annotations != nil {
 		in, out := &in.Annotations, &out.Annotations
 		*out = make(map[string]string, len(*in))

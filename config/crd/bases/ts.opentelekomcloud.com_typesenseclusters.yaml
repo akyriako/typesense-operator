@@ -1118,9 +1118,6 @@ spec:
                       Accepted Condition for the Route to `status: False`, with a
                       Reason of `UnsupportedValue`.
                     type: string
-                  useReverseProxy:
-                    default: false
-                    type: boolean
                 required:
                 - parentRef
                 type: object
