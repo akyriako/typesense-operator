@@ -121,6 +121,8 @@ type TypesenseClusterSpec struct {
 
 	Ingress *IngressSpec `json:"ingress,omitempty"`
 
+	Gateway *GatewaySpec `json:"gateway,omitempty"`
+
 	Scrapers []DocSearchScraperSpec `json:"scrapers,omitempty"`
 
 	Metrics *MetricsExporterSpec `json:"metrics,omitempty"`

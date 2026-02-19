@@ -115,6 +115,16 @@ func (r *TypesenseClusterReconciler) shouldEmergencyUpdateStatefulSet(sts *appsv
 		return false
 	}
 
+	condition := r.getConditionReady(ts)
+	if condition == nil {
+		return false
+	}
+
+	if *sts.Spec.Replicas != ts.Spec.Replicas &&
+		(condition.Reason != string(ConditionReasonQuorumDowngraded) || condition.Reason != string(ConditionReasonQuorumQueuedWrites)) {
+		return true
+	}
+
 	// ResourcesChanged
 	if !apiequality.Semantic.DeepEqual(sts.Spec.Template.Spec.Containers[0].Resources, ts.Spec.GetResources()) {
 		return true

@@ -2,8 +2,10 @@ package controller
 
 import (
 	"context"
+	"fmt"
 
 	tsv1alpha1 "github.com/akyriako/typesense-operator/api/v1alpha1"
+	"k8s.io/apimachinery/pkg/util/version"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -22,4 +24,23 @@ func (r *TypesenseClusterReconciler) patchStatus(
 	}
 
 	return nil
+}
+
+func (r *TypesenseClusterReconciler) IsFeatureSupported(minimum string) (bool, string, error) {
+	info, err := r.DiscoveryClient.ServerVersion()
+	if err != nil {
+		return false, "", err
+	}
+
+	ver, err := version.ParseGeneric(info.GitVersion)
+	if err != nil {
+		return false, info.GitVersion, err
+	}
+
+	req, err := version.ParseGeneric(fmt.Sprintf("v%s", minimum))
+	if err != nil {
+		return false, info.GitVersion, err
+	}
+
+	return ver.AtLeast(req), info.GitVersion, nil
 }

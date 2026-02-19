@@ -35,7 +35,7 @@ metadata:
   name: c-kind-1
 spec:
   image: typesense/typesense:30.0.rc27-amd64
-  replicas: 3
+  replicas: 1
   resources:
     limits:
       cpu: "1000m"
@@ -62,11 +62,17 @@ metadata:
   name: c-kind-2
 spec:
   image: typesense/typesense:30.0.rc29-amd64
-  replicas: 5
+  replicas: 1
   storage:
     size: 150Mi
     storageClassName: typesense-local-path
   adminApiKey:
     name: typesense-common-bootstrap-key
+  gateway:
+    parentRef:
+      name: traefik-gateway
+      namespace: kube-system
+    hostnames:
+      - typesense.gw.proxmox.home
   metrics:
     release: promstack

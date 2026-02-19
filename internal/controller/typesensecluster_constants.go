@@ -16,6 +16,8 @@ const (
 	ClusterReverseProxy          = "%s-reverse-proxy"
 	ClusterReverseProxyService   = "%s-reverse-proxy-svc"
 
+	ClusterHttpRoute = "%s-http-route"
+
 	//TODO Remove them future version 0.2.15
 
 	ClusterPrometheusExporterAppLabel       = "%s-prometheus-exporter"
