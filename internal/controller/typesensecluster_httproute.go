@@ -6,6 +6,7 @@ import (
 	"maps"
 
 	tsv1alpha1 "github.com/akyriako/typesense-operator/api/v1alpha1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -68,6 +69,38 @@ func (r *TypesenseClusterReconciler) ReconcileHttpRoute(ctx context.Context, ts 
 			r.logger.Error(err, "creating http route failed", "http_route", httpRouteName)
 			return err
 		}
+	} else {
+		annotations := r.getHttpRouteAnnotations(httpRoute, ts)
+		pRef := ts.Spec.Gateway.ParentRef
+		kind := gatewayv1.Kind("Gateway")
+		group := gatewayv1.Group(gatewayApiGroup)
+		parentRef := gatewayv1.ParentReference{
+			Group:       &group,
+			Kind:        &kind,
+			Name:        gatewayv1.ObjectName(pRef.Name),
+			Namespace:   pRef.Namespace,
+			SectionName: pRef.SectionName,
+		}
+		hostnames := make([]gatewayv1.Hostname, 0, len(ts.Spec.Gateway.Hostnames))
+		for _, h := range ts.Spec.Gateway.Hostnames {
+			hostnames = append(hostnames, gatewayv1.Hostname(h))
+		}
+		path := *httpRoute.Spec.Rules[0].Matches[0].Path.Value
+		pathType := httpRoute.Spec.Rules[0].Matches[0].Path.Type
+
+		if !apiequality.Semantic.DeepEqual(hostnames, httpRoute.Spec.Hostnames) ||
+			!apiequality.Semantic.DeepEqual(ts.Spec.Gateway.Annotations, annotations) ||
+			!apiequality.Semantic.DeepEqual(parentRef, httpRoute.Spec.ParentRefs[0]) ||
+			ts.Spec.Gateway.Path != path || *ts.Spec.Gateway.PathType != *pathType {
+
+			r.logger.V(debugLevel).Info("updating http route", "http_route", httpRouteName)
+
+			httpRoute, err = r.updateHttpRoute(ctx, httpRoute, ts)
+			if err != nil {
+				r.logger.Error(err, "updating http route failed", "http_route", httpRouteName)
+				return err
+			}
+		}
 	}
 
 	return nil
@@ -79,16 +112,7 @@ func (r *TypesenseClusterReconciler) createHttpRoute(ctx context.Context, key cl
 		maps.Copy(annotations, ts.Spec.Gateway.Annotations)
 	}
 
-	parentRef := gatewayv1.ParentReference{
-		Name:        gatewayv1.ObjectName(ts.Spec.Gateway.ParentRef.Name),
-		SectionName: ts.Spec.Gateway.ParentRef.SectionName,
-	}
-
-	ns := gatewayv1.Namespace(ts.Namespace)
-	if ts.Spec.Gateway.ParentRef.Namespace != nil {
-		ns = *ts.Spec.Gateway.ParentRef.Namespace
-	}
-	parentRef.Namespace = &ns
+	parentRef := r.getGatewayParentRef(ts)
 
 	hostnames := make([]gatewayv1.Hostname, 0, len(ts.Spec.Gateway.Hostnames))
 	for _, h := range ts.Spec.Gateway.Hostnames {
@@ -153,4 +177,53 @@ func (r *TypesenseClusterReconciler) deleteHttpRoute(ctx context.Context, httpRo
 	}
 
 	return nil
+}
+
+func (r *TypesenseClusterReconciler) updateHttpRoute(ctx context.Context, httpRoute *gatewayv1.HTTPRoute, ts *tsv1alpha1.TypesenseCluster) (*gatewayv1.HTTPRoute, error) {
+	patch := client.MergeFrom(httpRoute.DeepCopy())
+
+	parentRef := r.getGatewayParentRef(ts)
+	httpRoute.Spec.CommonRouteSpec.ParentRefs[0] = parentRef
+
+	hostnames := make([]gatewayv1.Hostname, 0, len(ts.Spec.Gateway.Hostnames))
+	for _, h := range ts.Spec.Gateway.Hostnames {
+		hostnames = append(hostnames, gatewayv1.Hostname(h))
+	}
+	httpRoute.Spec.Hostnames = hostnames
+
+	httpRoute.Spec.Rules[0].Matches[0].Path.Value = &ts.Spec.Gateway.Path
+	httpRoute.Spec.Rules[0].Matches[0].Path.Type = ts.Spec.Gateway.PathType
+
+	annotations := map[string]string{}
+	if ts.Spec.Gateway.Annotations != nil {
+		maps.Copy(annotations, ts.Spec.Gateway.Annotations)
+	}
+	httpRoute.Annotations = annotations
+
+	if err := r.Patch(ctx, httpRoute, patch); err != nil {
+		return nil, err
+	}
+
+	return httpRoute, nil
+}
+
+func (r *TypesenseClusterReconciler) getHttpRouteAnnotations(httpRoute *gatewayv1.HTTPRoute, ts *tsv1alpha1.TypesenseCluster) map[string]string {
+	filters := append([]string{clusterIssuerAnnotationKey, rancherDomainAnnotationKey}, ts.Spec.IgnoreAnnotationsFromExternalMutations...)
+	filtered := filterAnnotations(httpRoute.Annotations, filters...)
+	return filtered
+}
+
+func (r *TypesenseClusterReconciler) getGatewayParentRef(ts *tsv1alpha1.TypesenseCluster) gatewayv1.ParentReference {
+	parentRef := gatewayv1.ParentReference{
+		Name:        gatewayv1.ObjectName(ts.Spec.Gateway.ParentRef.Name),
+		SectionName: ts.Spec.Gateway.ParentRef.SectionName,
+	}
+
+	ns := gatewayv1.Namespace(ts.Namespace)
+	if ts.Spec.Gateway.ParentRef.Namespace != nil {
+		ns = *ts.Spec.Gateway.ParentRef.Namespace
+	}
+	parentRef.Namespace = &ns
+
+	return parentRef
 }
