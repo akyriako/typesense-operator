@@ -68,11 +68,23 @@ spec:
     storageClassName: typesense-local-path
   adminApiKey:
     name: typesense-common-bootstrap-key
-  gateway:
-    parentRef:
-      name: traefik-gateway
-      namespace: kube-system
-    hostnames:
-      - typesense.gw.proxmox.home
+  httpRoutes:
+    - name: public
+      parentRef:
+        name: traefik-gateway
+        namespace: kube-system
+      hostnames:
+        - typesense.gw.proxmox.home
+        - search.gw.proxmox.home
+      enabled: true
+    - name: private
+      parentRef:
+        name: traefik-gateway
+        namespace: kube-system
+        section: web
+      hostnames:
+        - typesense-int.gw.proxmox.home
+      enabled: true
+      referenceGrant: true
   metrics:
     release: promstack

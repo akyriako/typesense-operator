@@ -123,7 +123,7 @@ func (in *HttpRouteSpec) DeepCopyInto(out *HttpRouteSpec) {
 	}
 	if in.ReferenceGrant != nil {
 		in, out := &in.ReferenceGrant, &out.ReferenceGrant
-		*out = new(ReferenceGrantSpec)
+		*out = new(bool)
 		**out = **in
 	}
 }

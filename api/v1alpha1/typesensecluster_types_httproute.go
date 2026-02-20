@@ -39,7 +39,9 @@ type HttpRouteSpec struct {
 	Annotations map[string]string `json:"annotations,omitempty"`
 
 	// +optional
-	ReferenceGrant *ReferenceGrantSpec `json:"referenceGrant,omitempty"`
+	// +kubebuilder:default=false
+	// +kubebuilder:validation:Type=boolean
+	ReferenceGrant *bool `json:"referenceGrant,omitempty"`
 }
 
 type ReferenceGrantSpec struct {

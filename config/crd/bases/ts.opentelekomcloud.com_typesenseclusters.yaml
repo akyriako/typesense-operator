@@ -1200,18 +1200,8 @@ spec:
                         Reason of `UnsupportedValue`.
                       type: string
                     referenceGrant:
-                      properties:
-                        from:
-                          type: string
-                        in:
-                          type: string
-                        to:
-                          type: string
-                      required:
-                      - from
-                      - in
-                      - to
-                      type: object
+                      default: false
+                      type: boolean
                   required:
                   - name
                   - parentRef

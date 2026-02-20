@@ -8,11 +8,13 @@ import (
 	tsv1alpha1 "github.com/akyriako/typesense-operator/api/v1alpha1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
+	gatewayv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 )
 
 const (
@@ -90,11 +92,17 @@ func (r *TypesenseClusterReconciler) ReconcileHttpRoute(ctx context.Context, ts 
 		if !httpRouteExists && hrt.Enabled {
 			r.logger.V(debugLevel).Info("creating http route", "http_route", httpRouteName)
 
-			_, err = r.createHttpRoute(ctx, httpRouteObjectKey, hrt, ts)
+			httpRoute, err = r.createHttpRoute(ctx, httpRouteObjectKey, hrt, ts)
 			if err != nil {
 				r.logger.Error(err, "creating http route failed", "http_route", httpRouteName)
 				return err
 			}
+			_, err := r.createReferenceGrant(ctx, hrt, httpRoute, ts)
+			if err != nil {
+				r.logger.Error(err, "creating reference grant failed", "http_route", httpRouteName)
+				return err
+			}
+
 		} else {
 			if !hrt.Enabled {
 				err = r.deleteHttpRoute(ctx, httpRoute)
@@ -262,4 +270,42 @@ func (r *TypesenseClusterReconciler) getGatewayParentRef(spec tsv1alpha1.HttpRou
 	parentRef.Namespace = &ns
 
 	return parentRef
+}
+
+func (r *TypesenseClusterReconciler) createReferenceGrant(ctx context.Context, spec tsv1alpha1.HttpRouteSpec, httpRoute *gatewayv1.HTTPRoute, ts *tsv1alpha1.TypesenseCluster) (*gatewayv1beta1.ReferenceGrant, error) {
+	parentRefName := gatewayv1beta1.ObjectName(spec.ParentRef.Name)
+	referenceGrant := &gatewayv1beta1.ReferenceGrant{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      fmt.Sprintf(ClusterHttpRouteReferenceGrant, ts.Name, spec.Name),
+			Namespace: string(*spec.ParentRef.Namespace), // namespace of the *target* (Gateway)
+		},
+		Spec: gatewayv1beta1.ReferenceGrantSpec{
+			From: []gatewayv1beta1.ReferenceGrantFrom{
+				{
+					Group:     gatewayv1beta1.GroupName,
+					Kind:      gatewayv1beta1.Kind("HTTPRoute"),
+					Namespace: gatewayv1beta1.Namespace(ts.Namespace),
+				},
+			},
+			To: []gatewayv1beta1.ReferenceGrantTo{
+				{
+					Group: gatewayv1beta1.GroupName,
+					Kind:  gatewayv1beta1.Kind("Gateway"),
+					Name:  &parentRefName,
+				},
+			},
+		},
+	}
+
+	//err := ctrl.SetControllerReference(httpRoute, referenceGrant, r.Scheme)
+	//if err != nil {
+	//	return nil, err
+	//}
+
+	err := r.Create(ctx, referenceGrant)
+	if err != nil {
+		return nil, err
+	}
+
+	return referenceGrant, nil
 }
