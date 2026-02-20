@@ -45,15 +45,28 @@ func generateSecureRandomString(length int) (string, error) {
 	return string(result), nil
 }
 
-func getMergedLabels(def map[string]string, scoped map[string]string) map[string]string {
-	merged := make(map[string]string, len(def)+len(scoped))
-	for k, v := range def {
-		merged[k] = v
+func mergeLabels(maps ...map[string]string) map[string]string {
+	size := 0
+	for _, m := range maps {
+		size += len(m)
 	}
-	for k, v := range scoped {
-		merged[k] = v
+
+	if size == 0 {
+		return nil
 	}
+
+	merged := make(map[string]string, size)
+	for _, m := range maps {
+		for k, v := range m {
+			merged[k] = v
+		}
+	}
+
 	return merged
+}
+
+func getMergedLabels(def map[string]string, scoped map[string]string) map[string]string {
+	return mergeLabels(def, scoped)
 }
 
 func getDefaultLabels(ts *tsv1alpha1.TypesenseCluster) map[string]string {
@@ -118,6 +131,34 @@ func getPodMonitorObjectMeta(ts *tsv1alpha1.TypesenseCluster, name *string, anno
 		Namespace:   ts.Namespace,
 		Labels:      getMergedLabels(getDefaultLabels(ts), getPodMonitorLabels(ts)),
 		Annotations: annotations,
+	}
+}
+
+func getHttpRouteLabels(ts *tsv1alpha1.TypesenseCluster, spec tsv1alpha1.HttpRouteSpec) map[string]string {
+	return map[string]string{
+		"app":   fmt.Sprintf(ClusterAppLabel, ts.Name),
+		"route": fmt.Sprintf(ClusterHttpRoute, ts.Name, spec.Name),
+	}
+}
+
+func getHttpRouteObjectMeta(ts *tsv1alpha1.TypesenseCluster, spec tsv1alpha1.HttpRouteSpec, name *string, labels, annotations map[string]string) metav1.ObjectMeta {
+	if name == nil {
+		name = &ts.Name
+	}
+
+	return metav1.ObjectMeta{
+		Name:        *name,
+		Namespace:   ts.Namespace,
+		Labels:      mergeLabels(getDefaultLabels(ts), getHttpRouteLabels(ts, spec), labels),
+		Annotations: annotations,
+	}
+}
+
+func getReferenceGrantObjectMeta(ts *tsv1alpha1.TypesenseCluster, spec tsv1alpha1.HttpRouteSpec) metav1.ObjectMeta {
+	return metav1.ObjectMeta{
+		Name:      fmt.Sprintf(ClusterHttpRouteReferenceGrant, ts.Name, spec.Name),
+		Namespace: string(*spec.ParentRef.Namespace), // namespace of the *target* (Gateway)
+		Labels:    mergeLabels(getDefaultLabels(ts), getHttpRouteLabels(ts, spec)),
 	}
 }
 

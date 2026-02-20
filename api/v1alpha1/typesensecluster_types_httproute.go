@@ -44,12 +44,6 @@ type HttpRouteSpec struct {
 	ReferenceGrant *bool `json:"referenceGrant,omitempty"`
 }
 
-type ReferenceGrantSpec struct {
-	In   string `json:"in"`
-	From string `json:"from"`
-	To   string `json:"to"`
-}
-
 type GatewayParentRef struct {
 	Name        string                 `json:"name"`
 	Namespace   *gatewayv1.Namespace   `json:"namespace,omitempty"`

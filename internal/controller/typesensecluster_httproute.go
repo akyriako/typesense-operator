@@ -8,7 +8,6 @@ import (
 	tsv1alpha1 "github.com/akyriako/typesense-operator/api/v1alpha1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -43,35 +42,14 @@ func (r *TypesenseClusterReconciler) ReconcileHttpRoute(ctx context.Context, ts 
 
 	r.logger.V(debugLevel).Info("reconciling http routes")
 
-	labelSelector := labels.SelectorFromSet(getLabels(ts))
-	var httpRoutes gatewayv1.HTTPRouteList
-	if err = r.List(ctx, &httpRoutes, &client.ListOptions{
-		Namespace:     ts.Namespace,
-		LabelSelector: labelSelector,
-	}); err != nil {
-		gerr := fmt.Errorf("failed to list http routes: %w", err)
-		r.logger.Error(gerr, "reconciling http routes skipped")
-		return gerr
+	err = r.deleteOrphanedHttpRoutes(ctx, ts)
+	if err != nil {
+		return err
 	}
 
-	for _, eroute := range httpRoutes.Items {
-		exists := false
-		for _, droute := range ts.Spec.HttpRoutes {
-			drouteName := fmt.Sprintf(ClusterHttpRoute, ts.Name, droute.Name)
-			if eroute.Name == drouteName {
-				exists = true
-				break
-			}
-		}
-
-		if !exists {
-			err = r.deleteHttpRoute(ctx, &eroute)
-			if err != nil {
-				gerr := fmt.Errorf("deleting http route failed: %w", err)
-				r.logger.Error(gerr, "reconciling http routes skipped")
-				return gerr
-			}
-		}
+	err = r.deleteOrphanedReferenceGrants(ctx)
+	if err != nil {
+		return err
 	}
 
 	for _, hrt := range ts.Spec.HttpRoutes {
@@ -97,12 +75,14 @@ func (r *TypesenseClusterReconciler) ReconcileHttpRoute(ctx context.Context, ts 
 				r.logger.Error(err, "creating http route failed", "http_route", httpRouteName)
 				return err
 			}
-			_, err := r.createReferenceGrant(ctx, hrt, httpRoute, ts)
-			if err != nil {
-				r.logger.Error(err, "creating reference grant failed", "http_route", httpRouteName)
-				return err
-			}
 
+			if *hrt.ReferenceGrant {
+				_, err := r.createReferenceGrant(ctx, hrt, ts)
+				if err != nil {
+					r.logger.Error(err, "creating reference grant failed", "http_route", httpRouteName)
+					return err
+				}
+			}
 		} else {
 			if !hrt.Enabled {
 				err = r.deleteHttpRoute(ctx, httpRoute)
@@ -156,6 +136,11 @@ func (r *TypesenseClusterReconciler) createHttpRoute(ctx context.Context, key cl
 		maps.Copy(annotations, spec.Annotations)
 	}
 
+	lbls := map[string]string{}
+	if spec.Labels != nil {
+		maps.Copy(lbls, spec.Labels)
+	}
+
 	parentRef := r.getGatewayParentRef(spec, ts)
 
 	hostnames := make([]gatewayv1.Hostname, 0, len(spec.Hostnames))
@@ -179,7 +164,7 @@ func (r *TypesenseClusterReconciler) createHttpRoute(ctx context.Context, key cl
 	}
 
 	httpRoute := &gatewayv1.HTTPRoute{
-		ObjectMeta: getObjectMeta(ts, &key.Name, annotations),
+		ObjectMeta: getHttpRouteObjectMeta(ts, spec, &key.Name, lbls, annotations),
 		Spec: gatewayv1.HTTPRouteSpec{
 			CommonRouteSpec: gatewayv1.CommonRouteSpec{
 				ParentRefs: []gatewayv1.ParentReference{parentRef},
@@ -218,6 +203,42 @@ func (r *TypesenseClusterReconciler) deleteHttpRoute(ctx context.Context, httpRo
 	err := r.Delete(ctx, httpRoute)
 	if err != nil {
 		return err
+	}
+
+	return nil
+}
+
+func (r *TypesenseClusterReconciler) deleteOrphanedHttpRoutes(ctx context.Context, ts *tsv1alpha1.TypesenseCluster) error {
+	httpRouteLabelSelector := labels.SelectorFromSet(getLabels(ts))
+	var httpRoutes gatewayv1.HTTPRouteList
+	if err := r.List(ctx, &httpRoutes, &client.ListOptions{
+		Namespace:     ts.Namespace,
+		LabelSelector: httpRouteLabelSelector,
+	}); err != nil {
+		gerr := fmt.Errorf("failed to list http routes: %w", err)
+		r.logger.Error(gerr, "reconciling http routes skipped")
+		return gerr
+	}
+
+	// Delete HTTPRoutes that still in action but not anymore in new specs
+	for _, eroute := range httpRoutes.Items {
+		exists := false
+		for _, droute := range ts.Spec.HttpRoutes {
+			drouteName := fmt.Sprintf(ClusterHttpRoute, ts.Name, droute.Name)
+			if eroute.Name == drouteName {
+				exists = true
+				break
+			}
+		}
+
+		if !exists {
+			err := r.deleteHttpRoute(ctx, &eroute)
+			if err != nil {
+				gerr := fmt.Errorf("deleting http route failed: %w", err)
+				r.logger.Error(gerr, "reconciling http routes failed")
+				return gerr
+			}
+		}
 	}
 
 	return nil
@@ -272,13 +293,10 @@ func (r *TypesenseClusterReconciler) getGatewayParentRef(spec tsv1alpha1.HttpRou
 	return parentRef
 }
 
-func (r *TypesenseClusterReconciler) createReferenceGrant(ctx context.Context, spec tsv1alpha1.HttpRouteSpec, httpRoute *gatewayv1.HTTPRoute, ts *tsv1alpha1.TypesenseCluster) (*gatewayv1beta1.ReferenceGrant, error) {
+func (r *TypesenseClusterReconciler) createReferenceGrant(ctx context.Context, spec tsv1alpha1.HttpRouteSpec, ts *tsv1alpha1.TypesenseCluster) (*gatewayv1beta1.ReferenceGrant, error) {
 	parentRefName := gatewayv1beta1.ObjectName(spec.ParentRef.Name)
 	referenceGrant := &gatewayv1beta1.ReferenceGrant{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf(ClusterHttpRouteReferenceGrant, ts.Name, spec.Name),
-			Namespace: string(*spec.ParentRef.Namespace), // namespace of the *target* (Gateway)
-		},
+		ObjectMeta: getReferenceGrantObjectMeta(ts, spec),
 		Spec: gatewayv1beta1.ReferenceGrantSpec{
 			From: []gatewayv1beta1.ReferenceGrantFrom{
 				{
@@ -297,10 +315,10 @@ func (r *TypesenseClusterReconciler) createReferenceGrant(ctx context.Context, s
 		},
 	}
 
-	//err := ctrl.SetControllerReference(httpRoute, referenceGrant, r.Scheme)
-	//if err != nil {
-	//	return nil, err
-	//}
+	// ### IMPORTANT ###
+	// We cannot reference as owner HTTPRoute or TypesenseCluster because the ReferenceGrant
+	// have to be in the same namespace as Gateway, and cross-domain ownerships are
+	// not allowed.
 
 	err := r.Create(ctx, referenceGrant)
 	if err != nil {
@@ -308,4 +326,56 @@ func (r *TypesenseClusterReconciler) createReferenceGrant(ctx context.Context, s
 	}
 
 	return referenceGrant, nil
+}
+
+func (r *TypesenseClusterReconciler) deleteReferenceGrant(ctx context.Context, rg *gatewayv1beta1.ReferenceGrant) error {
+	err := r.Delete(ctx, rg)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (r *TypesenseClusterReconciler) deleteOrphanedReferenceGrants(ctx context.Context) error {
+	referenceGrantsLabelSelector := labels.SelectorFromSet(map[string]string{
+		"app.kubernetes.io/managed-by": "typesense-operator",
+	})
+
+	var referenceGrants gatewayv1beta1.ReferenceGrantList
+	if err := r.List(ctx, &referenceGrants, &client.ListOptions{
+		LabelSelector: referenceGrantsLabelSelector,
+	}); err != nil {
+		gerr := fmt.Errorf("failed to list reference grants: %w", err)
+		r.logger.Error(gerr, "reconciling http routes failed")
+		return gerr
+	}
+
+	var typesenseClusters tsv1alpha1.TypesenseClusterList
+	if err := r.List(ctx, &typesenseClusters, &client.ListOptions{}); err != nil {
+		gerr := fmt.Errorf("failed to list typesense clusters: %w", err)
+		r.logger.Error(gerr, "reconciling http routes failed")
+		return gerr
+	}
+
+	for _, rg := range referenceGrants.Items {
+		exists := false
+		for _, cluster := range typesenseClusters.Items {
+			if rg.Labels["app"] == fmt.Sprintf(ClusterAppLabel, cluster.Name) {
+				exists = true
+				break
+			}
+		}
+
+		if !exists {
+			err := r.deleteReferenceGrant(ctx, &rg)
+			if err != nil {
+				gerr := fmt.Errorf("deleting reference grant failed: %w", err)
+				r.logger.Error(gerr, "reconciling http routes failed")
+				return gerr
+			}
+		}
+	}
+
+	return nil
 }
