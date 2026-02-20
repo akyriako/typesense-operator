@@ -77,6 +77,7 @@ spec:
         - typesense.gw.proxmox.home
         - search.gw.proxmox.home
       enabled: true
+      referenceGrant: false
     - name: private
       parentRef:
         name: traefik-gateway

@@ -115,12 +115,13 @@ const (
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.18.4/pkg/reconcile
 func (r *TypesenseClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	r.logger = log.Log.WithValues("namespace", req.Namespace, "cluster", req.Name)
-	r.logger.Info("reconciling cluster")
 
 	var ts tsv1alpha1.TypesenseCluster
 	if err := r.Get(ctx, req.NamespacedName, &ts); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
+
+	r.logger.Info("reconciling cluster")
 
 	err := r.initConditions(ctx, &ts)
 	if err != nil {

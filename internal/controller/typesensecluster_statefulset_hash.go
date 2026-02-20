@@ -56,8 +56,8 @@ func (r *TypesenseClusterReconciler) shouldUpdateStatefulSet(sts *appsv1.Statefu
 	}
 
 	mutatedAnnotations := ts.Spec.IgnoreAnnotationsFromExternalMutations
-	stsAnnotations := filterAnnotations(sts.ObjectMeta.Annotations, append([]string{rancherDomainAnnotationKey}, mutatedAnnotations...)...)
-	podAnnotations := filterAnnotations(sts.Spec.Template.Annotations, append([]string{restartPodsAnnotationKey, rancherDomainAnnotationKey}, mutatedAnnotations...)...)
+	stsAnnotations := filterMap(sts.ObjectMeta.Annotations, append([]string{rancherDomainAnnotationKey}, mutatedAnnotations...)...)
+	podAnnotations := filterMap(sts.Spec.Template.Annotations, append([]string{restartPodsAnnotationKey, rancherDomainAnnotationKey}, mutatedAnnotations...)...)
 
 	// PodAnnotationsChanged
 	if !apiequality.Semantic.DeepEqual(podAnnotations, desired.Spec.Template.Annotations) {

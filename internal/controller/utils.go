@@ -135,10 +135,14 @@ func getPodMonitorObjectMeta(ts *tsv1alpha1.TypesenseCluster, name *string, anno
 }
 
 func getHttpRouteLabels(ts *tsv1alpha1.TypesenseCluster, spec tsv1alpha1.HttpRouteSpec) map[string]string {
-	return map[string]string{
+	route := map[string]string{
 		"app":   fmt.Sprintf(ClusterAppLabel, ts.Name),
 		"route": fmt.Sprintf(ClusterHttpRoute, ts.Name, spec.Name),
 	}
+
+	defaults := getDefaultLabels(ts)
+
+	return mergeLabels(defaults, route)
 }
 
 func getHttpRouteObjectMeta(ts *tsv1alpha1.TypesenseCluster, spec tsv1alpha1.HttpRouteSpec, name *string, labels, annotations map[string]string) metav1.ObjectMeta {
@@ -149,7 +153,7 @@ func getHttpRouteObjectMeta(ts *tsv1alpha1.TypesenseCluster, spec tsv1alpha1.Htt
 	return metav1.ObjectMeta{
 		Name:        *name,
 		Namespace:   ts.Namespace,
-		Labels:      mergeLabels(getDefaultLabels(ts), getHttpRouteLabels(ts, spec), labels),
+		Labels:      mergeLabels(getHttpRouteLabels(ts, spec), labels),
 		Annotations: annotations,
 	}
 }
@@ -158,7 +162,7 @@ func getReferenceGrantObjectMeta(ts *tsv1alpha1.TypesenseCluster, spec tsv1alpha
 	return metav1.ObjectMeta{
 		Name:      fmt.Sprintf(ClusterHttpRouteReferenceGrant, ts.Name, spec.Name),
 		Namespace: string(*spec.ParentRef.Namespace), // namespace of the *target* (Gateway)
-		Labels:    mergeLabels(getDefaultLabels(ts), getHttpRouteLabels(ts, spec)),
+		Labels:    getHttpRouteLabels(ts, spec),
 	}
 }
 
@@ -249,13 +253,13 @@ func toTitle(s string) string {
 	return cases.Title(language.Und, cases.NoLower).String(s)
 }
 
-func filterAnnotations(annotations map[string]string, filters ...string) map[string]string {
-	if len(annotations) == 0 {
-		return annotations
+func filterMap(m map[string]string, filters ...string) map[string]string {
+	if len(m) == 0 {
+		return m
 	}
 
-	filtered := make(map[string]string, len(annotations))
-	for key, value := range annotations {
+	filtered := make(map[string]string, len(m))
+	for key, value := range m {
 		skip := false
 		for _, f := range filters {
 			if strings.Contains(key, f) {

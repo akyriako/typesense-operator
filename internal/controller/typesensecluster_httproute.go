@@ -85,6 +85,28 @@ func (r *TypesenseClusterReconciler) ReconcileHttpRoute(ctx context.Context, ts 
 			}
 		} else {
 			if !hrt.Enabled {
+				referenceGrantsLabelSelector := labels.SelectorFromSet(map[string]string{
+					"route": httpRoute.Name,
+				})
+
+				var referenceGrants gatewayv1beta1.ReferenceGrantList
+				if err := r.List(ctx, &referenceGrants, &client.ListOptions{
+					LabelSelector: referenceGrantsLabelSelector,
+				}); err != nil {
+					gerr := fmt.Errorf("failed to list reference grants: %w", err)
+					r.logger.Error(gerr, "reconciling http routes failed")
+					return gerr
+				}
+
+				for _, rg := range referenceGrants.Items {
+					err := r.deleteReferenceGrant(ctx, &rg)
+					if err != nil {
+						if !apierrors.IsNotFound(err) {
+							r.logger.Error(err, "deleting reference grant failed: %w", err)
+						}
+					}
+				}
+
 				err = r.deleteHttpRoute(ctx, httpRoute)
 				if err != nil {
 					gerr := fmt.Errorf("deleting http route failed: %w", err)
@@ -93,7 +115,9 @@ func (r *TypesenseClusterReconciler) ReconcileHttpRoute(ctx context.Context, ts 
 				}
 			}
 
+			lbls := r.getHttpRouteLabels(httpRoute, hrt, ts)
 			annotations := r.getHttpRouteAnnotations(httpRoute, ts)
+
 			pRef := hrt.ParentRef
 			kind := gatewayv1.Kind("Gateway")
 			group := gatewayv1.Group(gatewayApiGroup)
@@ -104,14 +128,17 @@ func (r *TypesenseClusterReconciler) ReconcileHttpRoute(ctx context.Context, ts 
 				Namespace:   pRef.Namespace,
 				SectionName: pRef.SectionName,
 			}
+
 			hostnames := make([]gatewayv1.Hostname, 0, len(hrt.Hostnames))
 			for _, h := range hrt.Hostnames {
 				hostnames = append(hostnames, gatewayv1.Hostname(h))
 			}
+
 			path := *httpRoute.Spec.Rules[0].Matches[0].Path.Value
 			pathType := httpRoute.Spec.Rules[0].Matches[0].Path.Type
 
 			if !apiequality.Semantic.DeepEqual(hostnames, httpRoute.Spec.Hostnames) ||
+				!apiequality.Semantic.DeepEqual(hrt.Labels, lbls) ||
 				!apiequality.Semantic.DeepEqual(hrt.Annotations, annotations) ||
 				!apiequality.Semantic.DeepEqual(parentRef, httpRoute.Spec.ParentRefs[0]) ||
 				hrt.Path != path || *hrt.PathType != *pathType {
@@ -123,6 +150,11 @@ func (r *TypesenseClusterReconciler) ReconcileHttpRoute(ctx context.Context, ts 
 					r.logger.Error(err, "updating http route failed", "http_route", httpRouteName)
 					return err
 				}
+			}
+
+			err := r.updateReferenceGrant(ctx, hrt, ts)
+			if err != nil {
+				return err
 			}
 		}
 	}
@@ -274,7 +306,24 @@ func (r *TypesenseClusterReconciler) updateHttpRoute(ctx context.Context, spec t
 
 func (r *TypesenseClusterReconciler) getHttpRouteAnnotations(httpRoute *gatewayv1.HTTPRoute, ts *tsv1alpha1.TypesenseCluster) map[string]string {
 	filters := append([]string{clusterIssuerAnnotationKey, rancherDomainAnnotationKey}, ts.Spec.IgnoreAnnotationsFromExternalMutations...)
-	filtered := filterAnnotations(httpRoute.Annotations, filters...)
+	filtered := filterMap(httpRoute.Annotations, filters...)
+
+	return filtered
+}
+
+func (r *TypesenseClusterReconciler) getHttpRouteLabels(httpRoute *gatewayv1.HTTPRoute, spec tsv1alpha1.HttpRouteSpec, ts *tsv1alpha1.TypesenseCluster) map[string]string {
+	filters := make([]string, 0)
+	lbls := getHttpRouteLabels(ts, spec)
+	for k := range maps.Keys(lbls) {
+		filters = append(filters, k)
+	}
+
+	filtered := filterMap(httpRoute.Labels, filters...)
+
+	if len(filtered) == 0 {
+		return nil
+	}
+
 	return filtered
 }
 
@@ -374,6 +423,58 @@ func (r *TypesenseClusterReconciler) deleteOrphanedReferenceGrants(ctx context.C
 				r.logger.Error(gerr, "reconciling http routes failed")
 				return gerr
 			}
+		}
+	}
+
+	return nil
+}
+
+func (r *TypesenseClusterReconciler) updateReferenceGrant(ctx context.Context, spec tsv1alpha1.HttpRouteSpec, ts *tsv1alpha1.TypesenseCluster) error {
+	exists := true
+	cre := false
+	del := false
+
+	name := fmt.Sprintf(ClusterHttpRouteReferenceGrant, ts.Name, spec.Name)
+	namespace := string(*spec.ParentRef.Namespace)
+	objectKey := client.ObjectKey{Namespace: namespace, Name: name}
+
+	var referenceGrant gatewayv1beta1.ReferenceGrant
+	err := r.Get(ctx, objectKey, &referenceGrant)
+	if err != nil {
+		if !apierrors.IsNotFound(err) {
+			return err
+		}
+
+		exists = false
+	}
+
+	if exists && *spec.ReferenceGrant || !exists && !*spec.ReferenceGrant {
+		return nil
+	}
+
+	if !exists && *spec.ReferenceGrant {
+		cre = true
+	}
+
+	if exists && !*spec.ReferenceGrant {
+		del = true
+	}
+
+	if cre {
+		_, err := r.createReferenceGrant(ctx, spec, ts)
+		if err != nil {
+			r.logger.Error(err, "creating reference grant failed", "http_route", spec.Name)
+			return err
+		}
+
+		return nil
+	}
+
+	if del {
+		err := r.deleteReferenceGrant(ctx, &referenceGrant)
+		if err != nil {
+			r.logger.Error(err, "deleting reference grant failed", "http_route", spec.Name)
+			return err
 		}
 	}
 
