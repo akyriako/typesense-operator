@@ -12,7 +12,7 @@ data:
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: c-k3s-2-server-configuration
+  name: c-k3s-1-server-configuration
 data:
   TYPESENSE_HEALTHY_READ_LAG: "1000"
   TYPESENSE_HEALTHY_WRITE_LAG: "500"
@@ -23,7 +23,7 @@ metadata:
   labels:
     app.kubernetes.io/name: typesense-operator
     app.kubernetes.io/managed-by: kustomize
-  name: c-k3s-2
+  name: c-k3s-1
 spec:
   image: typesense/typesense:30.0.rc7-amd64
   replicas: 3
@@ -44,7 +44,7 @@ spec:
   metrics:
     release: promstack
   additionalServerConfiguration:
-    name: c-k3s-2-server-configuration
+    name: c-k3s-1-server-configuration
   ingress:
     host: typesense.apps.proxmox.home
     ingressClassName: traefik
@@ -55,3 +55,40 @@ spec:
       requests:
         cpu: "100m"
         memory: "32Mi"
+---
+apiVersion: ts.opentelekomcloud.com/v1alpha1
+kind: TypesenseCluster
+metadata:
+  labels:
+    app.kubernetes.io/name: typesense-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: c-k3s-2
+spec:
+  image: typesense/typesense:30.0.rc29-amd64
+  replicas: 3
+  storage:
+    size: 150Mi
+    storageClassName: typesense-local-path
+  adminApiKey:
+    name: typesense-common-bootstrap-key
+  httpRoutes:
+    - name: public
+      parentRef:
+        name: traefik-gateway
+        namespace: kube-system
+      hostnames:
+        - typesense.gw.proxmox.home
+        - search.gw.proxmox.home
+      enabled: true
+      referenceGrant: false
+    - name: private
+      parentRef:
+        name: traefik-gateway
+        namespace: kube-system
+        section: web
+      hostnames:
+        - typesense-int.gw.proxmox.home
+      enabled: true
+      referenceGrant: true
+  metrics:
+    release: promstack
