@@ -3,6 +3,7 @@ package controller
 import (
 	"context"
 	"fmt"
+
 	tsv1alpha1 "github.com/akyriako/typesense-operator/api/v1alpha1"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	appsv1 "k8s.io/api/apps/v1"
@@ -18,7 +19,7 @@ func (r *TypesenseClusterReconciler) ReconcilePodMonitor(ctx context.Context, ts
 	// TODO Remove in future version 0.2.15+
 	r.deleteMetricsExporterServiceMonitor(ctx, ts)
 
-	if deployed, err := r.IsPrometheusDeployed(); err != nil || !deployed {
+	if deployed, err := r.IsApiGroupDeployed(prometheusApiGroup); err != nil || !deployed {
 		if ts.Spec.Metrics != nil {
 			err := fmt.Errorf("prometheus api group %s was not found in cluster", prometheusApiGroup)
 			r.logger.Error(err, "reconciling podmonitor skipped")
@@ -126,21 +127,6 @@ func (r *TypesenseClusterReconciler) deleteMetricsExporterPodMonitor(ctx context
 	}
 
 	return nil
-}
-
-func (r *TypesenseClusterReconciler) IsPrometheusDeployed() (bool, error) {
-	apiGroupList, err := r.DiscoveryClient.ServerGroups()
-	if err != nil {
-		return false, err
-	}
-
-	for _, apiGroup := range apiGroupList.Groups {
-		if apiGroup.Name == prometheusApiGroup {
-			return true, nil
-		}
-	}
-
-	return false, nil
 }
 
 // TODO Remove in future version 0.2.15+

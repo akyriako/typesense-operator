@@ -102,6 +102,8 @@ const (
 // +kubebuilder:rbac:groups=monitoring.coreos.com,resources=servicemonitors,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=monitoring.coreos.com,resources=podmonitors,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=discovery.k8s.io,resources=endpointslices,verbs=get;list;watch
+// +kubebuilder:rbac:groups=gateway.networking.k8s.io,resources=httproutes,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=gateway.networking.k8s.io,resources=referencegrants,verbs=get;list;watch;create;update;patch;delete
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -114,12 +116,13 @@ const (
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.18.4/pkg/reconcile
 func (r *TypesenseClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	r.logger = log.Log.WithValues("namespace", req.Namespace, "cluster", req.Name)
-	r.logger.Info("reconciling cluster")
 
 	var ts tsv1alpha1.TypesenseCluster
 	if err := r.Get(ctx, req.NamespacedName, &ts); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
+
+	r.logger.Info("reconciling cluster")
 
 	err := r.initConditions(ctx, &ts)
 	if err != nil {
@@ -160,6 +163,16 @@ func (r *TypesenseClusterReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	err = r.ReconcileIngress(ctx, &ts)
 	if err != nil {
 		cerr := r.setConditionNotReady(ctx, &ts, ConditionReasonIngressNotReady, err)
+		if cerr != nil {
+			err = errors.Wrap(err, cerr.Error())
+		}
+		return ctrl.Result{}, err
+	}
+
+	// Update strategy: Update the existing objects, if changes are identified
+	err = r.ReconcileHttpRoute(ctx, &ts)
+	if err != nil {
+		cerr := r.setConditionNotReady(ctx, &ts, ConditionReasonHttpRouteNotReady, err)
 		if cerr != nil {
 			err = errors.Wrap(err, cerr.Error())
 		}

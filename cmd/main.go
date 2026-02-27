@@ -30,6 +30,8 @@ import (
 	// to ensure that exec-entrypoint and run can make use of them.
 
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
+	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
+	gatewayv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
 	_ "k8s.io/client-go/discovery"
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
@@ -57,6 +59,8 @@ var (
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
+	utilruntime.Must(gatewayv1.SchemeBuilder.AddToScheme(scheme))
+	utilruntime.Must(gatewayv1beta1.SchemeBuilder.AddToScheme(scheme))
 	utilruntime.Must(monitoringv1.AddToScheme(scheme))
 	utilruntime.Must(discoveryv1.AddToScheme(scheme))
 	// +kubebuilder:scaffold:scheme

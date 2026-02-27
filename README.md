@@ -17,7 +17,7 @@
 **Simplify the deployment, scaling, and management of Typesense clusters in Kubernetes.**
 
 - Deploy highly-available **Typesense** clusters with a **single declarative YAML manifest**
-- Automates **Typesense** [lifecycle management](https://akyriako.github.io/typesense-operator-docs/docs/getting-started#key-features) (config maps, secrets, volumes, statefulsets, services, ingress, metrics, scrapers)
+- Automates **Typesense** [lifecycle management](https://akyriako.github.io/typesense-operator-docs/docs/getting-started#key-features) (config maps, secrets, volumes, statefulsets, services, ingress or http routes, metrics, scrapers)
 - Automates **Raft quorum [configuration, discovery and recovery](https://akyriako.github.io/typesense-operator-docs/docs/how-it-works/recovering-a-cluster-that-has-lost-quorum)** without additional sidecars or manual interventions
 - Built with Go & Operator SDK — lightweight, Kubernetes-native, and flexible
 - Community-driven, with plethora of examples for Kind, CCE, AKS, EKS, GCP, and more
@@ -29,7 +29,7 @@
 helm repo add tyko https://akyriako.github.io/typesense-operator/
 helm repo update
 
-helm upgrade --install typesense-operator tyko/typesense-operator -n typesense-system --create-namespace
+helm upgrade --install typesense-operator tyko/typesense-operator -n typesense-system --create-namespace --reset-values
 ```
 
 <details>
@@ -228,7 +228,7 @@ Join the conversation:
 ## 📦 Project Status
 
 TyKO is an **independently maintained** project (not affiliated with Typesense, Inc.).
-- Latest version: **0.3.8**
+- Latest version: **0.4.0-rc.1**
 - Tested on: Kubernetes 1.35 (earliest 1.26), Typesense 30.0 (earliest 26.0)
 - Contributions welcome! See [FAQ](https://akyriako.github.io/typesense-operator-docs/docs/faq) and [Development](https://akyriako.github.io/typesense-operator-docs/docs/development)
 
