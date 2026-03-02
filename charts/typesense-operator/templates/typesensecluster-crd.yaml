@@ -1023,7 +1023,7 @@ spec:
               healthcheck:
                 properties:
                   image:
-                    default: akyriako78/typesense-healthcheck:0.1.8
+                    default: quay.io/akyriako/typesense-healthcheck:0.1.8
                     type: string
                   resources:
                     description: ResourceRequirements describes the compute resource
@@ -3502,7 +3502,7 @@ spec:
               metrics:
                 properties:
                   image:
-                    default: akyriako78/typesense-prometheus-exporter:0.1.9
+                    default: quay.io/akyriako/typesense-prometheus-exporter:0.1.9
                     type: string
                   interval:
                     default: 15
