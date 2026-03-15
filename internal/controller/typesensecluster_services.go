@@ -163,6 +163,15 @@ func (r *TypesenseClusterReconciler) createService(ctx context.Context, key clie
 		},
 	}
 
+	svcSpec := ts.Spec.Service
+	if svcSpec != nil {
+		svc.ObjectMeta.Labels = mergeLabels(svc.ObjectMeta.Labels, svcSpec.Labels)
+		svc.ObjectMeta.Annotations = mergeAnnotations(svc.ObjectMeta.Annotations, svcSpec.Annotations)
+		svc.Spec.Type = svcSpec.Type
+		svc.Spec.InternalTrafficPolicy = svcSpec.InternalTrafficPolicy
+		svc.Spec.ExternalTrafficPolicy = svcSpec.ExternalTrafficPolicy
+	}
+
 	err := ctrl.SetControllerReference(ts, svc, r.Scheme)
 	if err != nil {
 		return nil, err

@@ -65,6 +65,10 @@ func mergeLabels(maps ...map[string]string) map[string]string {
 	return merged
 }
 
+func mergeAnnotations(maps ...map[string]string) map[string]string {
+	return mergeLabels(maps...)
+}
+
 func getMergedLabels(def map[string]string, scoped map[string]string) map[string]string {
 	return mergeLabels(def, scoped)
 }
