@@ -35,7 +35,7 @@ metadata:
   name: c-kind-1
 spec:
   image: typesense/typesense:30.0.rc27-amd64
-  replicas: 1
+  replicas: 3
   resources:
     limits:
       cpu: "1000m"
@@ -62,7 +62,7 @@ metadata:
   name: c-kind-2
 spec:
   image: typesense/typesense:30.0.rc29-amd64
-  replicas: 1
+  replicas: 3
   storage:
     size: 150Mi
     storageClassName: typesense-local-path
