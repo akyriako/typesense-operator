@@ -22,6 +22,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/akyriako/typesense-operator/internal/monitoring"
 	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -222,6 +223,9 @@ func (r *TypesenseClusterReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		if action == Bootstrapping {
 			requeueAfter = 15 * time.Second
 		}
+
+		r.Observe(&ts, ConditionReasonQuorumStateUnknown)
+
 		r.logger.Info(fmt.Sprintf("%s cluster completed", string(action)), "condition", cond, "requeueAfter", requeueAfter)
 		return ctrl.Result{RequeueAfter: requeueAfter}, nil
 	}
@@ -283,6 +287,7 @@ func (r *TypesenseClusterReconciler) Reconcile(ctx context.Context, req ctrl.Req
 			}
 
 			r.Recorder.Eventf(&ts, "Warning", string(condition), toTitle(err.Error()))
+
 		} else {
 			report := ts.Status.Conditions[0].Status != metav1.ConditionTrue
 
@@ -298,9 +303,19 @@ func (r *TypesenseClusterReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	}
 
 	cond = condition
+	r.Observe(&ts, condition)
 
 	r.logger.Info(fmt.Sprintf("%s cluster completed", string(action)), "condition", cond, "requeueAfter", requeueAfter)
 	return ctrl.Result{RequeueAfter: requeueAfter}, nil
+}
+
+func (r *TypesenseClusterReconciler) Observe(ts *tsv1alpha1.TypesenseCluster, condition ConditionQuorum) {
+	quorumHealthyGaugeVal := 0.0
+	if condition == ConditionReasonQuorumReady {
+		quorumHealthyGaugeVal = 1.0
+	}
+
+	monitoring.QuorumHealthy.WithLabelValues(ts.Name).Set(quorumHealthyGaugeVal)
 }
 
 // SetupWithManager sets up the controller with the Manager.

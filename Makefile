@@ -50,10 +50,23 @@ endif
 # This is useful for CI or a project to utilize a specific version of the operator-sdk toolkit.
 OPERATOR_SDK_VERSION ?= v1.39.0
 # Image URL to use all building/pushing image targets
-DOCKER_HUB_NAME ?= quay.io/akyriako#$(shell docker info | sed '/Username:/!d;s/.* //')
 IMG_NAME ?= typesense-operator
-IMG_TAG ?= 0.4.0
+IMG_TAG ?= 0.4.1-dev.1
 IMG ?= $(DOCKER_HUB_NAME)/$(IMG_NAME):$(IMG_TAG)
+
+RELEASE_KIND := $(if $(findstring -dev,$(IMG_TAG)),dev,prod)
+
+ifeq ($(RELEASE_KIND),dev)
+DOCKER_HUB_NAME ?= $(shell docker info | sed '/Username:/!d;s/.* //')
+else
+DOCKER_HUB_NAME ?= quay.io/akyriako
+endif
+
+.PHONY: print-hub
+print-hub:
+	@echo "IMG_TAG=$(IMG_TAG)"
+	@echo "RELEASE_KIND=$(RELEASE_KIND)"
+	@echo "DOCKER_HUB_NAME=$(DOCKER_HUB_NAME)"
 
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
 ENVTEST_K8S_VERSION := $(shell go list -m -f "{{ .Version }}" k8s.io/api | awk -F'[v.]' '{printf "1.%d", $$3}')
@@ -173,11 +186,11 @@ run: manifests generate fmt vet ## Run a controller from your host.
 # (i.e. docker build --platform linux/arm64). However, you must enable docker buildKit for it.
 # More info: https://docs.docker.com/develop/develop-images/build_enhancements/
 .PHONY: docker-build
-docker-build: ## Build docker image with the manager.
+docker-build: print-hub ## Build docker image with the manager.
 	$(CONTAINER_TOOL) build -t ${IMG} .
 
 .PHONY: docker-push
-docker-push: ## Push docker image with the manager.
+docker-push: print-hub ## Push docker image with the manager.
 	$(CONTAINER_TOOL) push ${IMG}
 
 # PLATFORMS defines the target platforms for the manager image be built to provide support to multiple
