@@ -1,6 +1,9 @@
 package v1alpha1
 
-import "k8s.io/apimachinery/pkg/api/resource"
+import (
+	appsv1 "k8s.io/api/apps/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
+)
 
 type StorageSpec struct {
 
@@ -16,6 +19,8 @@ type StorageSpec struct {
 	AccessMode string `json:"accessMode,omitempty"`
 
 	Annotations map[string]string `json:"annotations,omitempty"`
+
+	PersistentVolumeClaimRetentionPolicy *appsv1.StatefulSetPersistentVolumeClaimRetentionPolicy `json:"persistentVolumeClaimRetentionPolicy"`
 }
 
 func (s *TypesenseClusterSpec) GetStorage() StorageSpec {
