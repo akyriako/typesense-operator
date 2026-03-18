@@ -156,6 +156,15 @@ type TypesenseClusterStatus struct {
 
 	// +optional
 	Phase string `json:"phase,omitempty"`
+
+	// +optional
+	QuorumIncidentStartTime *metav1.Time `json:"quorumIncidentStartTime,omitempty"`
+
+	// +optional
+	LastQuorumRecoveryTime *metav1.Time `json:"lastQuorumRecoveryTime,omitempty"`
+
+	// +optional
+	LastQuorumMTTRSeconds *int64 `json:"lastQuorumMTTRSeconds,omitempty"`
 }
 
 // +kubebuilder:object:root=true

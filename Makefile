@@ -51,7 +51,7 @@ endif
 OPERATOR_SDK_VERSION ?= v1.39.0
 # Image URL to use all building/pushing image targets
 IMG_NAME ?= typesense-operator
-IMG_TAG ?= 0.4.1-dev.1
+IMG_TAG ?= 0.4.1-dev.10
 IMG ?= $(DOCKER_HUB_NAME)/$(IMG_NAME):$(IMG_TAG)
 
 RELEASE_KIND := $(if $(findstring -dev,$(IMG_TAG)),dev,prod)

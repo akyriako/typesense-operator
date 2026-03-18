@@ -130,6 +130,9 @@ func (r *TypesenseClusterReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		return ctrl.Result{}, err
 	}
 
+	// Rehydrate metrics on every reconcile, allow auto-healing after/if controller restarts
+	r.syncQuorumMetrics(&ts)
+
 	// Update strategy: Admin Secret is Immutable, will not be updated on any future change
 	secret, err := r.ReconcileSecret(ctx, ts)
 	if err != nil {
@@ -224,7 +227,7 @@ func (r *TypesenseClusterReconciler) Reconcile(ctx context.Context, req ctrl.Req
 			requeueAfter = 15 * time.Second
 		}
 
-		r.Observe(&ts, ConditionReasonQuorumStateUnknown)
+		monitoring.QuorumHealthy.WithLabelValues(ts.Name).Set(0.0)
 
 		r.logger.Info(fmt.Sprintf("%s cluster completed", string(action)), "condition", cond, "requeueAfter", requeueAfter)
 		return ctrl.Result{RequeueAfter: requeueAfter}, nil
@@ -303,19 +306,9 @@ func (r *TypesenseClusterReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	}
 
 	cond = condition
-	r.Observe(&ts, condition)
 
 	r.logger.Info(fmt.Sprintf("%s cluster completed", string(action)), "condition", cond, "requeueAfter", requeueAfter)
 	return ctrl.Result{RequeueAfter: requeueAfter}, nil
-}
-
-func (r *TypesenseClusterReconciler) Observe(ts *tsv1alpha1.TypesenseCluster, condition ConditionQuorum) {
-	quorumHealthyGaugeVal := 0.0
-	if condition == ConditionReasonQuorumReady {
-		quorumHealthyGaugeVal = 1.0
-	}
-
-	monitoring.QuorumHealthy.WithLabelValues(ts.Name).Set(quorumHealthyGaugeVal)
 }
 
 // SetupWithManager sets up the controller with the Manager.

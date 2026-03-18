@@ -5,7 +5,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/metrics"
 )
 
-const metricLabelTypesenseCluster = "typesense_cluster"
+const (
+	metricLabelTypesenseCluster = "typesense_cluster"
+)
 
 var (
 	QuorumRecoveryDuration = prometheus.NewHistogramVec(
