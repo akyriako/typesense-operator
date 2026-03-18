@@ -22,6 +22,10 @@ const (
 )
 
 func (r *TypesenseClusterReconciler) ReconcileHttpRoute(ctx context.Context, ts *tsv1alpha1.TypesenseCluster) (err error) {
+	if ts.Spec.HttpRoutes == nil || (ts.Spec.HttpRoutes != nil && len(ts.Spec.HttpRoutes) == 0) {
+		return nil
+	}
+
 	if supported, ver, err := r.IsFeatureSupported(minimumSupportedVersionForGateway); !supported || err != nil {
 		if err != nil {
 			return err
@@ -34,7 +38,7 @@ func (r *TypesenseClusterReconciler) ReconcileHttpRoute(ctx context.Context, ts 
 
 	if deployed, err := r.IsApiGroupDeployed(gatewayApiGroup); err != nil || !deployed {
 		if ts.Spec.HttpRoutes != nil || len(ts.Spec.HttpRoutes) != 0 {
-			err := fmt.Errorf("gateway api group %s was not found in cluster", gatewayApiGroup)
+			err := fmt.Errorf("api group %s was not found in cluster", gatewayApiGroup)
 			r.logger.Error(err, "reconciling http routes skipped")
 		}
 		return nil

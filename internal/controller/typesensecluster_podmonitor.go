@@ -6,7 +6,6 @@ import (
 
 	tsv1alpha1 "github.com/akyriako/typesense-operator/api/v1alpha1"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
-	appsv1 "k8s.io/api/apps/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -16,12 +15,13 @@ import (
 const prometheusApiGroup = "monitoring.coreos.com"
 
 func (r *TypesenseClusterReconciler) ReconcilePodMonitor(ctx context.Context, ts tsv1alpha1.TypesenseCluster) error {
-	// TODO Remove in future version 0.2.15+
-	r.deleteMetricsExporterServiceMonitor(ctx, ts)
+	if ts.Spec.Metrics == nil {
+		return nil
+	}
 
 	if deployed, err := r.IsApiGroupDeployed(prometheusApiGroup); err != nil || !deployed {
 		if ts.Spec.Metrics != nil {
-			err := fmt.Errorf("prometheus api group %s was not found in cluster", prometheusApiGroup)
+			err := fmt.Errorf("api group %s was not found in cluster", prometheusApiGroup)
 			r.logger.Error(err, "reconciling podmonitor skipped")
 		}
 		return nil
@@ -122,39 +122,6 @@ func (r *TypesenseClusterReconciler) createMetricsExporterPodMonitor(ctx context
 
 func (r *TypesenseClusterReconciler) deleteMetricsExporterPodMonitor(ctx context.Context, podMonitor *monitoringv1.PodMonitor) error {
 	err := r.Delete(ctx, podMonitor)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// TODO Remove in future version 0.2.15+
-func (r *TypesenseClusterReconciler) deleteMetricsExporterServiceMonitor(ctx context.Context, ts tsv1alpha1.TypesenseCluster) {
-	deploymentName := fmt.Sprintf(ClusterPrometheusExporterDeployment, ts.Name)
-	deploymentExists := true
-	deploymentObjectKey := client.ObjectKey{Namespace: ts.Namespace, Name: deploymentName}
-
-	var deployment = &appsv1.Deployment{}
-	if err := r.Get(ctx, deploymentObjectKey, deployment); err != nil {
-		if apierrors.IsNotFound(err) {
-			deploymentExists = false
-		} else {
-			r.logger.V(debugLevel).Error(err, fmt.Sprintf("unable to fetch metrics exporter deployment: %s", deploymentName))
-		}
-	}
-
-	if deploymentExists {
-		err := r.deleteMetricsExporterDeployment(ctx, deployment)
-		if err != nil {
-			r.logger.V(debugLevel).Error(err, fmt.Sprintf("unable to cleanup metrics exporter deployment: %s", deploymentName))
-		}
-	}
-}
-
-// TODO Remove in future version 0.2.15+
-func (r *TypesenseClusterReconciler) deleteMetricsExporterDeployment(ctx context.Context, deployment *appsv1.Deployment) error {
-	err := r.Delete(ctx, deployment)
 	if err != nil {
 		return err
 	}

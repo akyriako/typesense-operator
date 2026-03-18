@@ -28,6 +28,7 @@ const (
 
 	ClusterMetricsPodMonitorAppLabel = "%s-sts"
 	ClusterMetricsPodMonitor         = "%s-podmonitor"
+	ClusterMetricsGrafanaDashboard   = "%s-grafana-dashboard"
 
 	ClusterScraperCronJob          = "%s-scraper"
 	ClusterScraperCronJobContainer = "%s-docsearch-scraper"

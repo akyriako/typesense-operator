@@ -24,6 +24,7 @@ const (
 	ConditionReasonHttpRouteNotReady                                     = "HttpRouteNotReady"
 	ConditionReasonScrapersNotReady                                      = "ScrapersNotReady"
 	ConditionReasonMetricsExporterNotReady                               = "MetricsExporterNotReady"
+	ConditionReasonGrafanaDashboardNotReady                              = "GrafanaDashboardNotReady"
 	ConditionReasonQuorumStateUnknown                    ConditionQuorum = "QuorumStateUnknown"
 	ConditionReasonQuorumReady                           ConditionQuorum = "QuorumReady"
 	ConditionReasonQuorumNotReady                        ConditionQuorum = "QuorumNotReady"

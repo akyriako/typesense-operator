@@ -89,3 +89,4 @@ spec:
       referenceGrant: true
   metrics:
     release: promstack
+    enableGrafanaDashboard: true

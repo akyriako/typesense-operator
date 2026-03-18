@@ -3504,6 +3504,9 @@ spec:
                 type: object
               metrics:
                 properties:
+                  enableGrafanaDashboard:
+                    default: false
+                    type: boolean
                   image:
                     default: quay.io/akyriako/typesense-prometheus-exporter:0.1.9
                     type: string
@@ -4833,7 +4836,16 @@ spec:
                   - type
                   type: object
                 type: array
+              lastQuorumMTTRSeconds:
+                format: int64
+                type: integer
+              lastQuorumRecoveryTime:
+                format: date-time
+                type: string
               phase:
+                type: string
+              quorumIncidentStartTime:
+                format: date-time
                 type: string
             type: object
         type: object
