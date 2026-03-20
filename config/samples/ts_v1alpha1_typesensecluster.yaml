@@ -11,3 +11,6 @@ spec:
   storage:
     size: 100Mi
     storageClassName: standard
+    persistentVolumeClaimRetentionPolicy: 
+      whenDeleted: Delete
+      whenScaled: Retain

@@ -21,6 +21,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -311,6 +312,11 @@ func (in *StorageSpec) DeepCopyInto(out *StorageSpec) {
 		for key, val := range *in {
 			(*out)[key] = val
 		}
+	}
+	if in.PersistentVolumeClaimRetentionPolicy != nil {
+		in, out := &in.PersistentVolumeClaimRetentionPolicy, &out.PersistentVolumeClaimRetentionPolicy
+		*out = new(appsv1.StatefulSetPersistentVolumeClaimRetentionPolicy)
+		**out = **in
 	}
 }
 
