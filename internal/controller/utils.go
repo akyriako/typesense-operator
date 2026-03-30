@@ -283,3 +283,11 @@ func getImageTag(image string) string {
 	}
 	return image[pos+1:]
 }
+
+func stringMapToInterfaceMap(in map[string]string) map[string]interface{} {
+	out := make(map[string]interface{}, len(in))
+	for k, v := range in {
+		out[k] = v
+	}
+	return out
+}

@@ -89,4 +89,6 @@ spec:
       referenceGrant: true
   metrics:
     release: promstack
-    enableGrafanaDashboard: true
+    grafana:
+      matchingInstanceLabels:
+        dashboards: "grafana"

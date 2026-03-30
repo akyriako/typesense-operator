@@ -17,7 +17,7 @@ const (
 )
 
 func (r *TypesenseClusterReconciler) ReconcileGrafanaDashboard(ctx context.Context, ts *tsv1alpha1.TypesenseCluster) error {
-	if !ts.Spec.GetMetricsExporterSpecs().EnableGrafanaDashboard {
+	if ts.Spec.GetMetricsExporterSpecs().Grafana == nil {
 		return nil
 	}
 
@@ -54,7 +54,7 @@ func (r *TypesenseClusterReconciler) ReconcileGrafanaDashboard(ctx context.Conte
 	}
 
 	metricsSpecs := ts.Spec.GetMetricsExporterSpecs()
-	if metricsSpecs.EnableGrafanaDashboard == false {
+	if metricsSpecs.Grafana == nil {
 		if grafanaDashboardExists {
 			err := r.Delete(ctx, existing)
 			if err != nil {
@@ -140,9 +140,7 @@ func (r *TypesenseClusterReconciler) buildGrafanaDashboard(ts *tsv1alpha1.Typese
 	if err := unstructured.SetNestedField(
 		u.Object,
 		map[string]interface{}{
-			"matchLabels": map[string]interface{}{
-				"dashboards": "grafana",
-			},
+			"matchLabels": stringMapToInterfaceMap(ts.Spec.Metrics.Grafana.MatchingInstanceLabels),
 		},
 		"spec", "instanceSelector",
 	); err != nil {

@@ -25,9 +25,11 @@ type MetricsExporterSpec struct {
 	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
 
 	// +optional
-	// +kubebuilder:default=false
-	// +kubebuilder:validation:Type=boolean
-	EnableGrafanaDashboard bool `json:"enableGrafanaDashboard,omitempty"`
+	Grafana *GrafanaSpec `json:"grafana,omitempty"`
+}
+
+type GrafanaSpec struct {
+	MatchingInstanceLabels map[string]string `json:"matchingInstanceLabels"`
 }
 
 func (s *TypesenseClusterSpec) GetMetricsExporterSpecs() MetricsExporterSpec {
@@ -36,10 +38,9 @@ func (s *TypesenseClusterSpec) GetMetricsExporterSpecs() MetricsExporterSpec {
 	}
 
 	return MetricsExporterSpec{
-		Release:                "promstack",
-		Image:                  "quay.io/akyriako/typesense-prometheus-exporter:0.1.9",
-		IntervalInSeconds:      15,
-		EnableGrafanaDashboard: false,
+		Release:           "promstack",
+		Image:             "quay.io/akyriako/typesense-prometheus-exporter:0.1.9",
+		IntervalInSeconds: 15,
 	}
 }
 

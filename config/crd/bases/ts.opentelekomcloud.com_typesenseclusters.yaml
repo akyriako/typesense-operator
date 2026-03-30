@@ -3504,9 +3504,15 @@ spec:
                 type: object
               metrics:
                 properties:
-                  enableGrafanaDashboard:
-                    default: false
-                    type: boolean
+                  grafana:
+                    properties:
+                      matchingInstanceLabels:
+                        additionalProperties:
+                          type: string
+                        type: object
+                    required:
+                    - matchingInstanceLabels
+                    type: object
                   image:
                     default: quay.io/akyriako/typesense-prometheus-exporter:0.1.9
                     type: string
