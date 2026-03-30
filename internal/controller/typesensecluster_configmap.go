@@ -380,3 +380,20 @@ func (r *TypesenseClusterReconciler) getShortName(raftNodeEndpoint string) strin
 
 	return host
 }
+
+func (r *TypesenseClusterReconciler) hasBootstrapValues(ts *tsv1alpha1.TypesenseCluster, cm *v1.ConfigMap) (bool, error) {
+	rawNodeslist, ok := cm.Data["nodes"]
+	if !ok || rawNodeslist == "" {
+		err := fmt.Errorf("configmap is missing 'nodes' key")
+		return false, err
+	}
+
+	nodeslist := strings.Split(rawNodeslist, ",")
+	for _, node := range nodeslist {
+		if strings.Contains(node, fmt.Sprintf(ClusterStatefulSet, ts.Name)) {
+			return true, nil
+		}
+	}
+
+	return false, nil
+}
