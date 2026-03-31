@@ -104,18 +104,32 @@ type TypesenseClusterSpec struct {
 	AdditionalServerConfiguration *corev1.LocalObjectReference `json:"additionalServerConfiguration,omitempty"`
 
 	// +kubebuilder:validation:Optional
+	AdditionalServerConfigurationSecret *corev1.LocalObjectReference `json:"additionalServerConfigurationSecret,omitempty"`
+
+	// +kubebuilder:validation:Optional
 	ServiceAnnotations map[string]string `json:"serviceAnnotations,omitempty"`
 
 	// +kubebuilder:validation:Optional
 	StatefulSetAnnotations map[string]string `json:"statefulSetAnnotations,omitempty"`
 
 	// +kubebuilder:validation:Optional
+	StatefulSetLabels map[string]string `json:"statefulSetLabels,omitempty"`
+
+	// +kubebuilder:validation:Optional
 	PodAnnotations map[string]string `json:"podAnnotations,omitempty"`
+
+	// +kubebuilder:validation:Optional
+	PodLabels map[string]string `json:"podLabels,omitempty"`
 
 	// +optional
 	// +kubebuilder:default=false
 	// +kubebuilder:validation:Type=boolean
 	PodsInheritStatefulSetAnnotations bool `json:"podsInheritStatefulSetAnnotations,omitempty"`
+
+	// +optional
+	// +kubebuilder:default=false
+	// +kubebuilder:validation:Type=boolean
+	PodsInheritStatefulSetLabels bool `json:"podsInheritStatefulSetLabels,omitempty"`
 
 	Storage *StorageSpec `json:"storage"`
 

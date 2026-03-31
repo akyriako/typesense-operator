@@ -24,17 +24,27 @@ func (s *TypesenseClusterSpec) GetResources() corev1.ResourceRequirements {
 }
 
 func (s *TypesenseClusterSpec) GetAdditionalServerConfiguration() []corev1.EnvFromSource {
+	var envs []corev1.EnvFromSource
 	if s.AdditionalServerConfiguration != nil {
-		return []corev1.EnvFromSource{
+		envs = append(envs, []corev1.EnvFromSource{
 			{
 				ConfigMapRef: &corev1.ConfigMapEnvSource{
 					LocalObjectReference: *s.AdditionalServerConfiguration,
 				},
 			},
-		}
+		}...)
+	}
+	if s.AdditionalServerConfigurationSecret != nil {
+		envs = append(envs, []corev1.EnvFromSource{
+			{
+				SecretRef: &corev1.SecretEnvSource{
+					LocalObjectReference: *s.AdditionalServerConfigurationSecret,
+				},
+			},
+		}...)
 	}
 
-	return []corev1.EnvFromSource{}
+	return envs
 }
 
 func (s *TypesenseClusterSpec) GetCorsDomains() string {

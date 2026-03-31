@@ -83,7 +83,7 @@ func getLabels(ts *tsv1alpha1.TypesenseCluster) map[string]string {
 	}
 }
 
-func getObjectMeta(ts *tsv1alpha1.TypesenseCluster, name *string, annotations map[string]string) metav1.ObjectMeta {
+func getObjectMeta(ts *tsv1alpha1.TypesenseCluster, name *string, annotations, labels map[string]string) metav1.ObjectMeta {
 	if name == nil {
 		name = &ts.Name
 	}
@@ -91,7 +91,7 @@ func getObjectMeta(ts *tsv1alpha1.TypesenseCluster, name *string, annotations ma
 	return metav1.ObjectMeta{
 		Name:        *name,
 		Namespace:   ts.Namespace,
-		Labels:      getMergedLabels(getDefaultLabels(ts), getLabels(ts)),
+		Labels:      mergeLabels(getDefaultLabels(ts), getLabels(ts), labels),
 		Annotations: annotations,
 	}
 }

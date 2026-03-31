@@ -119,7 +119,7 @@ func (r *TypesenseClusterReconciler) createScraper(ctx context.Context, key clie
 			APIVersion: "batch/v1",
 			Kind:       "CronJob",
 		},
-		ObjectMeta: getObjectMeta(ts, &key.Name, nil),
+		ObjectMeta: getObjectMeta(ts, &key.Name, nil, nil),
 		Spec: batchv1.CronJobSpec{
 			ConcurrencyPolicy:          batchv1.ForbidConcurrent,
 			SuccessfulJobsHistoryLimit: ptr.To[int32](1),

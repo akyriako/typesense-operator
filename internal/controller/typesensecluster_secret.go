@@ -3,6 +3,7 @@ package controller
 import (
 	"context"
 	"fmt"
+
 	tsv1alpha1 "github.com/akyriako/typesense-operator/api/v1alpha1"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -51,7 +52,7 @@ func (r *TypesenseClusterReconciler) createAdminApiKey(
 	}
 
 	secret := &v1.Secret{
-		ObjectMeta: getObjectMeta(ts, &secretObjectKey.Name, nil),
+		ObjectMeta: getObjectMeta(ts, &secretObjectKey.Name, nil, nil),
 		Type:       v1.SecretTypeOpaque,
 		Immutable:  ptr.To[bool](true),
 		Data: map[string][]byte{

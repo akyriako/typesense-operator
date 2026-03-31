@@ -430,6 +430,11 @@ func (in *TypesenseClusterSpec) DeepCopyInto(out *TypesenseClusterSpec) {
 		*out = new(v1.LocalObjectReference)
 		**out = **in
 	}
+	if in.AdditionalServerConfigurationSecret != nil {
+		in, out := &in.AdditionalServerConfigurationSecret, &out.AdditionalServerConfigurationSecret
+		*out = new(v1.LocalObjectReference)
+		**out = **in
+	}
 	if in.ServiceAnnotations != nil {
 		in, out := &in.ServiceAnnotations, &out.ServiceAnnotations
 		*out = make(map[string]string, len(*in))
@@ -444,8 +449,22 @@ func (in *TypesenseClusterSpec) DeepCopyInto(out *TypesenseClusterSpec) {
 			(*out)[key] = val
 		}
 	}
+	if in.StatefulSetLabels != nil {
+		in, out := &in.StatefulSetLabels, &out.StatefulSetLabels
+		*out = make(map[string]string, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
 	if in.PodAnnotations != nil {
 		in, out := &in.PodAnnotations, &out.PodAnnotations
+		*out = make(map[string]string, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
+	if in.PodLabels != nil {
+		in, out := &in.PodLabels, &out.PodLabels
 		*out = make(map[string]string, len(*in))
 		for key, val := range *in {
 			(*out)[key] = val

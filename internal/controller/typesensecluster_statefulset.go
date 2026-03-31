@@ -222,6 +222,13 @@ func (r *TypesenseClusterReconciler) buildStatefulSet(ctx context.Context, key c
 		}
 	}
 
+	podLabels := make(map[string]string)
+	if ts.Spec.PodLabels != nil {
+		for k, v := range ts.Spec.PodLabels {
+			podLabels[k] = v
+		}
+	}
+
 	stsAnnotations := make(map[string]string)
 	if ts.Spec.StatefulSetAnnotations != nil {
 		for k, v := range ts.Spec.StatefulSetAnnotations {
@@ -232,10 +239,20 @@ func (r *TypesenseClusterReconciler) buildStatefulSet(ctx context.Context, key c
 		}
 	}
 
+	stsLabels := make(map[string]string)
+	if ts.Spec.StatefulSetLabels != nil {
+		for k, v := range ts.Spec.StatefulSetLabels {
+			stsAnnotations[k] = v
+			if ts.Spec.PodsInheritStatefulSetLabels {
+				podLabels[k] = v
+			}
+		}
+	}
+
 	clusterName := ts.Name
 	sts := &appsv1.StatefulSet{
 		TypeMeta:   metav1.TypeMeta{},
-		ObjectMeta: getObjectMeta(ts, &key.Name, stsAnnotations),
+		ObjectMeta: getObjectMeta(ts, &key.Name, stsAnnotations, stsLabels),
 		Spec: appsv1.StatefulSetSpec{
 			ServiceName:         fmt.Sprintf(ClusterHeadlessService, clusterName),
 			PodManagementPolicy: appsv1.ParallelPodManagement,
@@ -244,7 +261,7 @@ func (r *TypesenseClusterReconciler) buildStatefulSet(ctx context.Context, key c
 				MatchLabels: getLabels(ts),
 			},
 			Template: corev1.PodTemplateSpec{
-				ObjectMeta: getObjectMeta(ts, &key.Name, podAnnotations),
+				ObjectMeta: getObjectMeta(ts, &key.Name, podAnnotations, podLabels),
 				Spec: corev1.PodSpec{
 					SecurityContext:               ts.Spec.GetPodSecurityContext(),
 					TerminationGracePeriodSeconds: ptr.To[int64](5),

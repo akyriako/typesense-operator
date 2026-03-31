@@ -299,7 +299,7 @@ func (r *TypesenseClusterReconciler) createIngress(ctx context.Context, key clie
 	}
 
 	ingress := &networkingv1.Ingress{
-		ObjectMeta: getObjectMeta(ts, &key.Name, annotations),
+		ObjectMeta: getObjectMeta(ts, &key.Name, annotations, nil),
 		Spec: networkingv1.IngressSpec{
 			IngressClassName: ptr.To(ts.Spec.Ingress.IngressClassName),
 			TLS: []networkingv1.IngressTLS{
