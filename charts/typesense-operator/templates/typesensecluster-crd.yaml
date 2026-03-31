@@ -75,6 +75,22 @@ spec:
                     type: string
                 type: object
                 x-kubernetes-map-type: atomic
+              additionalServerConfigurationSecret:
+                description: |-
+                  LocalObjectReference contains enough information to let you locate the
+                  referenced object inside the same namespace.
+                properties:
+                  name:
+                    default: ""
+                    description: |-
+                      Name of the referent.
+                      This field is effectively required, but due to backwards compatibility is
+                      allowed to be empty. Instances of this type with an empty value here are
+                      almost certainly wrong.
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                    type: string
+                type: object
+                x-kubernetes-map-type: atomic
               adminApiKey:
                 description: |-
                   SecretReference represents a Secret Reference. It has enough information to retrieve secret
@@ -3588,7 +3604,14 @@ spec:
                 additionalProperties:
                   type: string
                 type: object
+              podLabels:
+                additionalProperties:
+                  type: string
+                type: object
               podsInheritStatefulSetAnnotations:
+                default: false
+                type: boolean
+              podsInheritStatefulSetLabels:
                 default: false
                 type: boolean
               priorityClassName:
@@ -4523,6 +4546,10 @@ spec:
                   type: string
                 type: object
               statefulSetAnnotations:
+                additionalProperties:
+                  type: string
+                type: object
+              statefulSetLabels:
                 additionalProperties:
                   type: string
                 type: object

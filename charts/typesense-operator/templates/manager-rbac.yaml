@@ -161,5 +161,5 @@ roleRef:
   name: '{{ include "typesense-operator.fullname" . }}-manager-role'
 subjects:
 - kind: ServiceAccount
-  name: '{{ include "typesense-operator.fullname" . }}-controller-manager'
+  name: '{{ include "typesense-operator.serviceAccountName" . }}'
   namespace: '{{ .Release.Namespace }}'

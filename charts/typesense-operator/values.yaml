@@ -21,11 +21,12 @@ controllerManager:
       requests:
         cpu: 10m
         memory: 64Mi
+  nodeSelector: {}
   podSecurityContext:
     runAsNonRoot: true
   replicas: 1
-  serviceAccount:
-    annotations: {}
+  tolerations: []
+  topologySpreadConstraints: []
 imagePullSecrets: []
 kubernetesClusterDomain: cluster.local
 metricsService:
@@ -35,3 +36,8 @@ metricsService:
     protocol: TCP
     targetPort: 8443
   type: ClusterIP
+serviceAccount:
+  annotations: {}
+  automount: true
+  create: true
+  name: ""
