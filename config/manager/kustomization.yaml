@@ -5,4 +5,4 @@ kind: Kustomization
 images:
 - name: controller
   newName: quay.io/akyriako/typesense-operator
-  newTag: 0.4.1-dev.14
+  newTag: 0.4.1-rc.1
