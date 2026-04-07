@@ -116,14 +116,15 @@ func (r *TypesenseClusterReconciler) ReconcileQuorum(ctx context.Context, ts *ts
 	r.logger.V(debugLevel).Info("reporting cluster status", "status", clusterStatus)
 
 	if clusterStatus == ClusterStatusSplitBrain {
-		rawNodeslist, ok := quorum.NodesListConfigMap.Data["nodes"]
-		if !ok || rawNodeslist == "" {
-			return ConditionReasonQuorumNotReady, 0, fmt.Errorf("configmap %s is missing 'nodes' key", quorum.NodesListConfigMap.Name)
+		hbv, err := r.hasBootstrapValues(ts, quorum.NodesListConfigMap)
+		if err != nil {
+			return ConditionReasonQuorumNotReady, 0, err
 		}
-		nodeslist := strings.Split(rawNodeslist, ",")
-		if hasHostnameBasedNodes(nodeslist, fmt.Sprintf(ClusterStatefulSet, ts.Name)) {
+
+		if hbv {
 			return ConditionReasonQuorumNotReadyWaitATerm, 0, nil
 		}
+
 		return r.downgradeQuorum(ctx, ts, quorum.NodesListConfigMap, stsObjectKey, sts.Status.ReadyReplicas, int32(quorum.MinRequiredNodes))
 	}
 
@@ -174,14 +175,15 @@ func (r *TypesenseClusterReconciler) ReconcileQuorum(ctx context.Context, ts *ts
 	}
 
 	if clusterStatus == ClusterStatusElectionDeadlock {
-		rawNodeslist, ok := quorum.NodesListConfigMap.Data["nodes"]
-		if !ok || rawNodeslist == "" {
-			return ConditionReasonQuorumNotReady, 0, fmt.Errorf("configmap %s is missing 'nodes' key", quorum.NodesListConfigMap.Name)
+		hbv, err := r.hasBootstrapValues(ts, quorum.NodesListConfigMap)
+		if err != nil {
+			return ConditionReasonQuorumNotReady, 0, err
 		}
-		nodeslist := strings.Split(rawNodeslist, ",")
-		if hasHostnameBasedNodes(nodeslist, fmt.Sprintf(ClusterStatefulSet, ts.Name)) {
+
+		if hbv {
 			return ConditionReasonQuorumNotReadyWaitATerm, 0, nil
 		}
+
 		return r.downgradeQuorum(ctx, ts, quorum.NodesListConfigMap, stsObjectKey, int32(healthyNodes), int32(minRequiredNodes))
 	}
 
@@ -388,14 +390,4 @@ func (r *TypesenseClusterReconciler) updatePodReadinessGate(ctx context.Context,
 
 	//r.logger.V(debugLevel).Info("updating pod readiness gate condition", "pod", pod.Name, "condition", condition.Type, "conditionStatus", condition.Status)
 	return nil
-}
-
-func hasHostnameBasedNodes(nodes []string, statefulSetName string) bool {
-	for _, node := range nodes {
-		if strings.Contains(node, statefulSetName) {
-			return true
-		}
-	}
-
-	return false
 }

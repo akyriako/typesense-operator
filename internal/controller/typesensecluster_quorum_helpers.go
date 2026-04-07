@@ -161,7 +161,8 @@ func (r *TypesenseClusterReconciler) getQuorum(ctx context.Context, ts *tsv1alph
 
 	rawNodes, ok := cm.Data["nodes"]
 	if !ok || strings.TrimSpace(rawNodes) == "" {
-		return &Quorum{}, fmt.Errorf("configmap %s is missing 'nodes' key", cm.Name)
+		err := fmt.Errorf("configmap %s is missing 'nodes' key", configMapName)
+		return &Quorum{}, err
 	}
 	nodes := strings.Split(rawNodes, ",")
 	availableNodes := len(nodes)
