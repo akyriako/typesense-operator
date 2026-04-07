@@ -34,7 +34,7 @@ metadata:
     app.kubernetes.io/managed-by: kustomize
   name: c-kind-1
 spec:
-  image: typesense/typesense:30.0.rc27-amd64
+  image: typesense/typesense:30.2.rc12-amd64
   replicas: 3
   resources:
     limits:
@@ -49,6 +49,7 @@ spec:
   adminApiKey:
     name: typesense-common-bootstrap-key
   metrics:
+    logLevel: -4
     release: promstack
   additionalServerConfiguration:
     name: c-kind-1-server-configuration

@@ -1025,6 +1025,16 @@ spec:
                   image:
                     default: quay.io/akyriako/typesense-healthcheck:0.1.8
                     type: string
+                  logLevel:
+                    default: 0
+                    enum:
+                    - -4
+                    - 0
+                    - 4
+                    - 8
+                    maximum: 8
+                    minimum: -4
+                    type: integer
                   resources:
                     description: ResourceRequirements describes the compute resource
                       requirements.
@@ -3511,6 +3521,16 @@ spec:
                     default: 15
                     maximum: 60
                     minimum: 15
+                    type: integer
+                  logLevel:
+                    default: 0
+                    enum:
+                    - -4
+                    - 0
+                    - 4
+                    - 8
+                    maximum: 8
+                    minimum: -4
                     type: integer
                   release:
                     type: string

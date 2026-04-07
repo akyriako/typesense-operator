@@ -12,6 +12,16 @@ type HealthCheckSpec struct {
 
 	// +kubebuilder:validation:Optional
 	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
+
+	// +optional
+	// +kubebuilder:default=0
+	// +kubebuilder:validation:Minimum=-4
+	// +kubebuilder:validation:Maximum=8
+	// +kubebuilder:validation:ExclusiveMinimum=false
+	// +kubebuilder:validation:ExclusiveMaximum=false
+	// +kubebuilder:validation:Type=integer
+	// +kubebuilder:validation:Enum=-4;0;4;8
+	LogLevel int `json:"logLevel,omitempty"`
 }
 
 func (s *TypesenseClusterSpec) GetHealthCheckSidecarSpecs() HealthCheckSpec {

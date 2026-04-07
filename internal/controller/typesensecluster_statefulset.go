@@ -353,7 +353,7 @@ func (r *TypesenseClusterReconciler) buildStatefulSet(ctx context.Context, key c
 								},
 								{
 									Name:  "LOG_LEVEL",
-									Value: strconv.Itoa(0),
+									Value: strconv.Itoa(ts.Spec.GetMetricsExporterSpecs().LogLevel),
 								},
 								{
 									Name:  "TYPESENSE_PROTOCOL",
@@ -403,7 +403,7 @@ func (r *TypesenseClusterReconciler) buildStatefulSet(ctx context.Context, key c
 								},
 								{
 									Name:  "LOG_LEVEL",
-									Value: strconv.Itoa(0),
+									Value: strconv.Itoa(ts.Spec.GetHealthCheckSidecarSpecs().LogLevel),
 								},
 								{
 									Name:  "TYPESENSE_PROTOCOL",
