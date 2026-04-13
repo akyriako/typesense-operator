@@ -4271,7 +4271,7 @@ spec:
                     x-kubernetes-int-or-string: true
                   storageClassName:
                     type: string
-                  persistentVolumeClaimRetentionPolicy:
+                  retentionPolicy:
                     description: |-
                       StatefulSetPersistentVolumeClaimRetentionPolicy describes the policy used for PVCs
                       created from the StatefulSet VolumeClaimTemplates.

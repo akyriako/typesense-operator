@@ -242,8 +242,8 @@ func (in *StorageSpec) DeepCopyInto(out *StorageSpec) {
 			(*out)[key] = val
 		}
 	}
-	if in.PersistentVolumeClaimRetentionPolicy != nil {
-		in, out := &in.PersistentVolumeClaimRetentionPolicy, &out.PersistentVolumeClaimRetentionPolicy
+	if in.RetentionPolicy != nil {
+		in, out := &in.RetentionPolicy, &out.RetentionPolicy
 		*out = new(appsv1.StatefulSetPersistentVolumeClaimRetentionPolicy)
 		**out = **in
 	}

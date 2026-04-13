@@ -20,7 +20,7 @@ type StorageSpec struct {
 
 	Annotations map[string]string `json:"annotations,omitempty"`
 
-	PersistentVolumeClaimRetentionPolicy *appsv1.StatefulSetPersistentVolumeClaimRetentionPolicy `json:"persistentVolumeClaimRetentionPolicy"`
+	RetentionPolicy *appsv1.StatefulSetPersistentVolumeClaimRetentionPolicy `json:"retentionPolicy"`
 }
 
 func (s *TypesenseClusterSpec) GetStorage() StorageSpec {

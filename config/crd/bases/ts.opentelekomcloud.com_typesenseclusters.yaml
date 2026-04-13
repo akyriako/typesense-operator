@@ -4326,7 +4326,7 @@ spec:
                     additionalProperties:
                       type: string
                     type: object
-                  persistentVolumeClaimRetentionPolicy:
+                  retentionPolicy:
                     description: |-
                       StatefulSetPersistentVolumeClaimRetentionPolicy describes the policy used for PVCs
                       created from the StatefulSet VolumeClaimTemplates.
@@ -4357,7 +4357,7 @@ spec:
                   storageClassName:
                     type: string
                 required:
-                - persistentVolumeClaimRetentionPolicy
+                - retentionPolicy
                 - storageClassName
                 type: object
               tolerations:
