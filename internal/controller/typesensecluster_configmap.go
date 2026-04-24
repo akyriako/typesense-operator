@@ -260,16 +260,35 @@ func (r *TypesenseClusterReconciler) getNodes(ctx context.Context, ts *tsv1alpha
 		}
 
 		for _, pod := range pods.Items {
+			markAsScheduled := false
+			// mark the pod as unscheduled if it's still pulling the image
+			for _, cs := range append(pod.Status.InitContainerStatuses, pod.Status.ContainerStatuses...) {
+				if cs.State.Waiting == nil {
+					continue
+				}
+
+				switch cs.State.Waiting.Reason {
+				case "ContainerCreating", "ErrImagePull", "ImagePullBackOff":
+					markAsScheduled = true
+					break
+				}
+			}
+
 			if pod.Status.Phase != v1.PodPending {
 				continue
 			}
+
 			for _, cond := range pod.Status.Conditions {
 				if cond.Type == v1.PodScheduled &&
 					cond.Status == v1.ConditionFalse &&
 					cond.Reason == v1.PodReasonUnschedulable {
-					unscheduledPods++
+					markAsScheduled = true
 					break
 				}
+			}
+
+			if markAsScheduled {
+				unscheduledPods++
 			}
 		}
 
