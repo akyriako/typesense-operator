@@ -12,7 +12,7 @@ controllerManager:
         - ALL
     image:
       repository: quay.io/akyriako/typesense-operator
-      tag: 0.4.1-rc.1
+      tag: 0.4.1-rc.2
     imagePullPolicy: IfNotPresent
     resources:
       limits:
