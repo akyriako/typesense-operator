@@ -27,6 +27,10 @@ type IngressSpec struct {
 	// +kubebuilder:validation:Optional
 	ServiceAnnotations map[string]string `json:"serviceAnnotations,omitempty"`
 
+	// +optional
+	Labels map[string]string `json:"labels,omitempty"`
+
+	// +optional
 	Annotations map[string]string `json:"annotations,omitempty"`
 
 	// +optional
