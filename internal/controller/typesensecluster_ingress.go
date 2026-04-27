@@ -93,9 +93,13 @@ func (r *TypesenseClusterReconciler) ReconcileIngress(ctx context.Context, ts *t
 			return err
 		}
 	} else {
+		lbls := r.getIngressLabels(ig, ts, ingressObjectKey)
+		anons := r.getIngressAnnotations(ig, ts)
+
 		if ts.Spec.Ingress.Host != ig.Spec.Rules[0].Host ||
 			(ts.Spec.Ingress.ClusterIssuer != nil && *ts.Spec.Ingress.ClusterIssuer != ig.Annotations[clusterIssuerAnnotationKey]) ||
-			!apiequality.Semantic.DeepEqual(ts.Spec.Ingress.Annotations, r.getIngressAnnotations(ig, ts)) ||
+			!apiequality.Semantic.DeepEqual(ts.Spec.Ingress.Labels, lbls) ||
+			!apiequality.Semantic.DeepEqual(ts.Spec.Ingress.Annotations, anons) ||
 			(ts.Spec.Ingress.TLSSecretName != nil && *ts.Spec.Ingress.TLSSecretName != ig.Spec.TLS[0].SecretName) ||
 			ts.Spec.Ingress.IngressClassName != *ig.Spec.IngressClassName ||
 			ts.Spec.Ingress.Path != ig.Spec.Rules[0].IngressRuleValue.HTTP.Paths[0].Path ||
@@ -278,16 +282,17 @@ func (r *TypesenseClusterReconciler) ReconcileIngress(ctx context.Context, ts *t
 }
 
 func (r *TypesenseClusterReconciler) createIngress(ctx context.Context, key client.ObjectKey, ts *tsv1alpha1.TypesenseCluster) (*networkingv1.Ingress, error) {
-	if ts.Spec.Ingress.ClusterIssuer != nil && ts.Spec.Ingress.TLSSecretName == nil {
-		return nil, fmt.Errorf("tls secret name is required, skipping ingress creation")
-	}
-
+	labels := map[string]string{}
 	annotations := map[string]string{}
 	var tlsSecretName string
 
 	if ts.Spec.Ingress.ClusterIssuer != nil {
 		annotations[clusterIssuerAnnotationKey] = *ts.Spec.Ingress.ClusterIssuer
 		tlsSecretName = fmt.Sprintf("%s-reverse-proxy-%s-certificate-tls", ts.Name, *ts.Spec.Ingress.ClusterIssuer)
+	}
+
+	if ts.Spec.Ingress.Labels != nil {
+		maps.Copy(labels, ts.Spec.Ingress.Labels)
 	}
 
 	if ts.Spec.Ingress.Annotations != nil {
@@ -299,7 +304,7 @@ func (r *TypesenseClusterReconciler) createIngress(ctx context.Context, key clie
 	}
 
 	ingress := &networkingv1.Ingress{
-		ObjectMeta: getObjectMeta(ts, &key.Name, annotations),
+		ObjectMeta: getIngressObjectMeta(ts, &key.Name, ts.Spec.Ingress.Labels, ts.Spec.Ingress.Annotations),
 		Spec: networkingv1.IngressSpec{
 			IngressClassName: ptr.To(ts.Spec.Ingress.IngressClassName),
 			TLS: []networkingv1.IngressTLS{
@@ -348,9 +353,6 @@ func (r *TypesenseClusterReconciler) createIngress(ctx context.Context, key clie
 }
 
 func (r *TypesenseClusterReconciler) updateIngress(ctx context.Context, ig networkingv1.Ingress, ts *tsv1alpha1.TypesenseCluster) (*networkingv1.Ingress, error) {
-	if ts.Spec.Ingress.ClusterIssuer != nil && ts.Spec.Ingress.TLSSecretName == nil {
-		return nil, fmt.Errorf("tls secret name is required, skipping ingress update")
-	}
 	patch := client.MergeFrom(ig.DeepCopy())
 
 	ig.Spec.Rules[0].Host = ts.Spec.Ingress.Host
@@ -366,10 +368,13 @@ func (r *TypesenseClusterReconciler) updateIngress(ctx context.Context, ig netwo
 		tlsSecretName = fmt.Sprintf("%s-reverse-proxy-%s-certificate-tls", ts.Name, *ts.Spec.Ingress.ClusterIssuer)
 	}
 
-	if ts.Spec.Ingress.Annotations != nil {
-		maps.Copy(annotations, ts.Spec.Ingress.Annotations)
+	if ts.Spec.Ingress.Labels != nil {
+		maps.Copy(ig.Labels, ts.Spec.Ingress.Labels)
 	}
-	ig.Annotations = annotations
+
+	if ts.Spec.Ingress.Annotations != nil {
+		maps.Copy(ig.Annotations, ts.Spec.Ingress.Annotations)
+	}
 
 	if ts.Spec.Ingress.TLSSecretName != nil {
 		tlsSecretName = *ts.Spec.Ingress.TLSSecretName
@@ -390,6 +395,17 @@ func (r *TypesenseClusterReconciler) deleteIngress(ctx context.Context, ig *netw
 	}
 
 	return nil
+}
+
+func (r *TypesenseClusterReconciler) getIngressLabels(ig *networkingv1.Ingress, ts *tsv1alpha1.TypesenseCluster, key client.ObjectKey) map[string]string {
+	var filters []string
+	defaultLabels := getIngressObjectMeta(ts, &key.Name, nil, nil).Labels
+	for k := range defaultLabels {
+		filters = append(filters, k)
+	}
+
+	filtered := filterMap(ig.Labels, filters...)
+	return filtered
 }
 
 func (r *TypesenseClusterReconciler) getIngressAnnotations(ig *networkingv1.Ingress, ts *tsv1alpha1.TypesenseCluster) map[string]string {

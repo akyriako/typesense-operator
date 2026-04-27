@@ -1262,6 +1262,10 @@ spec:
                     type: string
                   ingressClassName:
                     type: string
+                  labels:
+                    additionalProperties:
+                      type: string
+                    type: object
                   locationDirectives:
                     type: string
                   path:

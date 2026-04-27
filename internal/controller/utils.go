@@ -121,6 +121,21 @@ func getPodMonitorLabels(ts *tsv1alpha1.TypesenseCluster) map[string]string {
 	}
 }
 
+func getIngressObjectMeta(ts *tsv1alpha1.TypesenseCluster, name *string, labels, annotations map[string]string) metav1.ObjectMeta {
+	if name == nil {
+		name = &ts.Name
+	}
+
+	defaultLabels := getMergedLabels(getDefaultLabels(ts), getLabels(ts))
+
+	return metav1.ObjectMeta{
+		Name:        *name,
+		Namespace:   ts.Namespace,
+		Labels:      getMergedLabels(defaultLabels, labels),
+		Annotations: annotations,
+	}
+}
+
 func getPodMonitorObjectMeta(ts *tsv1alpha1.TypesenseCluster, name *string, annotations map[string]string) metav1.ObjectMeta {
 	if name == nil {
 		name = &ts.Name
