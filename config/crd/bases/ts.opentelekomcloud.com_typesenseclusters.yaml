@@ -4551,6 +4551,27 @@ spec:
                         type: object
                     type: object
                 type: object
+              service:
+                properties:
+                  annotations:
+                    additionalProperties:
+                      type: string
+                    type: object
+                  externalTrafficPolicy:
+                    description: for backwards compat
+                    enum:
+                    - Cluster
+                    - Local
+                    type: string
+                  type:
+                    default: ClusterIP
+                    description: Service Type string describes ingress methods for
+                      a service
+                    enum:
+                    - ClusterIP
+                    - LoadBalancer
+                    type: string
+                type: object
               serviceAnnotations:
                 additionalProperties:
                   type: string

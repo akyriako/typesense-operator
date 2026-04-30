@@ -11,7 +11,9 @@ type ServiceSpec struct {
 	Type corev1.ServiceType `json:"type"`
 
 	// +optional
-	// +kubebuilder:default:="Cluster"
 	// +kubebuilder:validation:Enum=Cluster;Local
-	ExternalTrafficPolicy corev1.ServiceExternalTrafficPolicy `json:"externalTrafficPolicy,omitempty"`
+	ExternalTrafficPolicy *corev1.ServiceExternalTrafficPolicyType `json:"externalTrafficPolicy,omitempty"`
+
+	// +kubebuilder:validation:Optional
+	Annotations map[string]string `json:"annotations,omitempty"`
 }
