@@ -163,6 +163,12 @@ func (r *TypesenseClusterReconciler) createService(ctx context.Context, key clie
 		},
 	}
 
+	svcSpec := ts.Spec.Service
+	if svcSpec != nil {
+		svc.Spec.Type = svcSpec.Type
+		svc.Spec.ExternalTrafficPolicy = svcSpec.ExternalTrafficPolicy
+	}
+
 	err := ctrl.SetControllerReference(ts, svc, r.Scheme)
 	if err != nil {
 		return nil, err
