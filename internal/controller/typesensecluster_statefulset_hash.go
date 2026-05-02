@@ -17,15 +17,16 @@ import (
 type UpdateStatefulSetTrigger string
 
 var (
-	SpecReplicasChanged             UpdateStatefulSetTrigger = "SpecReplicasChanged"
-	HashAnnotationChanged           UpdateStatefulSetTrigger = "HashAnnotationChanged"
-	PodAnnotationsChanged           UpdateStatefulSetTrigger = "PodAnnotationsChanged"
-	StatefulSetAnnotationsChanged   UpdateStatefulSetTrigger = "StatefulSetAnnotationsChanged"
-	SpecResourcesChanged            UpdateStatefulSetTrigger = "SpecResourcesChanged"
-	PodSecurityContextChanged       UpdateStatefulSetTrigger = "PodSecurityContextChanged"
-	InvalidContainerCount           UpdateStatefulSetTrigger = "InvalidContainerCount"
-	ContainerSecurityContextChanged UpdateStatefulSetTrigger = "ContainerSecurityContextChanged"
-	SpecTypesenseVersionChanged     UpdateStatefulSetTrigger = "SpecTypesenseVersionChanged"
+	SpecReplicasChanged                UpdateStatefulSetTrigger = "SpecReplicasChanged"
+	HashAnnotationChanged              UpdateStatefulSetTrigger = "HashAnnotationChanged"
+	PodAnnotationsChanged              UpdateStatefulSetTrigger = "PodAnnotationsChanged"
+	StatefulSetAnnotationsChanged      UpdateStatefulSetTrigger = "StatefulSetAnnotationsChanged"
+	StatefulSetARetentionPolicyChanged UpdateStatefulSetTrigger = "StatefulSetARetentionPolicyChanged"
+	SpecResourcesChanged               UpdateStatefulSetTrigger = "SpecResourcesChanged"
+	PodSecurityContextChanged          UpdateStatefulSetTrigger = "PodSecurityContextChanged"
+	InvalidContainerCount              UpdateStatefulSetTrigger = "InvalidContainerCount"
+	ContainerSecurityContextChanged    UpdateStatefulSetTrigger = "ContainerSecurityContextChanged"
+	SpecTypesenseVersionChanged        UpdateStatefulSetTrigger = "SpecTypesenseVersionChanged"
 )
 
 func (r *TypesenseClusterReconciler) shouldUpdateStatefulSet(sts *appsv1.StatefulSet, desired *appsv1.StatefulSet, ts *tsv1alpha1.TypesenseCluster) (update bool, scaleOnly bool, triggers []UpdateStatefulSetTrigger) {
@@ -43,7 +44,7 @@ func (r *TypesenseClusterReconciler) shouldUpdateStatefulSet(sts *appsv1.Statefu
 
 	// SpecReplicasChanged
 	if *sts.Spec.Replicas != ts.Spec.Replicas &&
-		(condition.Reason != string(ConditionReasonQuorumDowngraded) || condition.Reason != string(ConditionReasonQuorumQueuedWrites)) {
+		(condition.Reason != string(ConditionReasonQuorumDowngraded) && condition.Reason != string(ConditionReasonQuorumQueuedWrites)) {
 		triggers = append(triggers, SpecReplicasChanged)
 		update = false
 		scaleOnly = true
@@ -68,6 +69,12 @@ func (r *TypesenseClusterReconciler) shouldUpdateStatefulSet(sts *appsv1.Statefu
 	// StatefulSetAnnotationsChanged
 	if !apiequality.Semantic.DeepEqual(stsAnnotations, desired.ObjectMeta.Annotations) {
 		triggers = append(triggers, StatefulSetAnnotationsChanged)
+		update = true
+	}
+
+	// StatefulSetARetentionPolicyChanged
+	if !apiequality.Semantic.DeepEqual(sts.Spec.PersistentVolumeClaimRetentionPolicy, desired.Spec.PersistentVolumeClaimRetentionPolicy) {
+		triggers = append(triggers, StatefulSetARetentionPolicyChanged)
 		update = true
 	}
 
