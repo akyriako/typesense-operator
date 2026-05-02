@@ -486,7 +486,7 @@ func (r *TypesenseClusterReconciler) buildStatefulSet(ctx context.Context, key c
 					},
 				},
 			},
-			PersistentVolumeClaimRetentionPolicy: ts.Spec.Storage.RetentionPolicy,
+			PersistentVolumeClaimRetentionPolicy: ts.Spec.GetStorageRetentionPolicy(),
 		},
 	}
 

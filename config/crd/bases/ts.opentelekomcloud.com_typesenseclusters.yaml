@@ -4357,7 +4357,6 @@ spec:
                   storageClassName:
                     type: string
                 required:
-                - retentionPolicy
                 - storageClassName
                 type: object
               tolerations:
