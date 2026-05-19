@@ -80,9 +80,10 @@ func (r *TypesenseClusterReconciler) ReconcileScraper(ctx context.Context, ts ts
 			hasChanged := false
 			hasChangedConfig := false
 			container := scraperCronJob.Spec.JobTemplate.Spec.Template.Spec.Containers[0]
+			config := scraper.GetScraperConfig()
 
 			for _, env := range container.Env {
-				if env.Name == "CONFIG" && env.Value != scraper.Config {
+				if env.Name == "CONFIG" && env.Value != config {
 					hasChangedConfig = true
 					break
 				}
@@ -139,7 +140,7 @@ func (r *TypesenseClusterReconciler) createScraper(ctx context.Context, key clie
 									Env: []corev1.EnvVar{
 										{
 											Name:  "CONFIG",
-											Value: scraperSpec.Config,
+											Value: scraperSpec.GetScraperConfig(),
 										},
 										{
 											Name: "TYPESENSE_API_KEY",
