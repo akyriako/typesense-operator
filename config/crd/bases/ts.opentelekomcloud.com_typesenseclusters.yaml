@@ -1023,7 +1023,7 @@ spec:
               healthcheck:
                 properties:
                   image:
-                    default: quay.io/akyriako/typesense-healthcheck:0.1.8
+                    default: quay.io/akyriako/typesense-healthcheck:0.2.0
                     type: string
                   logLevel:
                     default: 0

@@ -7,7 +7,7 @@ import (
 
 type HealthCheckSpec struct {
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default:="quay.io/akyriako/typesense-healthcheck:0.1.8"
+	// +kubebuilder:default:="quay.io/akyriako/typesense-healthcheck:0.2.0"
 	Image string `json:"image,omitempty"`
 
 	// +kubebuilder:validation:Optional
@@ -30,7 +30,7 @@ func (s *TypesenseClusterSpec) GetHealthCheckSidecarSpecs() HealthCheckSpec {
 	}
 
 	return HealthCheckSpec{
-		Image: "quay.io/akyriako/typesense-healthcheck:0.1.8",
+		Image: "quay.io/akyriako/typesense-healthcheck:0.2.0",
 	}
 }
 
