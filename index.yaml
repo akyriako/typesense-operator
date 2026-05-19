@@ -2,6 +2,21 @@ apiVersion: v1
 entries:
   typesense-operator:
   - apiVersion: v2
+    appVersion: 0.4.1
+    created: "2026-05-19T10:16:05.283585482Z"
+    description: Typesense Kubernetes Operator (TyKO) simplifies deploying, scaling
+      and managing highly-available, self-healing Typesense clusters in Kubernetes
+    digest: f5b4aaa3d5f9fbe0abf135ce5b51e0ba9a4e7c6befb0fc97aa73b5793d3d03c3
+    icon: https://akyriako.github.io/typesense-operator-docs/img/tyko-logo.png
+    maintainers:
+    - name: Kyriakos Akriotis
+      url: https://github.com/akyriako
+    name: typesense-operator
+    type: application
+    urls:
+    - https://github.com/akyriako/typesense-operator/releases/download/typesense-operator-0.4.1/typesense-operator-0.4.1.tgz
+    version: 0.4.1
+  - apiVersion: v2
     appVersion: 0.4.1-rc.4
     created: "2026-04-30T18:07:13.311294218Z"
     description: Typesense Kubernetes Operator (TyKO) simplifies deploying, scaling
@@ -666,4 +681,4 @@ entries:
     urls:
     - https://github.com/akyriako/typesense-operator/releases/download/typesense-operator-0.1.0/typesense-operator-0.1.0.tgz
     version: 0.1.0
-generated: "2026-04-30T18:07:13.311650182Z"
+generated: "2026-05-19T10:16:05.283819787Z"
