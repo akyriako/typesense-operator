@@ -52,11 +52,26 @@ OPERATOR_SDK_VERSION ?= v1.39.0
 # Image URL to use all building/pushing image targets
 DOCKER_HUB_NAME ?= quay.io/akyriako#$(shell docker info | sed '/Username:/!d;s/.* //')
 IMG_NAME ?= typesense-operator
-IMG_TAG ?= 0.4.1
+IMG_TAG ?= 0.5.0-dev.1
 IMG ?= $(DOCKER_HUB_NAME)/$(IMG_NAME):$(IMG_TAG)
 
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
 ENVTEST_K8S_VERSION := $(shell go list -m -f "{{ .Version }}" k8s.io/api | awk -F'[v.]' '{printf "1.%d", $$3}')
+
+#LDFLAGS
+BIN_VERSION ?= $(IMG_TAG)
+BIN_GIT_COMMIT ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo "none")
+BIN_BUILD_DATE ?= $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
+
+LDFLAGS = -s -w \
+  -X github.com/akyriako/typesense-operator/internal/version.Version=$(BIN_VERSION) \
+  -X github.com/akyriako/typesense-operator/internal/version.Commit=$(BIN_GIT_COMMIT) \
+  -X github.com/akyriako/typesense-operator/internal/version.BuildDate=$(BIN_BUILD_DATE)
+
+DOCKER_BUILD_ARGS := \
+  --build-arg BIN_VERSION=$(BIN_VERSION) \
+  --build-arg BIN_GIT_COMMIT=$(BIN_GIT_COMMIT) \
+  --build-arg BIN_BUILD_DATE=$(BIN_BUILD_DATE)
 
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
 ifeq (,$(shell go env GOBIN))
@@ -163,7 +178,7 @@ lint-config: golangci-lint ## Verify golangci-lint linter configuration
 
 .PHONY: build
 build: manifests generate fmt vet ## Build manager binary.
-	go build -o bin/manager cmd/main.go
+	go build -ldflags "$(LDFLAGS)" -o bin/manager cmd/main.go
 
 .PHONY: run
 run: manifests generate fmt vet ## Run a controller from your host.
@@ -174,7 +189,7 @@ run: manifests generate fmt vet ## Run a controller from your host.
 # More info: https://docs.docker.com/develop/develop-images/build_enhancements/
 .PHONY: docker-build
 docker-build: ## Build docker image with the manager.
-	$(CONTAINER_TOOL) build -t ${IMG} .
+	$(CONTAINER_TOOL) build $(DOCKER_BUILD_ARGS) -t ${IMG} .
 
 .PHONY: docker-push
 docker-push: ## Push docker image with the manager.
@@ -193,7 +208,7 @@ docker-buildx: ## Build and push docker image for the manager for cross-platform
 	sed -e '1 s/\(^FROM\)/FROM --platform=\$$\{BUILDPLATFORM\}/; t' -e ' 1,// s//FROM --platform=\$$\{BUILDPLATFORM\}/' Dockerfile > Dockerfile.cross
 	- $(CONTAINER_TOOL) buildx create --name typesense-operator-builder
 	$(CONTAINER_TOOL) buildx use typesense-operator-builder
-	- $(CONTAINER_TOOL) buildx build --push --platform=$(PLATFORMS) --tag ${IMG} -f Dockerfile.cross .
+	- $(CONTAINER_TOOL) buildx build --push --platform=$(PLATFORMS) $(DOCKER_BUILD_ARGS) --tag ${IMG} -f Dockerfile.cross .
 	- $(CONTAINER_TOOL) buildx rm typesense-operator-builder
 	rm Dockerfile.cross
 
