@@ -27,6 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -51,11 +52,7 @@ type TypesenseClusterReconciler struct {
 	ClientSet       *kubernetes.Clientset
 	Configuration   *rest.Config
 	InCluster       bool
-}
-
-type TypesenseClusterReconciliationPhase struct {
-	Name      string
-	Reconcile func(context.Context, *tsv1alpha1.TypesenseCluster) (ctrl.Result, error)
+	ServerVersion   *version.Info
 }
 
 var (

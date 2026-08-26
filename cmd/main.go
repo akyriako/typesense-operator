@@ -232,10 +232,10 @@ func main() {
 		os.Exit(1)
 	}
 
-	//discoveryClient, err := discovery.NewDiscoveryClientForConfig(kubeConfig)
-	//if err != nil {
-	//	setupLog.Error(err, "unable to create discovery client")
-	//}
+	serverVersion, err := clientSet.DiscoveryClient.ServerVersion()
+	if err != nil {
+		setupLog.Error(err, "unable to get kubernetes server version")
+	}
 
 	if err = (&controller.TypesenseClusterReconciler{
 		Client:          mgr.GetClient(),
@@ -245,6 +245,7 @@ func main() {
 		DiscoveryClient: clientSet.DiscoveryClient,
 		Configuration:   mgr.GetConfig(),
 		InCluster:       isInCluster(),
+		ServerVersion:   serverVersion,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "TypesenseCluster")
 		os.Exit(1)

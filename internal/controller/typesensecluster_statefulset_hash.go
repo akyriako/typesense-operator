@@ -28,17 +28,18 @@ var (
 	SpecTypesenseVersionChanged     UpdateStatefulSetTrigger = "SpecTypesenseVersionChanged"
 )
 
-func (r *TypesenseClusterReconciler) shouldUpdateStatefulSet(sts *appsv1.StatefulSet, desired *appsv1.StatefulSet, ts *tsv1alpha1.TypesenseCluster) (update bool, scaleOnly bool, triggers []UpdateStatefulSetTrigger) {
+func (r *TypesenseClusterReconciler) shouldUpdateStatefulSet(sts *appsv1.StatefulSet, desired *appsv1.StatefulSet, ts *tsv1alpha1.TypesenseCluster) (update bool, scaleOnly bool, inPlaceResize bool, triggers []UpdateStatefulSetTrigger) {
 	update = false
 	scaleOnly = false
+	inPlaceResize = false
 
 	if sts == nil || ts == nil {
-		return false, false, nil
+		return false, false, false, nil
 	}
 
 	condition := r.getConditionReady(ts)
 	if condition == nil {
-		return false, false, nil
+		return false, false, false, nil
 	}
 
 	// SpecReplicasChanged
@@ -71,11 +72,21 @@ func (r *TypesenseClusterReconciler) shouldUpdateStatefulSet(sts *appsv1.Statefu
 		update = true
 	}
 
-	//// SpecResourcesChanged
-	//if !apiequality.Semantic.DeepEqual(sts.Spec.Template.Spec.Containers[0].Resources, ts.Spec.GetResources()) {
-	//	triggers = append(triggers, SpecResourcesChanged)
-	//	update = true
-	//}
+	isInPlacePodResizingSupported, _, _ := r.IsFeatureSupported(minimumSupportedVersionForInPlacePodResizing)
+	if isInPlacePodResizingSupported {
+		//// SpecResourcesChanged
+		for i := range desired.Spec.Template.Spec.Containers {
+			if i >= len(sts.Spec.Template.Spec.Containers) {
+				break
+			}
+
+			if !apiequality.Semantic.DeepEqual(sts.Spec.Template.Spec.Containers[i].Resources, desired.Spec.Template.Spec.Containers[i].Resources) {
+				triggers = append(triggers, SpecResourcesChanged)
+				inPlaceResize = true
+				break
+			}
+		}
+	}
 
 	// PodSecurityContextChanged
 	if !apiequality.Semantic.DeepEqual(sts.Spec.Template.Spec.SecurityContext, ts.Spec.GetPodSecurityContext()) {
@@ -107,7 +118,12 @@ func (r *TypesenseClusterReconciler) shouldUpdateStatefulSet(sts *appsv1.Statefu
 		update = true
 	}
 
-	return update, scaleOnly, triggers
+	rolloutInProgress := sts.Status.ObservedGeneration < sts.Generation && sts.Spec.UpdateStrategy.RollingUpdate.Partition == nil
+	if (update && !inPlaceResize) || (rolloutInProgress && !inPlaceResize) {
+		inPlaceResize = false
+	}
+
+	return update, scaleOnly, inPlaceResize, triggers
 }
 
 func (r *TypesenseClusterReconciler) shouldEmergencyUpdateStatefulSet(sts *appsv1.StatefulSet, ts *tsv1alpha1.TypesenseCluster) bool {
@@ -190,17 +206,21 @@ func (r *TypesenseClusterReconciler) buildStatefulSetHash(ctx context.Context, s
 		AdditionalConfigurationData   map[string]map[string]string
 	}
 
-	c0, _ := json.Marshal(sts.Spec.Template.Spec.Containers[0].Resources)
-	c1, _ := json.Marshal(sts.Spec.Template.Spec.Containers[1].Resources)
-	c2, _ := json.Marshal(sts.Spec.Template.Spec.Containers[2].Resources)
-
 	shi := specsHashInput{
-		StsSpecAnnotations:            stsTemplate.Annotations,
-		PodSpecTemplate:               *podTemplate,
-		TypesenseContainerResources:   c0,
-		MetricsContainerResources:     c1,
-		HealthcheckContainerResources: c2,
-		AdditionalConfigurationData:   additionalConfData,
+		StsSpecAnnotations:          stsTemplate.Annotations,
+		PodSpecTemplate:             *podTemplate,
+		AdditionalConfigurationData: additionalConfData,
+	}
+
+	isInPlacePodResizingSupported, _, _ := r.IsFeatureSupported(minimumSupportedVersionForInPlacePodResizing)
+	if !isInPlacePodResizingSupported {
+		c0, _ := json.Marshal(sts.Spec.Template.Spec.Containers[0].Resources)
+		c1, _ := json.Marshal(sts.Spec.Template.Spec.Containers[1].Resources)
+		c2, _ := json.Marshal(sts.Spec.Template.Spec.Containers[2].Resources)
+
+		shi.TypesenseContainerResources = c0
+		shi.MetricsContainerResources = c1
+		shi.HealthcheckContainerResources = c2
 	}
 
 	h, err := hashstructure.Hash(shi, hashstructure.FormatV2, nil)

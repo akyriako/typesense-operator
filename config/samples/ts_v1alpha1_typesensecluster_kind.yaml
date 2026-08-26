@@ -34,11 +34,11 @@ metadata:
     app.kubernetes.io/managed-by: kustomize
   name: c-kind-1
 spec:
-  image: typesense/typesense:30.2.rc12-amd64
+  image: typesense/typesense:30.2
   replicas: 3
   resources:
     limits:
-      cpu: "1000m"
+      cpu: "900m"
       memory: "1024Mi"
     requests:
       cpu: "100m"
@@ -64,6 +64,13 @@ metadata:
 spec:
   image: typesense/typesense:30.0.rc29-amd64
   replicas: 3
+  resources:
+    limits:
+      cpu: "900m"
+      memory: "1024Mi"
+    requests:
+      cpu: "100m"
+      memory: "64Mi"
   storage:
     size: 150Mi
     storageClassName: typesense-local-path

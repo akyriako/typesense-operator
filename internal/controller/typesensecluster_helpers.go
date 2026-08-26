@@ -27,10 +27,7 @@ func (r *TypesenseClusterReconciler) patchStatus(
 }
 
 func (r *TypesenseClusterReconciler) IsFeatureSupported(minimum string) (bool, string, error) {
-	info, err := r.DiscoveryClient.ServerVersion()
-	if err != nil {
-		return false, "", err
-	}
+	info := r.ServerVersion
 
 	ver, err := version.ParseGeneric(info.GitVersion)
 	if err != nil {

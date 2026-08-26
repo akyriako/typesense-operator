@@ -26,6 +26,8 @@ const (
 	writeLagAnnotationKey              = "ts.opentelekomcloud.com/write-lag-threshold"
 	restartPodsAnnotationKey           = "kubectl.kubernetes.io/restartedAt"
 	rancherDomainAnnotationKey         = "cattle.io"
+
+	minimumSupportedVersionForInPlacePodResizing = "1.35.0"
 )
 
 func (r *TypesenseClusterReconciler) ReconcileStatefulSet(ctx context.Context, ts *tsv1alpha1.TypesenseCluster) (*appsv1.StatefulSet, bool, error) {
@@ -85,7 +87,7 @@ func (r *TypesenseClusterReconciler) ReconcileStatefulSet(ctx context.Context, t
 					r.logger.Error(err, "building statefulset failed", "sts", stsObjectKey.Name)
 				}
 
-				update, scaleOnly, triggers := r.shouldUpdateStatefulSet(sts, desiredSts, ts)
+				update, scaleOnly, inPlaceResize, triggers := r.shouldUpdateStatefulSet(sts, desiredSts, ts)
 				if update && !scaleOnly {
 					oldImage := getImageTag(sts.Spec.Template.Spec.Containers[0].Image)
 					newImage := getImageTag(desiredSts.Spec.Template.Spec.Containers[0].Image)
@@ -148,6 +150,30 @@ func (r *TypesenseClusterReconciler) ReconcileStatefulSet(ctx context.Context, t
 
 					r.logLagThresholds(desiredSts)
 					return desiredSts, true, nil
+				} else if inPlaceResize {
+					r.logger.V(debugLevel).Info("resizing of pods in-place", "sts", sts.Name, "triggers", triggers)
+
+					updatedSts, err := r.updateStatefulSetResourcesInPlace(ctx, sts, desiredSts)
+					if err != nil {
+						return sts, false, err
+					}
+
+					if err := r.ResizeInPlaceStatefulSetPods(ctx, updatedSts, desiredSts); err != nil {
+						return updatedSts, false, err
+					}
+
+					r.logLagThresholds(updatedSts)
+					return updatedSts, true, nil
+				}
+
+				if *sts.Spec.UpdateStrategy.RollingUpdate.Partition != 0 {
+					unlockedSts, err := r.unlockPartitionStatefulSet(ctx, sts)
+					if err != nil {
+						return sts, false, err
+					}
+
+					r.logLagThresholds(unlockedSts)
+					return unlockedSts, false, nil
 				}
 			}
 		}
@@ -651,5 +677,89 @@ func (r *TypesenseClusterReconciler) GetFreshStatefulSet(ctx context.Context, st
 		return nil, err
 	}
 
+	return sts, nil
+}
+
+func (r *TypesenseClusterReconciler) ResizeInPlaceStatefulSetPods(ctx context.Context, sts *appsv1.StatefulSet, desired *appsv1.StatefulSet) error {
+	labelSelector := labels.SelectorFromSet(sts.Spec.Selector.MatchLabels)
+
+	var pods corev1.PodList
+	if err := r.List(ctx, &pods, &client.ListOptions{
+		Namespace:     sts.Namespace,
+		LabelSelector: labelSelector,
+	}); err != nil {
+		r.logger.Error(err, "resizing pods in-place: failed to list pods", "statefulset", sts.Name)
+		return err
+	}
+
+	for i := range pods.Items {
+		pod := pods.Items[i].DeepCopy()
+		for j, _ := range pod.Spec.Containers {
+			pod.Spec.Containers[j].Resources.Requests = desired.Spec.Template.Spec.Containers[j].Resources.Requests
+			pod.Spec.Containers[j].Resources.Limits = desired.Spec.Template.Spec.Containers[j].Resources.Limits
+		}
+
+		if err := r.SubResource("resize").Update(ctx, pod); err != nil {
+			r.logger.Error(err, "failed to resize pod in-place", "statefulset", sts.Name, "pod", pod.Name)
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (r *TypesenseClusterReconciler) updateStatefulSetResourcesInPlace(ctx context.Context, sts *appsv1.StatefulSet, desired *appsv1.StatefulSet) (*appsv1.StatefulSet, error) {
+	patch := client.MergeFrom(sts.DeepCopy())
+
+	replicas := int32(0)
+	if sts.Spec.Replicas != nil {
+		replicas = *sts.Spec.Replicas
+	}
+
+	// Keep RollingUpdate but fence all current Pods.
+	if sts.Spec.UpdateStrategy.RollingUpdate == nil {
+		sts.Spec.UpdateStrategy.RollingUpdate = &appsv1.RollingUpdateStatefulSetStrategy{}
+	}
+
+	sts.Spec.UpdateStrategy.Type = appsv1.RollingUpdateStatefulSetStrategyType
+	sts.Spec.UpdateStrategy.RollingUpdate.Partition = ptr.To(replicas)
+
+	desiredResources := make(map[string]corev1.ResourceRequirements, len(desired.Spec.Template.Spec.Containers))
+	for _, container := range desired.Spec.Template.Spec.Containers {
+		desiredResources[container.Name] = container.Resources
+	}
+
+	for i := range sts.Spec.Template.Spec.Containers {
+		container := &sts.Spec.Template.Spec.Containers[i]
+
+		resources, ok := desiredResources[container.Name]
+		if !ok {
+			continue
+		}
+
+		container.Resources = *resources.DeepCopy()
+	}
+
+	if err := r.Patch(ctx, sts, patch); err != nil {
+		return nil, fmt.Errorf("failed to update statefulset resources in-place: %w", err)
+	}
+
+	return sts, nil
+}
+
+func (r *TypesenseClusterReconciler) unlockPartitionStatefulSet(ctx context.Context, sts *appsv1.StatefulSet) (*appsv1.StatefulSet, error) {
+	patch := client.MergeFrom(sts.DeepCopy())
+
+	if sts.Spec.UpdateStrategy.RollingUpdate == nil {
+		sts.Spec.UpdateStrategy.RollingUpdate = &appsv1.RollingUpdateStatefulSetStrategy{}
+	}
+
+	sts.Spec.UpdateStrategy.RollingUpdate.Partition = ptr.To(int32(0))
+
+	if err := r.Patch(ctx, sts, patch); err != nil {
+		return nil, fmt.Errorf("failed to unlock partition: %w", err)
+	}
+
+	r.logger.V(debugLevel).Info("unlocked partition after in-place resize", "sts", sts.Name)
 	return sts, nil
 }
