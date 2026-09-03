@@ -153,6 +153,11 @@ func (r *TypesenseClusterReconciler) ReconcileStatefulSet(ctx context.Context, t
 		}
 	}
 
+	if err := r.advanceRollingUpdatePartition(ctx, sts); err != nil {
+		r.logger.Error(err, "lowering rolling update partition failed", "sts", sts.Name)
+		return nil, false, err
+	}
+
 	r.logLagThresholds(sts)
 	return sts, false, nil
 }
@@ -195,6 +200,16 @@ func (r *TypesenseClusterReconciler) updateStatefulSet(ctx context.Context, sts 
 	patch := client.MergeFrom(sts.DeepCopy())
 	sts.Spec = desired.Spec
 
+	// Roll a multi member quorum one pod at a time. PodManagementPolicy is
+	// Parallel, so without a partition the StatefulSet restarts every member at
+	// once, the Raft majority is lost, and the operator has to recover through
+	// downgradeQuorum, which scales the cluster to a single node and rebuilds it.
+	// The partition is lowered again in advanceRollingUpdatePartition, once the
+	// member that was just replaced has rejoined.
+	if replicas := ptr.Deref(sts.Spec.Replicas, 1); replicas > 1 {
+		sts.Spec.UpdateStrategy = rollingUpdateWithPartition(replicas - 1)
+	}
+
 	sts.ObjectMeta.Annotations = desired.ObjectMeta.Annotations
 
 	if sts.Spec.Template.Annotations == nil {
@@ -208,6 +223,51 @@ func (r *TypesenseClusterReconciler) updateStatefulSet(ctx context.Context, sts 
 	}
 
 	return sts, nil
+}
+
+func rollingUpdateWithPartition(partition int32) appsv1.StatefulSetUpdateStrategy {
+	return appsv1.StatefulSetUpdateStrategy{
+		Type: appsv1.RollingUpdateStatefulSetStrategyType,
+		RollingUpdate: &appsv1.RollingUpdateStatefulSetStrategy{
+			Partition: ptr.To[int32](partition),
+		},
+	}
+}
+
+func rollingUpdatePartition(sts *appsv1.StatefulSet) int32 {
+	if sts.Spec.UpdateStrategy.RollingUpdate == nil {
+		return 0
+	}
+
+	return ptr.Deref(sts.Spec.UpdateStrategy.RollingUpdate.Partition, 0)
+}
+
+// advanceRollingUpdatePartition lowers the rolling update partition by one, so
+// that a pod template change reaches the next member only after the previous one
+// has rejoined the quorum. Readiness carries the RaftQuorumReady gate, so this
+// waits for a member to vote again, not merely to start. A member that never
+// becomes ready leaves the partition where it is and the remaining pods keep
+// serving the previous revision.
+func (r *TypesenseClusterReconciler) advanceRollingUpdatePartition(ctx context.Context, sts *appsv1.StatefulSet) error {
+	partition := rollingUpdatePartition(sts)
+	if partition == 0 {
+		return nil
+	}
+
+	replicas := ptr.Deref(sts.Spec.Replicas, 0)
+	if sts.Status.ReadyReplicas != replicas || sts.Status.UpdatedReplicas < replicas-partition {
+		return nil
+	}
+
+	patch := client.MergeFrom(sts.DeepCopy())
+	sts.Spec.UpdateStrategy = rollingUpdateWithPartition(partition - 1)
+
+	if err := r.Patch(ctx, sts, patch); err != nil {
+		return err
+	}
+
+	r.logger.V(debugLevel).Info("lowering rolling update partition", "sts", sts.Name, "partition", partition-1)
+	return nil
 }
 
 func (r *TypesenseClusterReconciler) buildStatefulSet(ctx context.Context, key client.ObjectKey, ts *tsv1alpha1.TypesenseCluster) (*appsv1.StatefulSet, error) {
@@ -517,6 +577,11 @@ func (r *TypesenseClusterReconciler) ScaleStatefulSet(ctx context.Context, stsOb
 
 	desired := sts.DeepCopy()
 	desired.Spec.Replicas = &desiredReplicas
+	// Scaling, including the downgrade and upgrade steps of quorum recovery,
+	// creates and removes pods rather than updating them in place; a partition
+	// left over from an interrupted roll would only pin survivors to an older
+	// revision.
+	desired.Spec.UpdateStrategy = rollingUpdateWithPartition(0)
 	if err := r.Client.Update(ctx, desired); err != nil {
 		r.logger.Error(err, "updating stateful replicas failed", "name", desired.Name)
 		return err
