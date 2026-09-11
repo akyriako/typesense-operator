@@ -322,29 +322,31 @@ func (r *TypesenseClusterReconciler) calculatePodReadinessGate(ctx context.Conte
 	conditionMessage := fmt.Sprintf("node's role is now: %s", nodeStatus.State)
 	conditionStatus := v1.ConditionTrue
 
-	health, err := r.getNodeHealth(ctx, httpClient, node, ts, logs)
-	if err != nil {
+	if !isNodeReadyForTraffic(nodeStatus.State) {
 		conditionReason = nodeNotHealthy
 		conditionStatus = v1.ConditionFalse
-
-		r.logger.Error(err, "fetching node health failed", "node", r.getShortName(node.PodName), "ip", node.IP)
 	} else {
-		if !health.Ok {
+		health, err := r.getNodeHealth(ctx, httpClient, node, ts, logs)
+		if err != nil {
+			conditionReason = nodeNotHealthy
+			conditionStatus = v1.ConditionFalse
+
+			r.logger.Error(err, "fetching node health failed", "node", r.getShortName(node.PodName), "ip", node.IP)
+		} else if !health.Ok {
+			conditionReason = nodeNotHealthy
+			conditionStatus = v1.ConditionFalse
+
 			if health.ResourceError != nil && (*health.ResourceError == OutOfMemory || *health.ResourceError == OutOfDisk) {
 				conditionReason = nodeNotRecoverable
 				conditionMessage = fmt.Sprintf("node is failing: %s", string(*health.ResourceError))
-				conditionStatus = v1.ConditionFalse
 
 				err := fmt.Errorf("health check reported a blocking node error on %s: %s", r.getShortName(node.PodName), string(*health.ResourceError))
 				r.logger.Error(err, "quorum cannot be recovered automatically")
 			}
-
-			conditionReason = nodeNotHealthy
-			conditionStatus = v1.ConditionFalse
 		}
 	}
 
-	r.logger.V(debugLevel).Info("reporting node health", "node", r.getShortName(node.PodName), "healthy", health.Ok, "ip", node.IP)
+	r.logger.V(debugLevel).Info("reporting node readiness", "node", r.getShortName(node.PodName), "state", nodeStatus.State, "ready", conditionStatus == v1.ConditionTrue, "ip", node.IP)
 	condition := &v1.PodCondition{
 		Type:    QuorumReadinessGateCondition,
 		Status:  conditionStatus,
@@ -353,6 +355,10 @@ func (r *TypesenseClusterReconciler) calculatePodReadinessGate(ctx context.Conte
 	}
 
 	return condition
+}
+
+func isNodeReadyForTraffic(state NodeState) bool {
+	return state != ErrorState && state != NotReadyState && state != UnreachableState
 }
 
 func (r *TypesenseClusterReconciler) updatePodReadinessGate(ctx context.Context, podObjectKey client.ObjectKey, condition *v1.PodCondition) error {
