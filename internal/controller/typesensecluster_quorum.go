@@ -350,6 +350,13 @@ func (r *TypesenseClusterReconciler) updatePodReadinessGate(ctx context.Context,
 		return client.IgnoreNotFound(err)
 	}
 
+	// Skip the status patch (one API request per pod and reconcile) when nothing changed.
+	for _, c := range pod.Status.Conditions {
+		if c.Type == condition.Type && c.Status == condition.Status && c.Reason == condition.Reason && c.Message == condition.Message {
+			return nil
+		}
+	}
+
 	patch := client.MergeFrom(pod.DeepCopy())
 
 	found := false

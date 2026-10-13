@@ -68,7 +68,8 @@ type TypesenseClusterSpec struct {
 	// +kubebuilder:validation:Type=integer
 	PeeringPort int `json:"peeringPort,omitempty"`
 
-	// HealthProbeTimeoutInMilliseconds defines how long Typesense waits before considering a node dead.
+	// HealthProbeTimeoutInMilliseconds defines how long the operator waits for a node's /status and /health
+	// endpoints to respond before treating the node as unreachable or unhealthy.
 	// +optional
 	// +kubebuilder:default=500
 	// +kubebuilder:validation:Minimum=500

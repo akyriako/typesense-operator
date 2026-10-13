@@ -723,52 +723,6 @@ func (r *TypesenseClusterReconciler) isPodPendingPersistentVolumeClaim(ctx conte
 	return false, nil
 }
 
-func (r *TypesenseClusterReconciler) RestartAllUnscheduledPods(ctx context.Context, sts *appsv1.StatefulSet, ts *tsv1alpha1.TypesenseCluster) error {
-	labelSelector := labels.SelectorFromSet(sts.Spec.Selector.MatchLabels)
-
-	var pods corev1.PodList
-	if err := r.List(ctx, &pods, &client.ListOptions{
-		Namespace:     sts.Namespace,
-		LabelSelector: labelSelector,
-	}); err != nil {
-		log.FromContext(ctx).Error(err, "deleting unscheduled pods: failed to list pods", "statefulset", sts.Name)
-		return err
-	}
-
-	removedAny := false
-	for i := range pods.Items {
-		pod := &pods.Items[i]
-		if !isPodUnschedulable(pod) {
-			continue
-		}
-
-		pendingPVC, err := r.isPodPendingPersistentVolumeClaim(ctx, pod)
-		if err != nil {
-			log.FromContext(ctx).Error(err, "failed to inspect pod PVCs before restarting unscheduled pod", "pod", pod.Name)
-			continue
-		}
-		if pendingPVC {
-			log.FromContext(ctx).V(debugLevel).Info("skipping restart of unscheduled pod because PVC is still pending", "pod", pod.Name)
-			continue
-		}
-
-		propagation := metav1.DeletePropagationBackground
-		err = r.Delete(ctx, pod, &client.DeleteOptions{
-			PropagationPolicy: &propagation,
-		})
-
-		if !removedAny {
-			removedAny = err == nil
-		}
-	}
-
-	if removedAny {
-		r.Recorder.Event(ts, "Warning", ConditionReasonStatefulSetNotReady, toTitle("removed unscheduled pods"))
-	}
-
-	return nil
-}
-
 func (r *TypesenseClusterReconciler) GetFreshStatefulSet(ctx context.Context, stsObjectKey client.ObjectKey) (*appsv1.StatefulSet, error) {
 	sts := &appsv1.StatefulSet{}
 	if err := r.Get(ctx, stsObjectKey, sts); err != nil {

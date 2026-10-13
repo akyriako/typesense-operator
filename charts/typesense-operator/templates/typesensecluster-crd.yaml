@@ -1027,8 +1027,9 @@ spec:
                 type: boolean
               healthProbeTimeoutInMilliseconds:
                 default: 500
-                description: HealthProbeTimeoutInMilliseconds defines how long Typesense
-                  waits before considering a node dead.
+                description: |-
+                  HealthProbeTimeoutInMilliseconds defines how long the operator waits for a node's /status and /health
+                  endpoints to respond before treating the node as unreachable or unhealthy.
                 maximum: 60000
                 minimum: 500
                 type: integer
