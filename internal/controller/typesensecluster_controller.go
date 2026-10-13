@@ -282,8 +282,8 @@ func (r *TypesenseClusterReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		return ctrl.Result{}, err
 	}
 
-	terminationGracePeriodSeconds := ptr.Deref(sts.Spec.Template.Spec.TerminationGracePeriodSeconds, 5)
-	requeueAfter := reconcileRequeuePeriod + (time.Duration(terminationGracePeriodSeconds) * time.Second)
+	gracePeriodSeconds := ptr.Deref(sts.Spec.Template.Spec.TerminationGracePeriodSeconds, terminationGracePeriodSeconds)
+	requeueAfter := reconcileRequeuePeriod + (time.Duration(gracePeriodSeconds) * time.Second)
 
 	cond := ConditionReasonQuorumStateUnknown
 	action := Bootstrapping

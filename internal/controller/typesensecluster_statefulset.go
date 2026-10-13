@@ -26,6 +26,10 @@ const (
 	restartPodsAnnotationKey   = "kubectl.kubernetes.io/restartedAt"
 	rancherDomainAnnotationKey = "cattle.io"
 
+	// terminationGracePeriodSeconds gives Typesense time to shut down gracefully on SIGTERM (stepping down
+	// as Raft leader and flushing its state) before it is killed.
+	terminationGracePeriodSeconds int64 = 30
+
 	// singleNodeStartupGracePeriod is how long the Typesense container of a single node cluster may run
 	// without answering before the node is considered stuck and its pod is purged.
 	singleNodeStartupGracePeriod = 5 * time.Minute
@@ -316,7 +320,7 @@ func (r *TypesenseClusterReconciler) buildStatefulSet(ctx context.Context, key c
 				ObjectMeta: getObjectMeta(ts, &key.Name, podAnnotations),
 				Spec: corev1.PodSpec{
 					SecurityContext:               ts.Spec.GetPodSecurityContext(),
-					TerminationGracePeriodSeconds: ptr.To[int64](5),
+					TerminationGracePeriodSeconds: ptr.To(terminationGracePeriodSeconds),
 					ReadinessGates: []corev1.PodReadinessGate{
 						{
 							ConditionType: QuorumReadinessGateCondition,
