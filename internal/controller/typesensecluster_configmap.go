@@ -345,17 +345,23 @@ func (r *TypesenseClusterReconciler) getNodes(ctx context.Context, ts *tsv1alpha
 		return nil, err
 	}
 
+	// The same endpoint may temporarily appear in more than one slice (e.g. while slices are rebalanced).
+	// Duplicates would let an incomplete peer list pass the replica count check.
+	seen := make(map[string]struct{})
 	for _, s := range eps {
 		for _, e := range s.Endpoints {
 			if len(e.Addresses) > 0 {
 				addr := e.Addresses[0]
+				if _, ok := seen[addr]; ok {
+					continue
+				}
+				seen[addr] = struct{}{}
 
 				apiPort := ts.Spec.ApiPort
 				if p, ok := podApiPortsByIP[addr]; ok {
 					apiPort = p
 				}
 
-				// r.logger.V(debugLevel).Info("discovered slice endpoint", "slice", s.Name, "endpoint", e.Hostname, "address", addr)
 				nodes = append(nodes, fmt.Sprintf("%s:%d:%d", addr, ts.Spec.PeeringPort, apiPort))
 			}
 		}
