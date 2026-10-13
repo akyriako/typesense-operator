@@ -18,6 +18,10 @@ const (
 	letters    = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 	debugLevel = 1
 	labelApp   = "app"
+
+	labelManagedBy      = "app.kubernetes.io/managed-by"
+	labelManagedByValue = "typesense-operator"
+	labelInstance       = "app.kubernetes.io/instance"
 )
 
 func generateToken() (string, error) {
@@ -75,9 +79,9 @@ func getMergedLabels(def map[string]string, scoped map[string]string) map[string
 
 func getDefaultLabels(ts *tsv1alpha1.TypesenseCluster) map[string]string {
 	return map[string]string{
-		"app.kubernetes.io/managed-by": "typesense-operator",
-		"app.kubernetes.io/name":       "typesense",
-		"app.kubernetes.io/instance":   ts.Name,
+		labelManagedBy:           labelManagedByValue,
+		"app.kubernetes.io/name": "typesense",
+		labelInstance:            ts.Name,
 	}
 }
 
@@ -212,27 +216,49 @@ func toTitle(s string) string {
 	return cases.Title(language.Und, cases.NoLower).String(s)
 }
 
-func filterMap(m map[string]string, filters ...string) map[string]string {
-	if len(m) == 0 {
-		return m
+// withoutExternalKeys returns a copy of current without the keys that match one of the filters (substring
+// match, like filterMap) and are not part of desired. Keys the operator manages itself are always kept,
+// so comparing the result with desired neither flags them as changed forever nor ignores their changes.
+func withoutExternalKeys(current, desired map[string]string, filters ...string) map[string]string {
+	if len(current) == 0 {
+		return current
 	}
 
-	filtered := make(map[string]string, len(m))
-	for key, value := range m {
-		skip := false
-		for _, f := range filters {
-			if strings.Contains(key, f) {
-				skip = true
-				break
-			}
-		}
-		if skip {
+	filtered := make(map[string]string, len(current))
+	for key, value := range current {
+		if _, managed := desired[key]; !managed && matchesAnyFilter(key, filters) {
 			continue
 		}
 		filtered[key] = value
 	}
 
 	return filtered
+}
+
+// preserveExternalKeys copies the keys of current that match one of the filters into desired, unless
+// desired sets them itself. It returns desired, allocating it when nil.
+func preserveExternalKeys(desired, current map[string]string, filters ...string) map[string]string {
+	if desired == nil {
+		desired = make(map[string]string)
+	}
+
+	for key, value := range current {
+		if _, managed := desired[key]; !managed && matchesAnyFilter(key, filters) {
+			desired[key] = value
+		}
+	}
+
+	return desired
+}
+
+func matchesAnyFilter(key string, filters []string) bool {
+	for _, f := range filters {
+		if strings.Contains(key, f) {
+			return true
+		}
+	}
+
+	return false
 }
 
 // withoutKeys returns a copy of m without the given keys. Unlike filterMap, keys are matched exactly,

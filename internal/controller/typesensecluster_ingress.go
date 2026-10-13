@@ -312,7 +312,7 @@ func (r *TypesenseClusterReconciler) ReconcileIngress(ctx context.Context, ts *t
 		}
 		portsMatch := len(service.Spec.Ports) > 0 && service.Spec.Ports[0].Port == 8080 && service.Spec.Ports[0].TargetPort.IntVal == 8080
 
-		svcAnnotations := r.getServiceAnnotations(service, ts)
+		svcAnnotations := withoutExternalKeys(service.Annotations, ts.Spec.Ingress.ServiceAnnotations, ts.Spec.IgnoreAnnotationsFromExternalMutations...)
 		if !apiequality.Semantic.DeepEqual(svcAnnotations, ts.Spec.Ingress.ServiceAnnotations) || service.Spec.Type != svcType || !portsMatch {
 			err = r.updateIngressService(ctx, service, ts)
 			if err != nil {
@@ -548,8 +548,7 @@ func (r *TypesenseClusterReconciler) getIngressLabels(ig *networkingv1.Ingress, 
 
 func (r *TypesenseClusterReconciler) getIngressAnnotations(ig *networkingv1.Ingress, ts *tsv1alpha1.TypesenseCluster) map[string]string {
 	filters := append([]string{clusterIssuerAnnotationKey, rancherDomainAnnotationKey}, ts.Spec.IgnoreAnnotationsFromExternalMutations...)
-	filtered := filterMap(ig.Annotations, filters...)
-	return filtered
+	return withoutExternalKeys(ig.Annotations, ts.Spec.Ingress.Annotations, filters...)
 }
 
 func (r *TypesenseClusterReconciler) createIngressConfigMap(ctx context.Context, key client.ObjectKey, ts *tsv1alpha1.TypesenseCluster) (*v1.ConfigMap, error) {
@@ -751,20 +750,8 @@ func (r *TypesenseClusterReconciler) updateIngressService(ctx context.Context, s
 		},
 	}
 
-	annotations := map[string]string{}
-	if ts.Spec.Ingress.ServiceAnnotations != nil {
-		maps.Copy(annotations, ts.Spec.Ingress.ServiceAnnotations)
-	}
-	filters := ts.Spec.IgnoreAnnotationsFromExternalMutations
-	for k, v := range service.Annotations {
-		for _, f := range filters {
-			if strings.Contains(k, f) {
-				annotations[k] = v
-				break
-			}
-		}
-	}
-	service.Annotations = annotations
+	annotations := maps.Clone(ts.Spec.Ingress.ServiceAnnotations)
+	service.Annotations = preserveExternalKeys(annotations, service.Annotations, ts.Spec.IgnoreAnnotationsFromExternalMutations...)
 
 	if err := r.Patch(ctx, service, patch); err != nil {
 		return err

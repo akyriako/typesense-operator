@@ -120,7 +120,7 @@ func (r *TypesenseClusterReconciler) ReconcileHttpRoute(ctx context.Context, ts 
 			}
 
 			lbls := r.getHttpRouteLabels(httpRoute, hrt, ts)
-			annotations := r.getHttpRouteAnnotations(httpRoute, ts)
+			annotations := r.getHttpRouteAnnotations(httpRoute, hrt, ts)
 
 			pRef := hrt.ParentRef
 			kind := gatewayv1.Kind("Gateway")
@@ -395,11 +395,9 @@ func (r *TypesenseClusterReconciler) updateHttpRoute(ctx context.Context, spec t
 	return desired, nil
 }
 
-func (r *TypesenseClusterReconciler) getHttpRouteAnnotations(httpRoute *gatewayv1.HTTPRoute, ts *tsv1alpha1.TypesenseCluster) map[string]string {
+func (r *TypesenseClusterReconciler) getHttpRouteAnnotations(httpRoute *gatewayv1.HTTPRoute, spec tsv1alpha1.HttpRouteSpec, ts *tsv1alpha1.TypesenseCluster) map[string]string {
 	filters := append([]string{clusterIssuerAnnotationKey, rancherDomainAnnotationKey}, ts.Spec.IgnoreAnnotationsFromExternalMutations...)
-	filtered := filterMap(httpRoute.Annotations, filters...)
-
-	return filtered
+	return withoutExternalKeys(httpRoute.Annotations, spec.Annotations, filters...)
 }
 
 func (r *TypesenseClusterReconciler) getHttpRouteLabels(httpRoute *gatewayv1.HTTPRoute, spec tsv1alpha1.HttpRouteSpec, ts *tsv1alpha1.TypesenseCluster) map[string]string {

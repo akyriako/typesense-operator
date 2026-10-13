@@ -418,20 +418,22 @@ func (r *TypesenseClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&networkingv1.Ingress{}).
 		Owns(&batchv1.CronJob{}).
 		Watches(&corev1.Pod{}, handler.EnqueueRequestsFromMapFunc(r.mapOwnedResourceToTypesenseCluster)).
-		Watches(&corev1.PersistentVolumeClaim{}, handler.EnqueueRequestsFromMapFunc(r.mapOwnedResourceToTypesenseCluster)).
+		Watches(&corev1.PersistentVolumeClaim{}, handler.EnqueueRequestsFromMapFunc(mapPersistentVolumeClaimToTypesenseCluster)).
 		Named("typesense-kubernetes-operator").
 		Complete(r)
 }
 
-func (r *TypesenseClusterReconciler) mapOwnedResourceToTypesenseCluster(_ context.Context, obj client.Object) []reconcile.Request {
+// mapOwnedResourceToTypesenseCluster runs in the informer's goroutine, so it must not use r.logger,
+// which Reconcile replaces on every run.
+func (r *TypesenseClusterReconciler) mapOwnedResourceToTypesenseCluster(ctx context.Context, obj client.Object) []reconcile.Request {
 	ownerRef := metav1.GetControllerOf(obj)
 	if ownerRef == nil || ownerRef.Kind != "StatefulSet" || ownerRef.APIVersion != "apps/v1" {
 		return nil
 	}
 
 	sts := &appsv1.StatefulSet{}
-	if err := r.Get(context.Background(), client.ObjectKey{Namespace: obj.GetNamespace(), Name: ownerRef.Name}, sts); err != nil {
-		r.logger.V(debugLevel).Info("unable to resolve owning statefulset", "ownerRef", ownerRef, "error", err)
+	if err := r.Get(ctx, client.ObjectKey{Namespace: obj.GetNamespace(), Name: ownerRef.Name}, sts); err != nil {
+		log.FromContext(ctx).V(debugLevel).Info("unable to resolve owning statefulset", "ownerRef", ownerRef, "error", err)
 		return nil
 	}
 
@@ -441,4 +443,17 @@ func (r *TypesenseClusterReconciler) mapOwnedResourceToTypesenseCluster(_ contex
 	}
 
 	return []reconcile.Request{{NamespacedName: client.ObjectKey{Namespace: sts.Namespace, Name: stsOwnerRef.Name}}}
+}
+
+// mapPersistentVolumeClaimToTypesenseCluster maps PVCs by the labels inherited from the StatefulSet's
+// volumeClaimTemplate. PVCs carry no controller reference to the StatefulSet (its retention policy keeps
+// them on deletion and only adds a pod owner reference on scale-down), so mapping by owner never matches.
+func mapPersistentVolumeClaimToTypesenseCluster(_ context.Context, obj client.Object) []reconcile.Request {
+	labels := obj.GetLabels()
+	cluster := labels[labelInstance]
+	if labels[labelManagedBy] != labelManagedByValue || cluster == "" {
+		return nil
+	}
+
+	return []reconcile.Request{{NamespacedName: client.ObjectKey{Namespace: obj.GetNamespace(), Name: cluster}}}
 }

@@ -3,7 +3,7 @@ package controller
 import (
 	"context"
 	"fmt"
-	"strings"
+	"maps"
 
 	tsv1alpha1 "github.com/akyriako/typesense-operator/api/v1alpha1"
 	v1 "k8s.io/api/core/v1"
@@ -85,7 +85,7 @@ func (r *TypesenseClusterReconciler) ReconcileServices(ctx context.Context, ts *
 			return err
 		}
 
-		svcAnnotations := r.getServiceAnnotations(svc, ts)
+		svcAnnotations := withoutExternalKeys(svc.Annotations, annotations, ts.Spec.IgnoreAnnotationsFromExternalMutations...)
 
 		if len(svc.Spec.Ports) != 2 ||
 			int32(ts.Spec.ApiPort) != svc.Spec.Ports[0].Port ||
@@ -242,17 +242,9 @@ func (r *TypesenseClusterReconciler) updateService(ctx context.Context, svc *v1.
 		svc.Spec.ExternalTrafficPolicy = *svcExternalTrafficPolicy
 	}
 
-	annotations := getMergedAnnotations(ts)
-	filters := ts.Spec.IgnoreAnnotationsFromExternalMutations
-	for k, v := range svc.Annotations {
-		for _, f := range filters {
-			if strings.Contains(k, f) {
-				annotations[k] = v
-				break
-			}
-		}
-	}
-	svc.Annotations = annotations
+	// getMergedAnnotations may return nil or the spec's own map, so preserve into a fresh copy.
+	annotations := maps.Clone(getMergedAnnotations(ts))
+	svc.Annotations = preserveExternalKeys(annotations, svc.Annotations, ts.Spec.IgnoreAnnotationsFromExternalMutations...)
 
 	if err := r.Patch(ctx, svc, patch); err != nil {
 		return err
@@ -274,10 +266,4 @@ func (r *TypesenseClusterReconciler) invalidateExternalTrafficPolicy(
 	}
 
 	return service.ExternalTrafficPolicy, nil
-}
-
-func (r *TypesenseClusterReconciler) getServiceAnnotations(svc *v1.Service, ts *tsv1alpha1.TypesenseCluster) map[string]string {
-	filters := ts.Spec.IgnoreAnnotationsFromExternalMutations
-	filtered := filterMap(svc.Annotations, filters...)
-	return filtered
 }

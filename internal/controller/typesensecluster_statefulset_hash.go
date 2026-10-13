@@ -62,9 +62,14 @@ func (r *TypesenseClusterReconciler) shouldUpdateStatefulSet(sts *appsv1.Statefu
 		update = true
 	}
 
+	// Externally mutated annotations are ignored, unless the operator sets them itself (e.g. a pod annotation
+	// that also matches an ignore filter); filtering those as well would report a change on every reconcile,
+	// and since every update stamps restartedAt, the pods would be restarted continuously.
 	mutatedAnnotations := ts.Spec.IgnoreAnnotationsFromExternalMutations
-	stsAnnotations := filterMap(sts.Annotations, append([]string{rancherDomainAnnotationKey}, mutatedAnnotations...)...)
-	podAnnotations := filterMap(sts.Spec.Template.Annotations, append([]string{restartPodsAnnotationKey, rancherDomainAnnotationKey}, mutatedAnnotations...)...)
+	stsFilters := append([]string{rancherDomainAnnotationKey}, mutatedAnnotations...)
+	podFilters := append([]string{restartPodsAnnotationKey, rancherDomainAnnotationKey}, mutatedAnnotations...)
+	stsAnnotations := withoutExternalKeys(sts.Annotations, desired.Annotations, stsFilters...)
+	podAnnotations := withoutExternalKeys(sts.Spec.Template.Annotations, desired.Spec.Template.Annotations, podFilters...)
 
 	// PodAnnotationsChanged
 	if !apiequality.Semantic.DeepEqual(podAnnotations, desired.Spec.Template.Annotations) {

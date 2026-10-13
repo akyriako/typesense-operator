@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"strconv"
-	"strings"
 	"time"
 
 	tsv1alpha1 "github.com/akyriako/typesense-operator/api/v1alpha1"
@@ -119,21 +118,8 @@ func (r *TypesenseClusterReconciler) ReconcileStatefulSet(ctx context.Context, t
 						return nil, false, err
 					}
 
-					configMapName := fmt.Sprintf(ClusterNodesConfigMap, ts.Name)
-					configMapObjectKey := client.ObjectKey{Namespace: ts.Namespace, Name: configMapName}
-
-					var cm = &corev1.ConfigMap{}
-					if err := r.Get(ctx, configMapObjectKey, cm); err != nil {
-						r.logger.V(debugLevel).Error(err, fmt.Sprintf("unable to fetch config map: %s", configMapName))
-					}
-
-					updated, err := r.updateConfigMap(ctx, ts, cm, updatedSts.Spec.Replicas, true)
-					if err != nil {
-						r.logger.V(debugLevel).Error(err, fmt.Sprintf("unable to update config map: %s", configMapName))
-					}
-
-					if updated && ts.Spec.ForceResetPeersConfigOnUpdate {
-						_ = r.forcePodsConfigMapUpdate(ctx, ts)
+					if err := r.syncConfigMapWithStatefulSet(ctx, ts, updatedSts.Spec.Replicas); err != nil {
+						r.logger.Error(err, "unable to update config map", "configmap", fmt.Sprintf(ClusterNodesConfigMap, ts.Name))
 					}
 
 					r.logLagThresholds(updatedSts)
@@ -147,20 +133,8 @@ func (r *TypesenseClusterReconciler) ReconcileStatefulSet(ctx context.Context, t
 						return desiredSts, true, err
 					}
 
-					configMapName := fmt.Sprintf(ClusterNodesConfigMap, ts.Name)
-					configMapObjectKey := client.ObjectKey{Namespace: ts.Namespace, Name: configMapName}
-
-					var cm = &corev1.ConfigMap{}
-					if err := r.Get(ctx, configMapObjectKey, cm); err != nil {
-						r.logger.V(debugLevel).Error(err, fmt.Sprintf("unable to fetch config map: %s", configMapName))
-					}
-					updated, err := r.updateConfigMap(ctx, ts, cm, &size, true)
-					if err != nil {
+					if err := r.syncConfigMapWithStatefulSet(ctx, ts, &size); err != nil {
 						return desiredSts, true, err
-					}
-
-					if updated && ts.Spec.ForceResetPeersConfigOnUpdate {
-						_ = r.forcePodsConfigMapUpdate(ctx, ts)
 					}
 
 					r.logLagThresholds(desiredSts)
@@ -172,6 +146,30 @@ func (r *TypesenseClusterReconciler) ReconcileStatefulSet(ctx context.Context, t
 
 	r.logLagThresholds(sts)
 	return sts, false, nil
+}
+
+// syncConfigMapWithStatefulSet rewrites the nodes config map for the given replica count after the
+// StatefulSet has been updated or scaled.
+func (r *TypesenseClusterReconciler) syncConfigMapWithStatefulSet(ctx context.Context, ts *tsv1alpha1.TypesenseCluster, replicas *int32) error {
+	configMapObjectKey := client.ObjectKey{Namespace: ts.Namespace, Name: fmt.Sprintf(ClusterNodesConfigMap, ts.Name)}
+
+	// Without the live config map there is nothing to patch; updateConfigMap would otherwise apply an
+	// object without a name.
+	var cm = &corev1.ConfigMap{}
+	if err := r.Get(ctx, configMapObjectKey, cm); err != nil {
+		return err
+	}
+
+	updated, err := r.updateConfigMap(ctx, ts, cm, replicas, true)
+	if err != nil {
+		return err
+	}
+
+	if updated && ts.Spec.ForceResetPeersConfigOnUpdate {
+		_ = r.forcePodsConfigMapUpdate(ctx, ts)
+	}
+
+	return nil
 }
 
 func (r *TypesenseClusterReconciler) logLagThresholds(sts *appsv1.StatefulSet) {
@@ -250,36 +248,13 @@ func (r *TypesenseClusterReconciler) updateStatefulSet(ctx context.Context, sts 
 	sts.Spec = desired.Spec
 	sts.Spec.VolumeClaimTemplates = existingVolumeClaimTemplates
 
-	// Preserve external StatefulSet annotations
-	stsAnnotations := desired.Annotations
-	if stsAnnotations == nil {
-		stsAnnotations = make(map[string]string)
-	}
+	// Preserve external StatefulSet annotations; values the operator sets itself take precedence
 	filters := append([]string{rancherDomainAnnotationKey}, ts.Spec.IgnoreAnnotationsFromExternalMutations...)
-	for k, v := range existingStsAnnotations {
-		for _, f := range filters {
-			if strings.Contains(k, f) {
-				stsAnnotations[k] = v
-				break
-			}
-		}
-	}
-	sts.Annotations = stsAnnotations
+	sts.Annotations = preserveExternalKeys(desired.Annotations, existingStsAnnotations, filters...)
 
-	// Preserve external Pod annotations
-	podAnnotations := desired.Spec.Template.Annotations
-	if podAnnotations == nil {
-		podAnnotations = make(map[string]string)
-	}
+	// Preserve external Pod annotations; values the operator sets itself take precedence
 	podFilters := append([]string{restartPodsAnnotationKey, rancherDomainAnnotationKey}, ts.Spec.IgnoreAnnotationsFromExternalMutations...)
-	for k, v := range existingPodAnnotations {
-		for _, f := range podFilters {
-			if strings.Contains(k, f) {
-				podAnnotations[k] = v
-				break
-			}
-		}
-	}
+	podAnnotations := preserveExternalKeys(desired.Spec.Template.Annotations, existingPodAnnotations, podFilters...)
 	podAnnotations[restartPodsAnnotationKey] = time.Now().Format(time.RFC3339)
 	podAnnotations[hashAnnotationKey] = desired.Spec.Template.Annotations[hashAnnotationKey]
 	sts.Spec.Template.Annotations = podAnnotations

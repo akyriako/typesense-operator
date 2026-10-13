@@ -23,14 +23,14 @@ func TestWithoutKeysMatchesExactly(t *testing.T) {
 	in := map[string]string{
 		"app":                       "ts-sts",
 		"app.kubernetes.io/part-of": "search",
-		"team":                      "platform",
+		teamKey:                     "platform",
 	}
 
 	got := withoutKeys(in, "app")
 	if _, ok := got["app"]; ok {
 		t.Errorf("expected key %q to be removed", "app")
 	}
-	if got["app.kubernetes.io/part-of"] != "search" || got["team"] != "platform" {
+	if got["app.kubernetes.io/part-of"] != "search" || got[teamKey] != "platform" {
 		t.Errorf("expected unrelated keys to be kept, got %v", got)
 	}
 }
