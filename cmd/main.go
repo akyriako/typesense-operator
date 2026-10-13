@@ -30,6 +30,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/akyriako/typesense-operator/internal/version"
 	"go.uber.org/zap/zapcore"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/retry"
@@ -357,7 +358,10 @@ func main() {
 		os.Exit(1)
 	}
 
-	setupLog.Info("starting manager")
+	v := version.GetBuildInfo()
+	setupLog.Info("starting manager",
+		"version", fmt.Sprintf("%s+%s", v.Version, v.Commit), "buildDate", v.BuildDate, "goVersion", v.GoVersion)
+	// ctx already holds the signal handler; SetupSignalHandler panics when called a second time.
 	if err := mgr.Start(ctx); err != nil {
 		setupLog.Error(err, "problem running manager")
 		os.Exit(1)

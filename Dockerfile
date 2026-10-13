@@ -3,6 +3,10 @@ FROM golang:1.26 AS builder
 ARG TARGETOS
 ARG TARGETARCH
 
+ARG BIN_VERSION=dev
+ARG BIN_GIT_COMMIT=unknown
+ARG BIN_BUILD_DATE=unknown
+
 WORKDIR /workspace
 # Copy the Go Modules manifests
 COPY go.mod go.mod
@@ -23,7 +27,12 @@ COPY internal/ internal/
 # by leaving it empty we can ensure that the container and binary shipped on it will have the same platform.
 RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build \
     CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} \
-    go build -a -trimpath -ldflags="-s -w" -o manager cmd/main.go
+    go build -a -trimpath \
+      -ldflags "-s -w \
+        -X github.com/akyriako/typesense-operator/internal/version.Version=${BIN_VERSION} \
+        -X github.com/akyriako/typesense-operator/internal/version.Commit=${BIN_GIT_COMMIT} \
+        -X github.com/akyriako/typesense-operator/internal/version.BuildDate=${BIN_BUILD_DATE}" \
+      -o manager ./cmd/main.go
 
 # Use distroless as minimal base image to package the manager binary
 # Refer to https://github.com/GoogleContainerTools/distroless for more details

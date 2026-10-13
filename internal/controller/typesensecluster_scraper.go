@@ -94,9 +94,10 @@ func (r *TypesenseClusterReconciler) ReconcileScraper(ctx context.Context, ts *t
 				scraperCronJob.Spec.JobTemplate.Spec.Template.Spec.Containers = append(scraperCronJob.Spec.JobTemplate.Spec.Template.Spec.Containers, corev1.Container{})
 			}
 			container := scraperCronJob.Spec.JobTemplate.Spec.Template.Spec.Containers[0]
+			config := scraper.GetScraperConfig()
 
 			for _, env := range container.Env {
-				if env.Name == envTypesenseConfig && env.Value != scraper.Config {
+				if env.Name == envTypesenseConfig && env.Value != config {
 					hasChangedConfig = true
 				}
 				if env.Name == envTypesensePort && env.Value != strconv.Itoa(ts.Spec.ApiPort) {
@@ -141,7 +142,7 @@ func (r *TypesenseClusterReconciler) ReconcileScraper(ctx context.Context, ts *t
 												Name:  fmt.Sprintf(ClusterScraperCronJobContainer, ts.Name, scraper.Name),
 												Image: scraper.Image,
 												Env: []corev1.EnvVar{
-													{Name: envTypesenseConfig, Value: scraper.Config},
+													{Name: envTypesenseConfig, Value: config},
 													{
 														Name: envTypesenseApiKey,
 														ValueFrom: &corev1.EnvVarSource{
@@ -215,7 +216,7 @@ func (r *TypesenseClusterReconciler) createScraper(ctx context.Context, key clie
 									Env: []corev1.EnvVar{
 										{
 											Name:  envTypesenseConfig,
-											Value: scraperSpec.Config,
+											Value: scraperSpec.GetScraperConfig(),
 										},
 										{
 											Name: envTypesenseApiKey,

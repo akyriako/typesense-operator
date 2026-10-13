@@ -61,6 +61,18 @@ spec:
 <summary>Quick example for Open Telekom Cloud CCE with OBS S3 support</summary>
 
 ```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: otc-aksk
+  namespace: default
+  labels:
+    secret.kubernetes.io/used-by: csi
+type: cfe/secure-opaque
+data:
+  access.key: WE5WWVhVNU*****
+  secret.key: Nnk4emJyZ0*****
+---
 apiVersion: ts.opentelekomcloud.com/v1alpha1
 kind: TypesenseCluster
 metadata:
@@ -87,6 +99,18 @@ spec:
 <summary>Quick example for Open Telekom Cloud CCE with SFS Turbo S3 support</summary>
 
 ```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: otc-aksk
+  namespace: default
+  labels:
+    secret.kubernetes.io/used-by: csi
+type: cfe/secure-opaque
+data:
+  access.key: WE5WWVhVNU*****
+  secret.key: Nnk4emJyZ0*****
+---
 apiVersion: ts.opentelekomcloud.com/v1alpha1
 kind: TypesenseCluster
 metadata:
@@ -293,7 +317,7 @@ Join the conversation:
 ## 📦 Project Status
 
 TyKO is an **independently maintained** project (not affiliated with Typesense, Inc.).
-- Latest version: **0.4.1-rc.4**
+- Latest version: **0.4.1**
 - Tested on: Kubernetes 1.35 (earliest 1.26), Typesense 30.2 (earliest 26.0)
 - Contributions welcome! See [FAQ](https://akyriako.github.io/typesense-operator-docs/docs/faq) and [Development](https://akyriako.github.io/typesense-operator-docs/docs/development)
 

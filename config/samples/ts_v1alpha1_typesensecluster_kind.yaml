@@ -69,24 +69,31 @@ spec:
     storageClassName: typesense-local-path
   adminApiKey:
     name: typesense-common-bootstrap-key
-  httpRoutes:
-    - name: public
-      parentRef:
-        name: traefik-gateway
-        namespace: kube-system
-      hostnames:
-        - typesense.gw.proxmox.home
-        - search.gw.proxmox.home
-      enabled: true
-      referenceGrant: false
-    - name: private
-      parentRef:
-        name: traefik-gateway
-        namespace: kube-system
-        section: web
-      hostnames:
-        - typesense-int.gw.proxmox.home
-      enabled: true
-      referenceGrant: true
+#  scrapers:
+#    - name: docs-example-com
+#      host: arch.otc-service.com
+#      schedule: '*/2 * * * *'
+  metrics:
+    release: promstack
+---
+apiVersion: ts.opentelekomcloud.com/v1alpha1
+kind: TypesenseCluster
+metadata:
+  labels:
+    app.kubernetes.io/name: typesense-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: c-kind-3
+spec:
+  image: typesense/typesense:30.2
+  replicas: 3
+  storage:
+    size: 150Mi
+    storageClassName: typesense-local-path
+  adminApiKey:
+    name: typesense-common-bootstrap-key
+  scrapers:
+    - name: docs-example-com
+      host: arch.otc-service.com
+      schedule: '*/2 * * * *'
   metrics:
     release: promstack

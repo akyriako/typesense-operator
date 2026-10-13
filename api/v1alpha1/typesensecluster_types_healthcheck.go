@@ -8,7 +8,7 @@ import (
 type HealthCheckSpec struct {
 	// Image specifies the Docker image to use for the Typesense health check sidecar container.
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default:="quay.io/akyriako/typesense-healthcheck:0.1.8"
+	// +kubebuilder:default:="quay.io/akyriako/typesense-healthcheck:0.2.0"
 	Image string `json:"image,omitempty"`
 
 	// Resources defines the compute resource requirements (CPU/Memory) for the health check sidecar container.
@@ -33,7 +33,7 @@ func (s *TypesenseClusterSpec) GetHealthCheckSidecarSpecs() HealthCheckSpec {
 	}
 
 	return HealthCheckSpec{
-		Image: "quay.io/akyriako/typesense-healthcheck:0.1.8",
+		Image: "quay.io/akyriako/typesense-healthcheck:0.2.0",
 	}
 }
 
