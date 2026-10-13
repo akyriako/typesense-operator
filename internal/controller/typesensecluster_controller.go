@@ -22,9 +22,9 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
-	"github.com/go-logr/logr"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -41,6 +41,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	crcontroller "sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -55,7 +56,6 @@ import (
 type TypesenseClusterReconciler struct {
 	client.Client
 	Scheme          *runtime.Scheme
-	logger          logr.Logger
 	Recorder        record.EventRecorder
 	DiscoveryClient *discovery.DiscoveryClient
 	ClientSet       *kubernetes.Clientset
@@ -63,7 +63,11 @@ type TypesenseClusterReconciler struct {
 	InCluster       bool
 	HttpClient      *http.Client
 
-	serverVersion string
+	// MaxConcurrentReconciles is the number of clusters reconciled in parallel; defaults to 1.
+	MaxConcurrentReconciles int
+
+	serverVersionMu sync.Mutex
+	serverVersion   string
 }
 
 type TypesenseClusterReconciliationPhase struct {
@@ -146,7 +150,6 @@ const (
 //
 //nolint:gocyclo // Reconcile sequentially coordinates multiple child controllers
 func (r *TypesenseClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	r.logger = log.Log.WithValues("namespace", req.Namespace, "cluster", req.Name)
 
 	var ts tsv1alpha1.TypesenseCluster
 	if err := r.Get(ctx, req.NamespacedName, &ts); err != nil {
@@ -177,7 +180,7 @@ func (r *TypesenseClusterReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		return ctrl.Result{}, nil
 	}
 
-	r.logger.Info("reconciling cluster")
+	log.FromContext(ctx).Info("reconciling cluster")
 
 	err := r.initConditions(ctx, &ts)
 	if err != nil {
@@ -295,7 +298,7 @@ func (r *TypesenseClusterReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		if action == Bootstrapping {
 			requeueAfter = 15 * time.Second
 		}
-		r.logger.Info(fmt.Sprintf("%s cluster completed", string(action)), "condition", cond, "requeueAfter", requeueAfter)
+		log.FromContext(ctx).Info(fmt.Sprintf("%s cluster completed", string(action)), "condition", cond, "requeueAfter", requeueAfter)
 		return ctrl.Result{RequeueAfter: requeueAfter}, nil
 	}
 
@@ -304,10 +307,10 @@ func (r *TypesenseClusterReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		if err != nil {
 			if agg, ok := err.(utilerrors.Aggregate); ok {
 				for _, e := range agg.Errors() {
-					r.logger.Error(e, "failed to force configmap update", "configmap", fmt.Sprintf(ClusterNodesConfigMap, ts.Name))
+					log.FromContext(ctx).Error(e, "failed to force configmap update", "configmap", fmt.Sprintf(ClusterNodesConfigMap, ts.Name))
 				}
 			} else {
-				r.logger.Error(err, "failed to force pods configmap update", "configmap", fmt.Sprintf(ClusterNodesConfigMap, ts.Name))
+				log.FromContext(ctx).Error(err, "failed to force pods configmap update", "configmap", fmt.Sprintf(ClusterNodesConfigMap, ts.Name))
 			}
 		}
 
@@ -324,7 +327,7 @@ func (r *TypesenseClusterReconciler) Reconcile(ctx context.Context, req ctrl.Req
 
 	condition, _, err := r.ReconcileQuorum(ctx, &ts, secret, client.ObjectKeyFromObject(sts))
 	if err != nil {
-		r.logger.Error(err, "reconciling quorum health failed")
+		log.FromContext(ctx).Error(err, "reconciling quorum health failed")
 	}
 
 	if strings.Contains(string(condition), "QuorumNeedsAttention") {
@@ -401,7 +404,7 @@ func (r *TypesenseClusterReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		requeueAfter = 15 * time.Second
 	}
 
-	r.logger.Info(fmt.Sprintf("%s cluster completed", string(action)), "condition", cond, "requeueAfter", requeueAfter)
+	log.FromContext(ctx).Info(fmt.Sprintf("%s cluster completed", string(action)), "condition", cond, "requeueAfter", requeueAfter)
 	return ctrl.Result{RequeueAfter: requeueAfter}, nil
 }
 
@@ -420,11 +423,11 @@ func (r *TypesenseClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Watches(&corev1.Pod{}, handler.EnqueueRequestsFromMapFunc(r.mapOwnedResourceToTypesenseCluster)).
 		Watches(&corev1.PersistentVolumeClaim{}, handler.EnqueueRequestsFromMapFunc(mapPersistentVolumeClaimToTypesenseCluster)).
 		Named("typesense-kubernetes-operator").
+		// The same cluster is never reconciled concurrently; workers only process different clusters in parallel.
+		WithOptions(crcontroller.Options{MaxConcurrentReconciles: max(1, r.MaxConcurrentReconciles)}).
 		Complete(r)
 }
 
-// mapOwnedResourceToTypesenseCluster runs in the informer's goroutine, so it must not use r.logger,
-// which Reconcile replaces on every run.
 func (r *TypesenseClusterReconciler) mapOwnedResourceToTypesenseCluster(ctx context.Context, obj client.Object) []reconcile.Request {
 	ownerRef := metav1.GetControllerOf(obj)
 	if ownerRef == nil || ownerRef.Kind != "StatefulSet" || ownerRef.APIVersion != "apps/v1" {

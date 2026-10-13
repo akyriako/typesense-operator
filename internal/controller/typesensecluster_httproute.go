@@ -13,6 +13,7 @@ import (
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 	gatewayv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 )
@@ -31,19 +32,19 @@ func (r *TypesenseClusterReconciler) ReconcileHttpRoute(ctx context.Context, ts 
 		}
 
 		notSupportedErr := fmt.Errorf("gateway is not supported in kubernetes current version")
-		r.logger.Error(notSupportedErr, "reconciling http routes skipped", "current", ver, "minimum_required", fmt.Sprintf("v%s", minimumSupportedVersionForGateway))
+		log.FromContext(ctx).Error(notSupportedErr, "reconciling http routes skipped", "current", ver, "minimum_required", fmt.Sprintf("v%s", minimumSupportedVersionForGateway))
 		return nil
 	}
 
 	if deployed, err := r.IsApiGroupDeployed(gatewayApiGroup); err != nil || !deployed {
 		if len(ts.Spec.HttpRoutes) > 0 {
 			err := fmt.Errorf("gateway api group %s was not found in cluster", gatewayApiGroup)
-			r.logger.Error(err, "reconciling http routes skipped")
+			log.FromContext(ctx).Error(err, "reconciling http routes skipped")
 		}
 		return nil
 	}
 
-	r.logger.V(debugLevel).Info("reconciling http routes")
+	log.FromContext(ctx).V(debugLevel).Info("reconciling http routes")
 
 	err = r.deleteOrphanedHttpRoutes(ctx, ts)
 	if err != nil {
@@ -60,24 +61,24 @@ func (r *TypesenseClusterReconciler) ReconcileHttpRoute(ctx context.Context, ts 
 			if apierrors.IsNotFound(err) {
 				httpRouteExists = false
 			} else {
-				r.logger.Error(err, fmt.Sprintf("unable to fetch http route: %s", httpRouteName))
+				log.FromContext(ctx).Error(err, fmt.Sprintf("unable to fetch http route: %s", httpRouteName))
 				return err
 			}
 		}
 
 		if !httpRouteExists && hrt.Enabled {
-			r.logger.V(debugLevel).Info("creating http route", "http_route", httpRouteName)
+			log.FromContext(ctx).V(debugLevel).Info("creating http route", "http_route", httpRouteName)
 
 			_, err = r.createHttpRoute(ctx, httpRouteObjectKey, hrt, ts)
 			if err != nil {
-				r.logger.Error(err, "creating http route failed", "http_route", httpRouteName)
+				log.FromContext(ctx).Error(err, "creating http route failed", "http_route", httpRouteName)
 				return err
 			}
 
 			if ptr.Deref(hrt.ReferenceGrant, false) {
 				err := r.createReferenceGrant(ctx, hrt, ts)
 				if err != nil {
-					r.logger.Error(err, "creating reference grant failed", "http_route", httpRouteName)
+					log.FromContext(ctx).Error(err, "creating reference grant failed", "http_route", httpRouteName)
 					return err
 				}
 			}
@@ -92,7 +93,7 @@ func (r *TypesenseClusterReconciler) ReconcileHttpRoute(ctx context.Context, ts 
 					LabelSelector: referenceGrantsLabelSelector,
 				}); err != nil {
 					gerr := fmt.Errorf("failed to list reference grants: %w", err)
-					r.logger.Error(gerr, "reconciling http routes failed")
+					log.FromContext(ctx).Error(gerr, "reconciling http routes failed")
 					return gerr
 				}
 
@@ -105,7 +106,7 @@ func (r *TypesenseClusterReconciler) ReconcileHttpRoute(ctx context.Context, ts 
 					err := r.deleteReferenceGrant(ctx, &grant)
 					if err != nil {
 						if !apierrors.IsNotFound(err) {
-							r.logger.Error(err, "deleting reference grant failed: %w", err)
+							log.FromContext(ctx).Error(err, "deleting reference grant failed: %w", err)
 						}
 					}
 				}
@@ -113,7 +114,7 @@ func (r *TypesenseClusterReconciler) ReconcileHttpRoute(ctx context.Context, ts 
 				err = r.deleteHttpRoute(ctx, httpRoute)
 				if err != nil {
 					gerr := fmt.Errorf("deleting http route failed: %w", err)
-					r.logger.Error(gerr, "reconciling http routes failed")
+					log.FromContext(ctx).Error(gerr, "reconciling http routes failed")
 					return gerr
 				}
 				continue
@@ -170,11 +171,11 @@ func (r *TypesenseClusterReconciler) ReconcileHttpRoute(ctx context.Context, ts 
 				!hasValidMatch || hrt.Path != path || pathType == nil || *expectedPathType != *pathType ||
 				currentBackendPort == nil || *currentBackendPort != expectedBackendPort {
 
-				r.logger.V(debugLevel).Info("updating http route", "http_route", httpRouteName)
+				log.FromContext(ctx).V(debugLevel).Info("updating http route", "http_route", httpRouteName)
 
 				_, err = r.updateHttpRoute(ctx, hrt, httpRoute, ts)
 				if err != nil {
-					r.logger.Error(err, "updating http route failed", "http_route", httpRouteName)
+					log.FromContext(ctx).Error(err, "updating http route failed", "http_route", httpRouteName)
 					return err
 				}
 			}
@@ -283,7 +284,7 @@ func (r *TypesenseClusterReconciler) deleteOrphanedHttpRoutes(ctx context.Contex
 		LabelSelector: httpRouteLabelSelector,
 	}); err != nil {
 		gerr := fmt.Errorf("failed to list http routes: %w", err)
-		r.logger.Error(gerr, "reconciling http routes skipped")
+		log.FromContext(ctx).Error(gerr, "reconciling http routes skipped")
 		return gerr
 	}
 
@@ -303,7 +304,7 @@ func (r *TypesenseClusterReconciler) deleteOrphanedHttpRoutes(ctx context.Contex
 			err := r.deleteHttpRoute(ctx, &route)
 			if err != nil {
 				gerr := fmt.Errorf("deleting http route failed: %w", err)
-				r.logger.Error(gerr, "reconciling http routes failed")
+				log.FromContext(ctx).Error(gerr, "reconciling http routes failed")
 				return gerr
 			}
 		}
@@ -498,7 +499,7 @@ func (r *TypesenseClusterReconciler) deleteOrphanedReferenceGrants(ctx context.C
 		LabelSelector: referenceGrantsLabelSelector,
 	}); err != nil {
 		gerr := fmt.Errorf("failed to list scoped reference grants: %w", err)
-		r.logger.Error(gerr, "cleaning up reference grants failed")
+		log.FromContext(ctx).Error(gerr, "cleaning up reference grants failed")
 		return gerr
 	}
 
@@ -532,7 +533,7 @@ func (r *TypesenseClusterReconciler) deleteOrphanedReferenceGrants(ctx context.C
 			err := r.deleteReferenceGrant(ctx, &grant)
 			if err != nil {
 				gerr := fmt.Errorf("deleting reference grant failed: %w", err)
-				r.logger.Error(gerr, "reconciling http routes failed")
+				log.FromContext(ctx).Error(gerr, "reconciling http routes failed")
 				return gerr
 			}
 		}
@@ -580,7 +581,7 @@ func (r *TypesenseClusterReconciler) updateReferenceGrant(ctx context.Context, s
 	if cre {
 		err := r.createReferenceGrant(ctx, spec, ts)
 		if err != nil {
-			r.logger.Error(err, "creating reference grant failed", "http_route", spec.Name)
+			log.FromContext(ctx).Error(err, "creating reference grant failed", "http_route", spec.Name)
 			return err
 		}
 
@@ -590,7 +591,7 @@ func (r *TypesenseClusterReconciler) updateReferenceGrant(ctx context.Context, s
 	if del {
 		err := r.deleteReferenceGrant(ctx, &referenceGrant)
 		if err != nil {
-			r.logger.Error(err, "deleting reference grant failed", "http_route", spec.Name)
+			log.FromContext(ctx).Error(err, "deleting reference grant failed", "http_route", spec.Name)
 			return err
 		}
 	}

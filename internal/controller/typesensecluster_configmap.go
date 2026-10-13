@@ -18,6 +18,7 @@ import (
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 const (
@@ -25,7 +26,7 @@ const (
 )
 
 func (r *TypesenseClusterReconciler) ReconcileConfigMap(ctx context.Context, ts *tsv1alpha1.TypesenseCluster) (*bool, error) {
-	r.logger.V(debugLevel).Info("reconciling config map")
+	log.FromContext(ctx).V(debugLevel).Info("reconciling config map")
 
 	configMapName := fmt.Sprintf(ClusterNodesConfigMap, ts.Name)
 	configMapExists := true
@@ -36,17 +37,17 @@ func (r *TypesenseClusterReconciler) ReconcileConfigMap(ctx context.Context, ts 
 		if apierrors.IsNotFound(err) {
 			configMapExists = false
 		} else {
-			r.logger.Error(err, fmt.Sprintf("unable to fetch config map: %s", configMapName))
+			log.FromContext(ctx).Error(err, fmt.Sprintf("unable to fetch config map: %s", configMapName))
 			return nil, err
 		}
 	}
 
 	if !configMapExists {
-		r.logger.V(debugLevel).Info("creating config map", "configmap", configMapObjectKey.Name)
+		log.FromContext(ctx).V(debugLevel).Info("creating config map", "configmap", configMapObjectKey.Name)
 
 		_, err := r.createConfigMap(ctx, configMapObjectKey, ts)
 		if err != nil {
-			r.logger.Error(err, "creating config map failed", "configmap", configMapObjectKey.Name)
+			log.FromContext(ctx).Error(err, "creating config map failed", "configmap", configMapObjectKey.Name)
 			return nil, err
 		}
 
@@ -105,7 +106,7 @@ func (r *TypesenseClusterReconciler) updateConfigMap(ctx context.Context, ts *ts
 				return false, err
 			}
 		} else {
-			r.logger.Error(err, fmt.Sprintf("unable to fetch statefulset: %s", stsName))
+			log.FromContext(ctx).Error(err, fmt.Sprintf("unable to fetch statefulset: %s", stsName))
 		}
 
 		return false, err
@@ -130,7 +131,7 @@ func (r *TypesenseClusterReconciler) updateConfigMap(ctx context.Context, ts *ts
 
 	availableNodes := len(nodes)
 	if availableNodes < int(*replicas) {
-		r.logger.V(debugLevel).Info("incomplete quorum configuration, using fallback nodes")
+		log.FromContext(ctx).V(debugLevel).Info("incomplete quorum configuration, using fallback nodes")
 		nodes = fallback
 		availableNodes = len(nodes)
 	}
@@ -140,13 +141,13 @@ func (r *TypesenseClusterReconciler) updateConfigMap(ctx context.Context, ts *ts
 
 	if !resizeOp {
 		currentNodes := strings.Split(cm.Data["nodes"], ",")
-		r.logger.V(debugLevel).Info("current quorum configuration", "size", len(currentNodes), "nodes", currentNodes)
+		log.FromContext(ctx).V(debugLevel).Info("current quorum configuration", "size", len(currentNodes), "nodes", currentNodes)
 	}
 
 	updated := false
 	if cm.Data["nodes"] != nodesStr || cm.Data["fallback"] != fallbackStr {
 		if !resizeOp {
-			r.logger.Info("updating quorum configuration", "size", availableNodes, "nodes", nodes)
+			log.FromContext(ctx).Info("updating quorum configuration", "size", availableNodes, "nodes", nodes)
 		}
 
 		desired := &v1.ConfigMap{
@@ -164,7 +165,7 @@ func (r *TypesenseClusterReconciler) updateConfigMap(ctx context.Context, ts *ts
 		//nolint:staticcheck
 		err := r.Patch(ctx, desired, client.Apply, client.ForceOwnership, client.FieldOwner("typesense-operator"))
 		if err != nil {
-			r.logger.Error(err, "updating quorum configuration failed")
+			log.FromContext(ctx).Error(err, "updating quorum configuration failed")
 			return false, err
 		}
 		updated = true
@@ -208,12 +209,12 @@ func (r *TypesenseClusterReconciler) forcePodsConfigMapUpdate(ctx context.Contex
 		pod.Annotations[forceConfigMapUpdateAnnotationKey] = time.Now().Format(time.RFC3339)
 
 		if err := r.Patch(ctx, pod, client.MergeFrom(original)); err != nil {
-			r.logger.Error(err, "patching pod annotations failed", "pod", pod.Name)
+			log.FromContext(ctx).Error(err, "patching pod annotations failed", "pod", pod.Name)
 			errs = append(errs, fmt.Errorf("pod %s: %w", pod.Name, err))
 			continue
 		}
 
-		r.logger.V(debugLevel).Info("patching pod annotations", "pod", pod.Name, "annotation", forceConfigMapUpdateAnnotationKey)
+		log.FromContext(ctx).V(debugLevel).Info("patching pod annotations", "pod", pod.Name, "annotation", forceConfigMapUpdateAnnotationKey)
 	}
 
 	return utilerrors.NewAggregate(errs)
@@ -247,7 +248,7 @@ func (r *TypesenseClusterReconciler) getNodes(ctx context.Context, ts *tsv1alpha
 			Namespace:     sts.Namespace,
 			LabelSelector: labelSelector,
 		}); err != nil {
-			r.logger.Error(err, "failed to list pods", "statefulset", sts.Name)
+			log.FromContext(ctx).Error(err, "failed to list pods", "statefulset", sts.Name)
 		} else {
 			for _, pod := range pods.Items {
 				actualApiPort := ts.Spec.ApiPort
@@ -373,7 +374,7 @@ func (r *TypesenseClusterReconciler) getNodes(ctx context.Context, ts *tsv1alpha
 }
 
 func (r *TypesenseClusterReconciler) getEndpointSlicesForStatefulSet(ctx context.Context, sts *appsv1.StatefulSet) ([]discoveryv1.EndpointSlice, error) {
-	r.logger.V(debugLevel).Info("collecting endpoint slices")
+	log.FromContext(ctx).V(debugLevel).Info("collecting endpoint slices")
 	svcName := sts.Spec.ServiceName
 	namespace := sts.Namespace
 

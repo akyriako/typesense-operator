@@ -105,6 +105,7 @@ func main() {
 	var watchNamespace string
 	var watchCurrentNamespace bool
 	var enableWebhook bool
+	var maxConcurrentReconciles int
 	var tlsOpts []func(*tls.Config)
 	flag.StringVar(&metricsAddr, "metrics-bind-address", "0", "The address the metrics endpoint binds to. "+
 		"Use :8443 for HTTPS or :8080 for HTTP, or leave as 0 to disable the metrics service.")
@@ -129,6 +130,8 @@ func main() {
 		"If set, the operator watches only the namespace where its Pod is running.")
 	flag.BoolVar(&enableWebhook, "enable-webhook", true,
 		"If set to true, the webhook server is enabled. Use --enable-webhook=false to disable it.")
+	flag.IntVar(&maxConcurrentReconciles, "max-concurrent-reconciles", 3,
+		"Number of TypesenseClusters reconciled in parallel. A slow or unreachable cluster then does not delay the others.")
 
 	opts := zap.Options{
 		Development:     true,
@@ -291,12 +294,13 @@ func main() {
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
 		//nolint:staticcheck // GetEventRecorderFor is deprecated but required for backward compatibility
-		Recorder:        mgr.GetEventRecorderFor("typesensecluster-controller"),
-		ClientSet:       clientSet,
-		DiscoveryClient: discoveryClient,
-		Configuration:   mgr.GetConfig(),
-		InCluster:       isInCluster(),
-		HttpClient:      mgr.GetHTTPClient(),
+		Recorder:                mgr.GetEventRecorderFor("typesensecluster-controller"),
+		ClientSet:               clientSet,
+		DiscoveryClient:         discoveryClient,
+		Configuration:           mgr.GetConfig(),
+		InCluster:               isInCluster(),
+		HttpClient:              mgr.GetHTTPClient(),
+		MaxConcurrentReconciles: maxConcurrentReconciles,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "TypesenseCluster")
 		os.Exit(1)

@@ -10,10 +10,11 @@ import (
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 func (r *TypesenseClusterReconciler) ReconcileSecret(ctx context.Context, ts *tsv1alpha1.TypesenseCluster) (*v1.Secret, error) {
-	r.logger.V(debugLevel).Info("reconciling secret")
+	log.FromContext(ctx).V(debugLevel).Info("reconciling secret")
 
 	secretExists := true
 	secretObjectKey := r.getAdminApiKeyObjectKey(ts)
@@ -23,17 +24,17 @@ func (r *TypesenseClusterReconciler) ReconcileSecret(ctx context.Context, ts *ts
 		if apierrors.IsNotFound(err) && ts.Spec.AdminApiKey == nil {
 			secretExists = false
 		} else {
-			r.logger.Error(err, fmt.Sprintf("unable to fetch secret: %s", secretObjectKey))
+			log.FromContext(ctx).Error(err, fmt.Sprintf("unable to fetch secret: %s", secretObjectKey))
 			return secret, err
 		}
 	}
 
 	if !secretExists {
-		r.logger.V(debugLevel).Info("creating admin api key", "secret", secretObjectKey)
+		log.FromContext(ctx).V(debugLevel).Info("creating admin api key", "secret", secretObjectKey)
 
 		secret, err := r.createAdminApiKey(ctx, secretObjectKey, ts)
 		if err != nil {
-			r.logger.Error(err, "creating admin api key failed", "secret", secretObjectKey)
+			log.FromContext(ctx).Error(err, "creating admin api key failed", "secret", secretObjectKey)
 			return nil, err
 		}
 		return secret, nil

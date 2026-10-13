@@ -16,6 +16,7 @@ import (
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 const (
@@ -36,7 +37,7 @@ const (
 )
 
 func (r *TypesenseClusterReconciler) ReconcileStatefulSet(ctx context.Context, ts *tsv1alpha1.TypesenseCluster) (*appsv1.StatefulSet, bool, error) {
-	r.logger.V(debugLevel).Info("reconciling statefulset")
+	log.FromContext(ctx).V(debugLevel).Info("reconciling statefulset")
 
 	stsName := fmt.Sprintf(ClusterStatefulSet, ts.Name)
 	stsExists := true
@@ -50,13 +51,13 @@ func (r *TypesenseClusterReconciler) ReconcileStatefulSet(ctx context.Context, t
 		if apierrors.IsNotFound(err) {
 			stsExists = false
 		} else {
-			r.logger.Error(err, fmt.Sprintf("unable to fetch statefulset: %s", stsName))
+			log.FromContext(ctx).Error(err, fmt.Sprintf("unable to fetch statefulset: %s", stsName))
 			return nil, false, err
 		}
 	}
 
 	if !stsExists {
-		r.logger.V(debugLevel).Info("creating statefulset", "sts", stsObjectKey.Name)
+		log.FromContext(ctx).V(debugLevel).Info("creating statefulset", "sts", stsObjectKey.Name)
 
 		sts, err := r.createStatefulSet(
 			ctx,
@@ -64,16 +65,16 @@ func (r *TypesenseClusterReconciler) ReconcileStatefulSet(ctx context.Context, t
 			ts,
 		)
 		if err != nil {
-			r.logger.Error(err, "creating statefulset failed", "sts", stsObjectKey.Name)
+			log.FromContext(ctx).Error(err, "creating statefulset failed", "sts", stsObjectKey.Name)
 			return nil, false, err
 		}
 
-		r.logLagThresholds(sts)
+		r.logLagThresholds(ctx, sts)
 		return sts, false, nil
 	} else {
 		err := r.expandPersistentVolumeClaims(ctx, sts, ts)
 		if err != nil {
-			r.logger.Error(err, "expanding pvcs failed", "sts", stsObjectKey.Name)
+			log.FromContext(ctx).Error(err, "expanding pvcs failed", "sts", stsObjectKey.Name)
 		}
 
 		skipConditions := []string{
@@ -94,7 +95,7 @@ func (r *TypesenseClusterReconciler) ReconcileStatefulSet(ctx context.Context, t
 			if !contains(skipConditions, condition.Reason) || emergencyUpdateRequired {
 				desiredSts, err := r.buildStatefulSet(ctx, stsObjectKey, ts)
 				if err != nil {
-					r.logger.Error(err, "building statefulset failed", "sts", stsObjectKey.Name)
+					log.FromContext(ctx).Error(err, "building statefulset failed", "sts", stsObjectKey.Name)
 					return nil, false, err
 				}
 
@@ -116,22 +117,22 @@ func (r *TypesenseClusterReconciler) ReconcileStatefulSet(ctx context.Context, t
 						r.Recorder.Eventf(ts, "Normal", "TypesenseVersionUpdate", "Scheduled update from %s to %s", oldImage, newImage)
 					}
 
-					r.logger.V(debugLevel).Info("updating statefulset", "sts", sts.Name, "triggers", triggers)
+					log.FromContext(ctx).V(debugLevel).Info("updating statefulset", "sts", sts.Name, "triggers", triggers)
 
 					updatedSts, err := r.updateStatefulSet(ctx, sts, desiredSts, ts)
 					if err != nil {
-						r.logger.Error(err, "updating statefulset failed", "sts", stsObjectKey.Name)
+						log.FromContext(ctx).Error(err, "updating statefulset failed", "sts", stsObjectKey.Name)
 						return nil, false, err
 					}
 
 					if err := r.syncConfigMapWithStatefulSet(ctx, ts, updatedSts.Spec.Replicas); err != nil {
-						r.logger.Error(err, "unable to update config map", "configmap", fmt.Sprintf(ClusterNodesConfigMap, ts.Name))
+						log.FromContext(ctx).Error(err, "unable to update config map", "configmap", fmt.Sprintf(ClusterNodesConfigMap, ts.Name))
 					}
 
-					r.logLagThresholds(updatedSts)
+					r.logLagThresholds(ctx, updatedSts)
 					return updatedSts, true, nil
 				} else if scaleOnly {
-					r.logger.V(debugLevel).Info("scaling statefulset", "sts", sts.Name, "triggers", triggers)
+					log.FromContext(ctx).V(debugLevel).Info("scaling statefulset", "sts", sts.Name, "triggers", triggers)
 
 					size := ts.Spec.Replicas
 					err = r.ScaleStatefulSet(ctx, stsObjectKey, size)
@@ -143,14 +144,14 @@ func (r *TypesenseClusterReconciler) ReconcileStatefulSet(ctx context.Context, t
 						return desiredSts, true, err
 					}
 
-					r.logLagThresholds(desiredSts)
+					r.logLagThresholds(ctx, desiredSts)
 					return desiredSts, true, nil
 				}
 			}
 		}
 	}
 
-	r.logLagThresholds(sts)
+	r.logLagThresholds(ctx, sts)
 	return sts, false, nil
 }
 
@@ -178,7 +179,7 @@ func (r *TypesenseClusterReconciler) syncConfigMapWithStatefulSet(ctx context.Co
 	return nil
 }
 
-func (r *TypesenseClusterReconciler) logLagThresholds(sts *appsv1.StatefulSet) {
+func (r *TypesenseClusterReconciler) logLagThresholds(ctx context.Context, sts *appsv1.StatefulSet) {
 	read := sts.Spec.Template.Annotations[readLagAnnotationKey]
 	write := sts.Spec.Template.Annotations[writeLagAnnotationKey]
 
@@ -190,7 +191,7 @@ func (r *TypesenseClusterReconciler) logLagThresholds(sts *appsv1.StatefulSet) {
 		write = strconv.Itoa(HealthyWriteLagDefaultValue)
 	}
 
-	r.logger.V(debugLevel).Info("reporting lag thresholds", "read", read, "write", write)
+	log.FromContext(ctx).V(debugLevel).Info("reporting lag thresholds", "read", read, "write", write)
 }
 
 func (r *TypesenseClusterReconciler) createStatefulSet(ctx context.Context, key client.ObjectKey, ts *tsv1alpha1.TypesenseCluster) (*appsv1.StatefulSet, error) {
@@ -236,7 +237,7 @@ func (r *TypesenseClusterReconciler) expandPersistentVolumeClaims(ctx context.Co
 			if err := r.Patch(ctx, &pvc, patch); err != nil {
 				errs = append(errs, err)
 			} else {
-				r.logger.Info("expanded pvc", "pvc", pvc.Name, "newSize", desiredSize.String())
+				log.FromContext(ctx).Info("expanded pvc", "pvc", pvc.Name, "newSize", desiredSize.String())
 			}
 		}
 	}
@@ -567,7 +568,7 @@ func (r *TypesenseClusterReconciler) buildStatefulSet(ctx context.Context, key c
 		return nil, err
 	}
 
-	r.logger.V(debugLevel).Info("calculated hash", "hash", base16Hash)
+	log.FromContext(ctx).V(debugLevel).Info("calculated hash", "hash", base16Hash)
 
 	if sts.Spec.Template.Annotations == nil {
 		sts.Spec.Template.Annotations = map[string]string{}
@@ -584,14 +585,14 @@ func (r *TypesenseClusterReconciler) ScaleStatefulSet(ctx context.Context, stsOb
 	}
 
 	if ptr.Deref(sts.Spec.Replicas, 1) == desiredReplicas {
-		r.logger.V(debugLevel).Info("statefulset already scaled to desired replicas", "name", sts.Name, "replicas", desiredReplicas)
+		log.FromContext(ctx).V(debugLevel).Info("statefulset already scaled to desired replicas", "name", sts.Name, "replicas", desiredReplicas)
 		return nil
 	}
 
 	patch := client.MergeFrom(sts.DeepCopy())
 	sts.Spec.Replicas = &desiredReplicas
 	if err := r.Patch(ctx, sts, patch); err != nil {
-		r.logger.Error(err, "updating stateful replicas failed", "name", sts.Name)
+		log.FromContext(ctx).Error(err, "updating stateful replicas failed", "name", sts.Name)
 		return err
 	}
 
@@ -606,7 +607,7 @@ func (r *TypesenseClusterReconciler) PurgeStatefulSetPods(ctx context.Context, s
 		Namespace:     sts.Namespace,
 		LabelSelector: labelSelector,
 	}); err != nil {
-		r.logger.Error(err, "failed to list pods", "statefulset", sts.Name)
+		log.FromContext(ctx).Error(err, "failed to list pods", "statefulset", sts.Name)
 		return err
 	}
 
@@ -616,17 +617,17 @@ func (r *TypesenseClusterReconciler) PurgeStatefulSetPods(ctx context.Context, s
 
 		pendingPVC, err := r.isPodPendingPersistentVolumeClaim(ctx, pod)
 		if err != nil {
-			r.logger.Error(err, "failed to inspect pod PVCs before purging statefulset pod", "pod", pod.Name)
+			log.FromContext(ctx).Error(err, "failed to inspect pod PVCs before purging statefulset pod", "pod", pod.Name)
 			return err
 		}
 		if pendingPVC {
-			r.logger.V(debugLevel).Info("skipping purge of pod because PVC is still pending", "pod", pod.Name)
+			log.FromContext(ctx).V(debugLevel).Info("skipping purge of pod because PVC is still pending", "pod", pod.Name)
 			continue
 		}
 
 		err = r.Delete(ctx, pod)
 		if err != nil {
-			r.logger.Error(err, "failed to delete pod", "pod", pod.Name)
+			log.FromContext(ctx).Error(err, "failed to delete pod", "pod", pod.Name)
 			errs = append(errs, err)
 		}
 	}
@@ -648,7 +649,7 @@ func (r *TypesenseClusterReconciler) GetUnscheduledPods(ctx context.Context, sts
 		Namespace:     sts.Namespace,
 		LabelSelector: labelSelector,
 	}); err != nil {
-		r.logger.Error(err, "retrieving unscheduled pods: failed to list pods", "statefulset", sts.Name)
+		log.FromContext(ctx).Error(err, "retrieving unscheduled pods: failed to list pods", "statefulset", sts.Name)
 		return nil, err
 	}
 
@@ -672,20 +673,20 @@ func (r *TypesenseClusterReconciler) RestartUnscheduledPods(ctx context.Context,
 
 		pendingPVC, err := r.isPodPendingPersistentVolumeClaim(ctx, pod)
 		if err != nil {
-			r.logger.Error(err, "failed to inspect pod PVCs before restarting unscheduled pod", "pod", pod.Name)
+			log.FromContext(ctx).Error(err, "failed to inspect pod PVCs before restarting unscheduled pod", "pod", pod.Name)
 			continue
 		}
 		if pendingPVC {
-			r.logger.V(debugLevel).Info("skipping restart of unscheduled pod because PVC is still pending", "pod", pod.Name)
+			log.FromContext(ctx).V(debugLevel).Info("skipping restart of unscheduled pod because PVC is still pending", "pod", pod.Name)
 			continue
 		}
 
-		r.logger.V(debugLevel).Info("removing unscheduled pod", "pod", pod.Name)
+		log.FromContext(ctx).V(debugLevel).Info("removing unscheduled pod", "pod", pod.Name)
 
 		propagation := metav1.DeletePropagationBackground
 		err = r.Delete(ctx, pod, &client.DeleteOptions{PropagationPolicy: &propagation})
 		if err != nil {
-			r.logger.Error(err, "failed to remove unscheduled pod", "pod", pod.Name)
+			log.FromContext(ctx).Error(err, "failed to remove unscheduled pod", "pod", pod.Name)
 		}
 
 		if !removedAny {
@@ -730,7 +731,7 @@ func (r *TypesenseClusterReconciler) RestartAllUnscheduledPods(ctx context.Conte
 		Namespace:     sts.Namespace,
 		LabelSelector: labelSelector,
 	}); err != nil {
-		r.logger.Error(err, "deleting unscheduled pods: failed to list pods", "statefulset", sts.Name)
+		log.FromContext(ctx).Error(err, "deleting unscheduled pods: failed to list pods", "statefulset", sts.Name)
 		return err
 	}
 
@@ -743,11 +744,11 @@ func (r *TypesenseClusterReconciler) RestartAllUnscheduledPods(ctx context.Conte
 
 		pendingPVC, err := r.isPodPendingPersistentVolumeClaim(ctx, pod)
 		if err != nil {
-			r.logger.Error(err, "failed to inspect pod PVCs before restarting unscheduled pod", "pod", pod.Name)
+			log.FromContext(ctx).Error(err, "failed to inspect pod PVCs before restarting unscheduled pod", "pod", pod.Name)
 			continue
 		}
 		if pendingPVC {
-			r.logger.V(debugLevel).Info("skipping restart of unscheduled pod because PVC is still pending", "pod", pod.Name)
+			log.FromContext(ctx).V(debugLevel).Info("skipping restart of unscheduled pod because PVC is still pending", "pod", pod.Name)
 			continue
 		}
 
@@ -772,7 +773,7 @@ func (r *TypesenseClusterReconciler) GetFreshStatefulSet(ctx context.Context, st
 	sts := &appsv1.StatefulSet{}
 	if err := r.Get(ctx, stsObjectKey, sts); err != nil {
 		if !apierrors.IsNotFound(err) {
-			r.logger.Error(err, fmt.Sprintf("unable to fetch statefulset: %s", stsObjectKey.Name))
+			log.FromContext(ctx).Error(err, fmt.Sprintf("unable to fetch statefulset: %s", stsObjectKey.Name))
 		}
 		return nil, err
 	}

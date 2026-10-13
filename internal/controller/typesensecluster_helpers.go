@@ -12,6 +12,7 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/util/csaupgrade"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 const operatorFieldOwner = "typesense-operator"
@@ -58,7 +59,7 @@ func (r *TypesenseClusterReconciler) patchStatus(
 
 	err := r.Status().Patch(ctx, ts, patch)
 	if err != nil {
-		r.logger.Error(err, "unable to patch typesense cluster status")
+		log.FromContext(ctx).Error(err, "unable to patch typesense cluster status")
 		return err
 	}
 
@@ -66,25 +67,38 @@ func (r *TypesenseClusterReconciler) patchStatus(
 }
 
 func (r *TypesenseClusterReconciler) IsFeatureSupported(minimum string) (bool, string, error) {
-	if r.serverVersion == "" {
-		info, err := r.DiscoveryClient.ServerVersion()
-		if err != nil {
-			return false, "", err
-		}
-		r.serverVersion = info.GitVersion
+	serverVersion, err := r.getServerVersion()
+	if err != nil {
+		return false, "", err
 	}
 
-	ver, err := version.ParseGeneric(r.serverVersion)
+	ver, err := version.ParseGeneric(serverVersion)
 	if err != nil {
-		return false, r.serverVersion, err
+		return false, serverVersion, err
 	}
 
 	req, err := version.ParseGeneric(fmt.Sprintf("v%s", minimum))
 	if err != nil {
-		return false, r.serverVersion, err
+		return false, serverVersion, err
 	}
 
-	return ver.AtLeast(req), r.serverVersion, nil
+	return ver.AtLeast(req), serverVersion, nil
+}
+
+// getServerVersion caches the Kubernetes server version; reconciles may run concurrently.
+func (r *TypesenseClusterReconciler) getServerVersion() (string, error) {
+	r.serverVersionMu.Lock()
+	defer r.serverVersionMu.Unlock()
+
+	if r.serverVersion == "" {
+		info, err := r.DiscoveryClient.ServerVersion()
+		if err != nil {
+			return "", err
+		}
+		r.serverVersion = info.GitVersion
+	}
+
+	return r.serverVersion, nil
 }
 
 func (r *TypesenseClusterReconciler) IsApiGroupDeployed(apiGroup string) (bool, error) {

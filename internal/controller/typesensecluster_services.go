@@ -12,10 +12,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 func (r *TypesenseClusterReconciler) ReconcileServices(ctx context.Context, ts *tsv1alpha1.TypesenseCluster) error {
-	r.logger.V(debugLevel).Info("reconciling services")
+	log.FromContext(ctx).V(debugLevel).Info("reconciling services")
 
 	headlessSvcName := fmt.Sprintf(ClusterHeadlessService, ts.Name)
 	headlessExists := true
@@ -26,26 +27,26 @@ func (r *TypesenseClusterReconciler) ReconcileServices(ctx context.Context, ts *
 		if apierrors.IsNotFound(err) {
 			headlessExists = false
 		} else {
-			r.logger.Error(err, fmt.Sprintf("unable to fetch service: %s", headlessSvcName))
+			log.FromContext(ctx).Error(err, fmt.Sprintf("unable to fetch service: %s", headlessSvcName))
 			return err
 		}
 	}
 
 	if !headlessExists {
-		r.logger.V(debugLevel).Info("creating headless service", "service", headlessObjectKey.Name)
+		log.FromContext(ctx).V(debugLevel).Info("creating headless service", "service", headlessObjectKey.Name)
 
 		_, err := r.createHeadlessService(ctx, headlessObjectKey, ts)
 		if err != nil {
-			r.logger.Error(err, "creating headless service failed", "service", headlessObjectKey.Name)
+			log.FromContext(ctx).Error(err, "creating headless service failed", "service", headlessObjectKey.Name)
 			return err
 		}
 	} else {
 		if len(headless.Spec.Ports) != 2 || int32(ts.Spec.ApiPort) != headless.Spec.Ports[0].Port || int32(ts.Spec.PeeringPort) != headless.Spec.Ports[1].Port {
-			r.logger.V(debugLevel).Info("updating headless service", "service", headlessObjectKey.Name)
+			log.FromContext(ctx).V(debugLevel).Info("updating headless service", "service", headlessObjectKey.Name)
 
 			err := r.updateHeadlessService(ctx, headless, ts)
 			if err != nil {
-				r.logger.Error(err, "updating headless service failed", "service", headlessObjectKey.Name)
+				log.FromContext(ctx).Error(err, "updating headless service failed", "service", headlessObjectKey.Name)
 				return err
 			}
 		}
@@ -60,17 +61,17 @@ func (r *TypesenseClusterReconciler) ReconcileServices(ctx context.Context, ts *
 		if apierrors.IsNotFound(err) {
 			svcExists = false
 		} else {
-			r.logger.Error(err, fmt.Sprintf("unable to fetch service: %s", svcName))
+			log.FromContext(ctx).Error(err, fmt.Sprintf("unable to fetch service: %s", svcName))
 			return err
 		}
 	}
 
 	if !svcExists {
-		r.logger.V(debugLevel).Info("creating resolver service", "service", svcObjectKey.Name)
+		log.FromContext(ctx).V(debugLevel).Info("creating resolver service", "service", svcObjectKey.Name)
 
 		err := r.createService(ctx, svcObjectKey, ts)
 		if err != nil {
-			r.logger.Error(err, "creating resolver service failed", "service", svcObjectKey.Name)
+			log.FromContext(ctx).Error(err, "creating resolver service failed", "service", svcObjectKey.Name)
 			return err
 		}
 	} else {
@@ -92,11 +93,11 @@ func (r *TypesenseClusterReconciler) ReconcileServices(ctx context.Context, ts *
 			!apiequality.Semantic.DeepEqual(svcAnnotations, annotations) ||
 			svc.Spec.Type != svcType ||
 			!externalTrafficPolicyEqual(svc.Spec.ExternalTrafficPolicy, svcExternalTrafficPolicy) {
-			r.logger.V(debugLevel).Info("updating resolver service", "service", svcObjectKey.Name)
+			log.FromContext(ctx).V(debugLevel).Info("updating resolver service", "service", svcObjectKey.Name)
 
 			err := r.updateService(ctx, svc, ts)
 			if err != nil {
-				r.logger.Error(err, "updating resolver service failed", "service", svcObjectKey.Name)
+				log.FromContext(ctx).Error(err, "updating resolver service failed", "service", svcObjectKey.Name)
 				return err
 			}
 		}
