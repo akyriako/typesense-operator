@@ -1,9 +1,14 @@
 name: Release Charts
 on:
-  push:
-    tags:
-      - "v*.*.*"
+#  push:
+#    branches:
+#      - main
+#    tags:
+#      - "v*.*.*"
   workflow_dispatch:
+    paths-ignore:
+      - '**/README.md'
+      - "**/.github/workflows/**"
 
 jobs:
   chart-release:
@@ -12,7 +17,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v6.0.2
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
@@ -21,14 +26,7 @@ jobs:
           git config user.name "$GITHUB_ACTOR"
           git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
 
-      - name: Update Chart Version
-        run: |
-          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
-            VERSION="${GITHUB_REF_NAME#v}"
-            sed -i -e "s/^version:.*/version: $VERSION/" -e "s/^appVersion:.*/appVersion: \"$VERSION\"/" charts/typesense-operator/Chart.yaml
-          fi
-
       - name: Run chart-releaser
-        uses: helm/chart-releaser-action@v1.7.0
+        uses: helm/chart-releaser-action@v1.6.0
         env:
           CR_TOKEN: "${{ secrets.GITHUB_TOKEN }}"

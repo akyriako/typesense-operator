@@ -1,9 +1,6 @@
 name: Lint
 
 on:
-  push:
-    branches:
-      - feature/gapped_operator
   workflow_dispatch:
 
 jobs:

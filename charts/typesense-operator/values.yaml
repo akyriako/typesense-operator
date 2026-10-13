@@ -18,9 +18,8 @@ controllerManager:
         - ALL
       readOnlyRootFilesystem: true
     image:
-      repository: ghcr.io/firanzo/typesense-operator
-      # Empty: defaults to the chart's appVersion, i.e. the image built by CI for the same release tag.
-      tag: ""
+      repository: quay.io/akyriako/typesense-operator
+      tag: 0.4.1
     imagePullPolicy: IfNotPresent
     resources:
       limits:
