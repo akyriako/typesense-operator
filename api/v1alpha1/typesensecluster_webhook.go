@@ -84,6 +84,10 @@ func (r *TypesenseCluster) validateScrapers() error {
 		if len(cronJobName) > 52 {
 			errs = append(errs, fmt.Sprintf("scraper name '%s' combined with cluster name '%s' exceeds the 52 character limit for CronJobs (got %d characters: %s)", scraper.Name, r.Name, len(cronJobName), cronJobName))
 		}
+		// Without either, GetScraperConfig returns an empty configuration and the scraper has nothing to crawl.
+		if scraper.GetScraperConfig() == "" {
+			errs = append(errs, fmt.Sprintf("scraper '%s' must set either host or config", scraper.Name))
+		}
 	}
 
 	if len(errs) > 0 {

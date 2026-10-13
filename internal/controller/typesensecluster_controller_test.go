@@ -375,4 +375,40 @@ var _ = Describe("TypesenseCluster Controller", func() {
 			Expect(err).NotTo(HaveOccurred())
 		})
 	})
+
+	Context("When validating scrapers in the CRD", func() {
+		// The rule is enforced by the API server itself, so it also applies when the admission webhook is disabled.
+		newClusterWithScraper := func(name string, scraper tsv1alpha1.DocSearchScraperSpec) *tsv1alpha1.TypesenseCluster {
+			scraper.Schedule = "0 0 * * *"
+			return &tsv1alpha1.TypesenseCluster{
+				ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: defaultNamespace},
+				Spec: tsv1alpha1.TypesenseClusterSpec{
+					Image:       "typesense/typesense:30.0",
+					Replicas:    1,
+					ApiPort:     8108,
+					PeeringPort: 8107,
+					Storage: &tsv1alpha1.StorageSpec{
+						StorageClassName: "default",
+						Size:             resource.MustParse("1Gi"),
+					},
+					Scrapers: []tsv1alpha1.DocSearchScraperSpec{scraper},
+				},
+			}
+		}
+
+		It("should reject a scraper without host and config", func(ctx context.Context) {
+			ts := newClusterWithScraper("scraper-invalid", tsv1alpha1.DocSearchScraperSpec{Name: "docs"})
+
+			err := k8sClient.Create(ctx, ts)
+			Expect(errors.IsInvalid(err)).To(BeTrue(), "expected an invalid error, got %v", err)
+			Expect(err.Error()).To(ContainSubstring("either host or config must be set"))
+		})
+
+		It("should accept a scraper with a host", func(ctx context.Context) {
+			ts := newClusterWithScraper("scraper-valid", tsv1alpha1.DocSearchScraperSpec{Name: "docs", Host: ptr.To("docs.example.com")})
+
+			Expect(k8sClient.Create(ctx, ts)).To(Succeed())
+			Expect(k8sClient.Delete(ctx, ts)).To(Succeed())
+		})
+	})
 })

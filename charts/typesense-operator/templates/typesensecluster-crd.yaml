@@ -3777,6 +3777,8 @@ spec:
                 description: Scrapers configures DocSearch scrapers to automatically
                   crawl websites and index their content into this Typesense cluster.
                 items:
+                  description: DocSearchScraperSpec needs either a host, from which
+                    the DocSearch configuration is generated, or an explicit config.
                   properties:
                     authConfiguration:
                       description: AuthConfiguration references a Kubernetes Secret
@@ -3825,6 +3827,10 @@ spec:
                   - name
                   - schedule
                   type: object
+                  x-kubernetes-validations:
+                  - message: either host or config must be set
+                    rule: (has(self.host) && self.host != '') || (has(self.config)
+                      && self.config != '')
                 type: array
               securityContext:
                 description: SecurityContext defines the security attributes (e.g.,
