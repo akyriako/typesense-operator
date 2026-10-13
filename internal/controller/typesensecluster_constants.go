@@ -16,8 +16,10 @@ const (
 	ClusterReverseProxy          = "%s-reverse-proxy"
 	ClusterReverseProxyService   = "%s-reverse-proxy-svc"
 
-	ClusterHttpRoute               = "%s-%s"
-	ClusterHttpRouteReferenceGrant = "%s-%s-reference-grant"
+	ClusterHttpRoute = "%s-%s"
+	// ReferenceGrants live in the Gateway's namespace, so the cluster's namespace is part of the name
+	// to avoid collisions between equally named clusters in different namespaces.
+	ClusterHttpRouteReferenceGrant = "%s-%s-%s-reference-grant"
 
 	ClusterMetricsPodMonitorAppLabel = "%s-sts"
 	ClusterMetricsPodMonitor         = "%s-podmonitor"

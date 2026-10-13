@@ -400,7 +400,11 @@ func (r *TypesenseClusterReconciler) createIngress(ctx context.Context, key clie
 	}
 
 	ingress := &networkingv1.Ingress{
-		ObjectMeta: getIngressObjectMeta(ts, &key.Name, ts.Spec.Ingress.Labels, ts.Spec.Ingress.Annotations),
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: networkingv1.SchemeGroupVersion.String(),
+			Kind:       "Ingress",
+		},
+		ObjectMeta: getIngressObjectMeta(ts, &key.Name, labels, annotations),
 		Spec: networkingv1.IngressSpec{
 			IngressClassName: ptr.To(ts.Spec.Ingress.IngressClassName),
 			TLS:              ingressTLS,
@@ -435,7 +439,8 @@ func (r *TypesenseClusterReconciler) createIngress(ctx context.Context, key clie
 		return nil, err
 	}
 
-	err = r.Create(ctx, ingress)
+	//nolint:staticcheck
+	err = r.Patch(ctx, ingress, client.Apply, client.ForceOwnership, client.FieldOwner(operatorFieldOwner))
 	if err != nil {
 		return nil, err
 	}
@@ -444,6 +449,10 @@ func (r *TypesenseClusterReconciler) createIngress(ctx context.Context, key clie
 }
 
 func (r *TypesenseClusterReconciler) updateIngress(ctx context.Context, ig networkingv1.Ingress, ts *tsv1alpha1.TypesenseCluster) (*networkingv1.Ingress, error) {
+	if err := r.migrateLegacyFieldOwnership(ctx, &ig); err != nil {
+		return nil, err
+	}
+
 	pathType := ts.Spec.Ingress.PathType
 	if pathType == nil {
 		pathType = ptr.To(networkingv1.PathTypePrefix)
@@ -513,8 +522,14 @@ func (r *TypesenseClusterReconciler) updateIngress(ctx context.Context, ig netwo
 		},
 	}
 
+	// The owner reference must be part of the applied configuration, otherwise server-side apply
+	// removes it once the operator owns it.
+	if err := ctrl.SetControllerReference(ts, desired, r.Scheme); err != nil {
+		return nil, err
+	}
+
 	//nolint:staticcheck
-	if err := r.Patch(ctx, desired, client.Apply, client.ForceOwnership, client.FieldOwner("typesense-operator")); err != nil {
+	if err := r.Patch(ctx, desired, client.Apply, client.ForceOwnership, client.FieldOwner(operatorFieldOwner)); err != nil {
 		return nil, err
 	}
 
@@ -528,8 +543,7 @@ func (r *TypesenseClusterReconciler) getIngressLabels(ig *networkingv1.Ingress, 
 		filters = append(filters, k)
 	}
 
-	filtered := filterMap(ig.Labels, filters...)
-	return filtered
+	return withoutKeys(ig.Labels, filters...)
 }
 
 func (r *TypesenseClusterReconciler) getIngressAnnotations(ig *networkingv1.Ingress, ts *tsv1alpha1.TypesenseCluster) map[string]string {

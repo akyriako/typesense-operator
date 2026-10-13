@@ -184,10 +184,14 @@ func getReferenceGrantObjectMeta(ts *tsv1alpha1.TypesenseCluster, spec tsv1alpha
 	}
 
 	return metav1.ObjectMeta{
-		Name:      fmt.Sprintf(ClusterHttpRouteReferenceGrant, ts.Name, spec.Name),
+		Name:      getReferenceGrantName(ts, spec.Name),
 		Namespace: ns, // namespace of the *target* (Gateway)
 		Labels:    getHttpRouteLabels(ts, spec),
 	}
+}
+
+func getReferenceGrantName(ts *tsv1alpha1.TypesenseCluster, routeName string) string {
+	return fmt.Sprintf(ClusterHttpRouteReferenceGrant, ts.Namespace, ts.Name, routeName)
 }
 
 func contains(values []string, value string) bool {
@@ -226,6 +230,23 @@ func filterMap(m map[string]string, filters ...string) map[string]string {
 			continue
 		}
 		filtered[key] = value
+	}
+
+	return filtered
+}
+
+// withoutKeys returns a copy of m without the given keys. Unlike filterMap, keys are matched exactly,
+// so user labels such as "app.kubernetes.io/part-of" are not dropped because they contain "app".
+func withoutKeys(m map[string]string, keys ...string) map[string]string {
+	if len(m) == 0 {
+		return m
+	}
+
+	filtered := make(map[string]string, len(m))
+	for key, value := range m {
+		if !contains(keys, key) {
+			filtered[key] = value
+		}
 	}
 
 	return filtered

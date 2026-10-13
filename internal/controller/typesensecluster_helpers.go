@@ -3,11 +3,47 @@ package controller
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	tsv1alpha1 "github.com/akyriako/typesense-operator/api/v1alpha1"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/version"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/util/csaupgrade"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
+
+const operatorFieldOwner = "typesense-operator"
+
+// migrateLegacyFieldOwnership moves the fields of obj that are owned by the operator's client-side
+// manager (objects created via Create before they were server-side applied) to operatorFieldOwner.
+// Without this, fields that were later removed from the spec stay co-owned by the legacy manager and
+// server-side apply never prunes them. obj must be the live object, including its managedFields.
+func (r *TypesenseClusterReconciler) migrateLegacyFieldOwnership(ctx context.Context, obj client.Object) error {
+	patch, err := csaupgrade.UpgradeManagedFieldsPatch(obj, sets.New(r.legacyFieldManager()), operatorFieldOwner)
+	if err != nil {
+		return err
+	}
+
+	if patch == nil {
+		return nil
+	}
+
+	return r.Patch(ctx, obj, client.RawPatch(types.JSONPatchType, patch))
+}
+
+// legacyFieldManager returns the field manager the api server records for requests without an explicit
+// field owner: the user agent up to the first "/".
+func (r *TypesenseClusterReconciler) legacyFieldManager() string {
+	userAgent := rest.DefaultKubernetesUserAgent()
+	if r.Configuration != nil && r.Configuration.UserAgent != "" {
+		userAgent = r.Configuration.UserAgent
+	}
+
+	manager, _, _ := strings.Cut(userAgent, "/")
+	return manager
+}
 
 func (r *TypesenseClusterReconciler) patchStatus(
 	ctx context.Context,

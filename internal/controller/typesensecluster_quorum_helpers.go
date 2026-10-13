@@ -227,8 +227,10 @@ func (r *TypesenseClusterReconciler) getQuorum(ctx context.Context, ts *tsv1alph
 	return &Quorum{minRequiredNodes, availableNodes, qn, cm}, nil
 }
 
+// getMinimumRequiredNodes returns the Raft majority (floor(n/2)+1). The StatefulSet can temporarily run
+// with an even number of replicas during incremental quorum recovery, where (n-1)/2+1 would be too low.
 func getMinimumRequiredNodes(availableNodes int) int {
-	return (availableNodes-1)/2 + 1
+	return availableNodes/2 + 1
 }
 
 func (r *TypesenseClusterReconciler) getHealthyWriteLagThreshold(ctx context.Context, ts *tsv1alpha1.TypesenseCluster) int {

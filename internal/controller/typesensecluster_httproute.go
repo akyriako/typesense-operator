@@ -20,6 +20,7 @@ import (
 const (
 	minimumSupportedVersionForGateway = "1.26.0"
 	gatewayApiGroup                   = "gateway.networking.k8s.io"
+	kindHTTPRoute                     = "HTTPRoute"
 )
 
 //nolint:gocyclo // ReconcileHttpRoute sequentially processes HTTP routes
@@ -45,11 +46,6 @@ func (r *TypesenseClusterReconciler) ReconcileHttpRoute(ctx context.Context, ts 
 	r.logger.V(debugLevel).Info("reconciling http routes")
 
 	err = r.deleteOrphanedHttpRoutes(ctx, ts)
-	if err != nil {
-		return err
-	}
-
-	err = r.deleteOrphanedReferenceGrants(ctx, ts)
 	if err != nil {
 		return err
 	}
@@ -101,6 +97,10 @@ func (r *TypesenseClusterReconciler) ReconcileHttpRoute(ctx context.Context, ts 
 				}
 
 				for _, rg := range referenceGrants.Items {
+					if !isReferenceGrantOwnedBy(&rg, ts) {
+						continue
+					}
+
 					grant := rg
 					err := r.deleteReferenceGrant(ctx, &grant)
 					if err != nil {
@@ -186,7 +186,9 @@ func (r *TypesenseClusterReconciler) ReconcileHttpRoute(ctx context.Context, ts 
 		}
 	}
 
-	return nil
+	// Runs after the desired grants have been ensured, so grants still carrying the legacy
+	// (namespace-less) name are only removed once their replacement exists.
+	return r.deleteOrphanedReferenceGrants(ctx, ts)
 }
 
 func (r *TypesenseClusterReconciler) createHttpRoute(ctx context.Context, key client.ObjectKey, spec tsv1alpha1.HttpRouteSpec, ts *tsv1alpha1.TypesenseCluster) (*gatewayv1.HTTPRoute, error) {
@@ -228,6 +230,10 @@ func (r *TypesenseClusterReconciler) createHttpRoute(ctx context.Context, key cl
 	}
 
 	httpRoute := &gatewayv1.HTTPRoute{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: gatewayv1.GroupVersion.String(),
+			Kind:       kindHTTPRoute,
+		},
 		ObjectMeta: getHttpRouteObjectMeta(ts, spec, &key.Name, lbls, annotations),
 		Spec: gatewayv1.HTTPRouteSpec{
 			CommonRouteSpec: gatewayv1.CommonRouteSpec{
@@ -255,7 +261,8 @@ func (r *TypesenseClusterReconciler) createHttpRoute(ctx context.Context, key cl
 		return nil, err
 	}
 
-	err = r.Create(ctx, httpRoute)
+	//nolint:staticcheck
+	err = r.Patch(ctx, httpRoute, client.Apply, client.ForceOwnership, client.FieldOwner(operatorFieldOwner))
 	if err != nil {
 		return nil, err
 	}
@@ -306,6 +313,10 @@ func (r *TypesenseClusterReconciler) deleteOrphanedHttpRoutes(ctx context.Contex
 }
 
 func (r *TypesenseClusterReconciler) updateHttpRoute(ctx context.Context, spec tsv1alpha1.HttpRouteSpec, httpRoute *gatewayv1.HTTPRoute, ts *tsv1alpha1.TypesenseCluster) (*gatewayv1.HTTPRoute, error) {
+	if err := r.migrateLegacyFieldOwnership(ctx, httpRoute); err != nil {
+		return nil, err
+	}
+
 	parentRef := r.getGatewayParentRef(spec, ts)
 
 	hostnames := make([]gatewayv1.Hostname, 0, len(spec.Hostnames))
@@ -346,7 +357,7 @@ func (r *TypesenseClusterReconciler) updateHttpRoute(ctx context.Context, spec t
 	desired := &gatewayv1.HTTPRoute{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: gatewayv1.GroupVersion.String(),
-			Kind:       "HTTPRoute",
+			Kind:       kindHTTPRoute,
 		},
 		ObjectMeta: getHttpRouteObjectMeta(ts, spec, &httpRoute.Name, lbls, annotations),
 		Spec: gatewayv1.HTTPRouteSpec{
@@ -370,8 +381,14 @@ func (r *TypesenseClusterReconciler) updateHttpRoute(ctx context.Context, spec t
 		},
 	}
 
+	// The owner reference must be part of the applied configuration, otherwise server-side apply
+	// removes it once the operator owns it.
+	if err := ctrl.SetControllerReference(ts, desired, r.Scheme); err != nil {
+		return nil, err
+	}
+
 	//nolint:staticcheck
-	if err := r.Patch(ctx, desired, client.Apply, client.ForceOwnership, client.FieldOwner("typesense-operator")); err != nil {
+	if err := r.Patch(ctx, desired, client.Apply, client.ForceOwnership, client.FieldOwner(operatorFieldOwner)); err != nil {
 		return nil, err
 	}
 
@@ -392,7 +409,7 @@ func (r *TypesenseClusterReconciler) getHttpRouteLabels(httpRoute *gatewayv1.HTT
 		filters = append(filters, k)
 	}
 
-	filtered := filterMap(httpRoute.Labels, filters...)
+	filtered := withoutKeys(httpRoute.Labels, filters...)
 
 	if len(filtered) == 0 {
 		return nil
@@ -424,7 +441,7 @@ func (r *TypesenseClusterReconciler) createReferenceGrant(ctx context.Context, s
 			From: []gatewayv1beta1.ReferenceGrantFrom{
 				{
 					Group:     gatewayv1beta1.GroupName,
-					Kind:      gatewayv1beta1.Kind("HTTPRoute"),
+					Kind:      gatewayv1beta1.Kind(kindHTTPRoute),
 					Namespace: gatewayv1beta1.Namespace(ts.Namespace),
 				},
 			},
@@ -456,6 +473,19 @@ func (r *TypesenseClusterReconciler) deleteReferenceGrant(ctx context.Context, r
 	return client.IgnoreNotFound(err)
 }
 
+// isReferenceGrantOwnedBy reports whether rg was created for ts. ReferenceGrants are listed across
+// namespaces by their "app" label, which is identical for equally named clusters in different
+// namespaces, so the grant's HTTPRoute source namespace is what tells them apart.
+func isReferenceGrantOwnedBy(rg *gatewayv1beta1.ReferenceGrant, ts *tsv1alpha1.TypesenseCluster) bool {
+	for _, from := range rg.Spec.From {
+		if from.Kind == kindHTTPRoute && string(from.Namespace) == ts.Namespace {
+			return true
+		}
+	}
+
+	return false
+}
+
 func (r *TypesenseClusterReconciler) deleteOrphanedReferenceGrants(ctx context.Context, ts *tsv1alpha1.TypesenseCluster) error {
 	if deployed, err := r.IsApiGroupDeployed(gatewayApiGroup); err != nil || !deployed {
 		return nil
@@ -478,16 +508,22 @@ func (r *TypesenseClusterReconciler) deleteOrphanedReferenceGrants(ctx context.C
 	if !ts.DeletionTimestamp.IsZero() {
 		for i := range referenceGrants.Items {
 			grant := &referenceGrants.Items[i]
+			if !isReferenceGrantOwnedBy(grant, ts) {
+				continue
+			}
 			_ = r.deleteReferenceGrant(ctx, grant)
 		}
 		return nil
 	}
 
 	for _, rg := range referenceGrants.Items {
+		if !isReferenceGrantOwnedBy(&rg, ts) {
+			continue
+		}
+
 		exists := false
 		for _, droute := range ts.Spec.HttpRoutes {
-			expectedName := fmt.Sprintf(ClusterHttpRouteReferenceGrant, ts.Name, droute.Name)
-			if rg.Name == expectedName {
+			if rg.Name == getReferenceGrantName(ts, droute.Name) {
 				exists = true
 				break
 			}
@@ -512,7 +548,7 @@ func (r *TypesenseClusterReconciler) updateReferenceGrant(ctx context.Context, s
 	cre := false
 	del := false
 
-	name := fmt.Sprintf(ClusterHttpRouteReferenceGrant, ts.Name, spec.Name)
+	name := getReferenceGrantName(ts, spec.Name)
 	namespace := ts.Namespace
 	if spec.ParentRef.Namespace != nil {
 		namespace = string(*spec.ParentRef.Namespace)
