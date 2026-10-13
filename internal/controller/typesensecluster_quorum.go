@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	tsv1alpha1 "github.com/akyriako/typesense-operator/api/v1alpha1"
 	v1 "k8s.io/api/core/v1"
@@ -166,9 +167,13 @@ func (r *TypesenseClusterReconciler) ReconcileQuorum(ctx context.Context, ts *ts
 		if availableNodes == 1 {
 			podName := fmt.Sprintf("%s-%d", fmt.Sprintf(ClusterStatefulSet, ts.Name), 0)
 			nodeStatus := nodesStatus[podName]
-			state := nodeStatus.State
 
-			if state == ErrorState || state == UnreachableState {
+			pod := &v1.Pod{}
+			if err := r.Get(ctx, client.ObjectKey{Namespace: ts.Namespace, Name: podName}, pod); err != nil {
+				return ConditionReasonQuorumNotReady, 0, client.IgnoreNotFound(err)
+			}
+
+			if shouldPurgeSingleNode(pod, nodeStatus.State, time.Now()) {
 				r.logger.Info("purging quorum")
 				err := r.PurgeStatefulSetPods(ctx, sts, ts)
 				if err != nil {
@@ -211,6 +216,26 @@ func (r *TypesenseClusterReconciler) ReconcileQuorum(ctx context.Context, ts *ts
 	}
 
 	return ConditionReasonQuorumReady, 0, nil
+}
+
+// shouldPurgeSingleNode decides whether the only node of a cluster is stuck. A node in ERROR state is
+// purged right away. An unreachable node is only purged once its Typesense container has been running
+// for the startup grace period: a pod already has its IP while the image is still being pulled or the
+// server is still starting, and purging it then would restart that pod over and over.
+func shouldPurgeSingleNode(pod *v1.Pod, state NodeState, now time.Time) bool {
+	switch state {
+	case ErrorState:
+		return true
+	case UnreachableState:
+		for _, cs := range pod.Status.ContainerStatuses {
+			if cs.Name == containerTypesense && cs.State.Running != nil {
+				return now.Sub(cs.State.Running.StartedAt.Time) >= singleNodeStartupGracePeriod
+			}
+		}
+		return false
+	default:
+		return false
+	}
 }
 
 var (

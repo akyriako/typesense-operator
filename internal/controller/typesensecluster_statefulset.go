@@ -19,14 +19,16 @@ import (
 )
 
 const (
-	metricsPort                        = 9100
-	startupProbeFailureThreshold int32 = 30
-	startupProbePeriodSeconds    int32 = 10
-	hashAnnotationKey                  = "ts.opentelekomcloud.com/pod-template-hash"
-	readLagAnnotationKey               = "ts.opentelekomcloud.com/read-lag-threshold"
-	writeLagAnnotationKey              = "ts.opentelekomcloud.com/write-lag-threshold"
-	restartPodsAnnotationKey           = "kubectl.kubernetes.io/restartedAt"
-	rancherDomainAnnotationKey         = "cattle.io"
+	metricsPort                = 9100
+	hashAnnotationKey          = "ts.opentelekomcloud.com/pod-template-hash"
+	readLagAnnotationKey       = "ts.opentelekomcloud.com/read-lag-threshold"
+	writeLagAnnotationKey      = "ts.opentelekomcloud.com/write-lag-threshold"
+	restartPodsAnnotationKey   = "kubectl.kubernetes.io/restartedAt"
+	rancherDomainAnnotationKey = "cattle.io"
+
+	// singleNodeStartupGracePeriod is how long the Typesense container of a single node cluster may run
+	// without answering before the node is considered stuck and its pod is purged.
+	singleNodeStartupGracePeriod = 5 * time.Minute
 )
 
 func (r *TypesenseClusterReconciler) ReconcileStatefulSet(ctx context.Context, ts *tsv1alpha1.TypesenseCluster) (*appsv1.StatefulSet, bool, error) {
