@@ -52,12 +52,15 @@ import (
 	discoveryv1 "k8s.io/api/discovery/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	crcontroller "sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/metrics/filters"
@@ -70,6 +73,12 @@ import (
 var (
 	scheme   = runtime.NewScheme()
 	setupLog = ctrl.Log.WithName("setup")
+)
+
+const (
+	serviceAccountNamespaceFile = "/var/run/secrets/kubernetes.io/serviceaccount/namespace"
+	webhookSecretName           = "typesense-operator-webhook-cert"
+	defaultWebhookServiceName   = "typesense-operator-webhook-service"
 )
 
 func init() {
@@ -263,11 +272,7 @@ func main() {
 	}
 
 	if watchNamespace != "" {
-		options.Cache = cache.Options{
-			DefaultNamespaces: map[string]cache.Config{
-				watchNamespace: {},
-			},
-		}
+		options.Cache = getNamespacedCacheOptions(watchNamespace, enableWebhook)
 	}
 
 	mgr, err := ctrl.NewManager(kubeConfig, options)
@@ -323,15 +328,6 @@ func main() {
 	}
 
 	if enableWebhook && isInCluster() {
-		nsBytes, _ := os.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace")
-		operatorNamespace := strings.TrimSpace(string(nsBytes))
-
-		svcName := os.Getenv("WEBHOOK_SERVICE_NAME")
-		if svcName == "" {
-			svcName = "typesense-operator-webhook-service"
-		}
-		secretName := "typesense-operator-webhook-cert"
-
 		setupLog.Info("Adding webhook secret reconciler to manager")
 		if err := (&WebhookSecretReconciler{
 			Client:      mgr.GetClient(),
@@ -339,9 +335,9 @@ func main() {
 			CertDir:     webhookCertPath,
 			CertName:    webhookCertName,
 			KeyName:     webhookCertKey,
-			Namespace:   operatorNamespace,
-			SecretName:  secretName,
-			ServiceName: svcName,
+			Namespace:   getOperatorNamespace(),
+			SecretName:  webhookSecretName,
+			ServiceName: getWebhookServiceName(),
 		}).SetupWithManager(mgr); err != nil {
 			setupLog.Error(err, "Unable to add webhook secret reconciler to manager")
 			os.Exit(1)
@@ -459,6 +455,22 @@ func (r *WebhookSecretReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		return ctrl.Result{}, err
 	}
 
+	// Another replica may have rotated the certificate; every replica serves the webhook, so each one
+	// has to pick up the current certificate from the secret.
+	keyData, ok := secret.Data["tls.key"]
+	if !ok {
+		setupLog.Info("Webhook secret missing tls.key, regenerating...")
+		err := setupWebhookCertificates(
+			ctx, r.ClientSet, r.CertDir, r.CertName, r.KeyName,
+			r.Namespace, r.ServiceName, r.SecretName,
+		)
+		return ctrl.Result{}, err
+	}
+
+	if err := syncCertificatesToDisk(r.CertDir, r.CertName, r.KeyName, certData, keyData); err != nil {
+		return ctrl.Result{}, err
+	}
+
 	requeueAfter := timeRemaining - (30 * 24 * time.Hour)
 	caRequeueAfter := caTimeRemaining - (6 * 30 * 24 * time.Hour)
 	if caRequeueAfter < requeueAfter {
@@ -472,7 +484,12 @@ func (r *WebhookSecretReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 
 func (r *WebhookSecretReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
+		Named("webhook-certificate").
 		For(&corev1.Secret{}).
+		// Every replica serves webhook requests, so non-leaders must keep their on-disk certificate in sync
+		// with the secret as well. Concurrent rotations are resolved by the optimistic locking in
+		// ensureCertificatesInSecret.
+		WithOptions(crcontroller.Options{NeedLeaderElection: ptr.To(false)}).
 		WithEventFilter(predicate.NewPredicateFuncs(func(object client.Object) bool {
 			return object.GetName() == r.SecretName && object.GetNamespace() == r.Namespace
 		})).
@@ -496,19 +513,10 @@ func initWebhookCertificates(
 
 	// Generate and patch self-signed certificates dynamically
 	if isInCluster() {
-		nsBytes, _ := os.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace")
-		namespace := strings.TrimSpace(string(nsBytes))
-
-		svcName := os.Getenv("WEBHOOK_SERVICE_NAME")
-		if svcName == "" {
-			svcName = "typesense-operator-webhook-service"
-		}
-		secretName := "typesense-operator-webhook-cert"
-
 		setupLog.Info("Generating self-signed webhook certificates")
 		if err := setupWebhookCertificates(
 			ctx, clientSet, certPath, certName, certKey,
-			namespace, svcName, secretName,
+			getOperatorNamespace(), getWebhookServiceName(), webhookSecretName,
 		); err != nil {
 			setupLog.Error(err, "failed to setup webhook certificates")
 			os.Exit(1)
@@ -555,14 +563,60 @@ func isInCluster() bool {
 	return inCluster
 }
 
+// getOperatorNamespace returns the namespace the operator pod runs in, or "" when running out of cluster.
+func getOperatorNamespace() string {
+	content, err := os.ReadFile(serviceAccountNamespaceFile)
+	if err != nil {
+		return ""
+	}
+
+	return strings.TrimSpace(string(content))
+}
+
+func getNamespacedCacheOptions(watchNamespace string, enableWebhook bool) cache.Options {
+	options := cache.Options{
+		DefaultNamespaces: map[string]cache.Config{
+			watchNamespace: {},
+		},
+	}
+
+	// The webhook certificate secret lives in the operator's own namespace. When that namespace is not
+	// the watched one (gapped mode), the webhook secret reconciler would never see it, so the cache also
+	// watches that single secret there.
+	operatorNamespace := getOperatorNamespace()
+	if !enableWebhook || operatorNamespace == "" || operatorNamespace == watchNamespace {
+		return options
+	}
+
+	options.ByObject = map[client.Object]cache.ByObject{
+		&corev1.Secret{}: {
+			Namespaces: map[string]cache.Config{
+				watchNamespace: {},
+				operatorNamespace: {
+					FieldSelector: fields.OneTermEqualSelector("metadata.name", webhookSecretName),
+				},
+			},
+		},
+	}
+
+	return options
+}
+
+func getWebhookServiceName() string {
+	if svcName := os.Getenv("WEBHOOK_SERVICE_NAME"); svcName != "" {
+		return svcName
+	}
+
+	return defaultWebhookServiceName
+}
+
 func getWatchNamespace(flagValue string, useCurrent bool) string {
 	if !useCurrent {
 		useCurrent = strings.EqualFold(strings.TrimSpace(os.Getenv("WATCH_CURRENT_NAMESPACE")), "true")
 	}
 
 	if useCurrent {
-		namespaceFile := "/var/run/secrets/kubernetes.io/serviceaccount/namespace"
-		content, err := os.ReadFile(namespaceFile)
+		content, err := os.ReadFile(serviceAccountNamespaceFile)
 		if err != nil {
 			setupLog.Error(err, "unable to read current namespace from service account")
 			os.Exit(1)
@@ -720,6 +774,18 @@ func writeCertificatesToDisk(certDir, certName, keyName string, certPEM, keyPEM 
 	}
 
 	return nil
+}
+
+// syncCertificatesToDisk writes the certificate and key only when they differ from what is already on disk.
+func syncCertificatesToDisk(certDir, certName, keyName string, certPEM, keyPEM []byte) error {
+	currentCert, certErr := os.ReadFile(filepath.Join(certDir, certName))
+	currentKey, keyErr := os.ReadFile(filepath.Join(certDir, keyName))
+	if certErr == nil && keyErr == nil && bytes.Equal(currentCert, certPEM) && bytes.Equal(currentKey, keyPEM) {
+		return nil
+	}
+
+	setupLog.Info("Webhook certificate on disk differs from secret, updating")
+	return writeCertificatesToDisk(certDir, certName, keyName, certPEM, keyPEM)
 }
 
 func patchWebhookConfiguration(

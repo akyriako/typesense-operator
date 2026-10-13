@@ -424,6 +424,53 @@ subjects:
 - kind: ServiceAccount
   name: {{ include "typesense-operator.serviceAccountName" . }}
   namespace: {{ .Release.Namespace }}
+{{- if ne $$targetNamespace .Release.Namespace }}
+---
+# The webhook certificate secret is kept in the operator's own namespace, which is not covered by the
+# manager role when a different namespace is watched.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "typesense-operator.fullname" . }}-webhook-secret-role
+  namespace: {{ .Release.Namespace }}
+  labels:
+  {{- include "typesense-operator.labels" . | nindent 4 }}
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - secrets
+  verbs:
+  - create
+- apiGroups:
+  - ""
+  resources:
+  - secrets
+  resourceNames:
+  - typesense-operator-webhook-cert
+  verbs:
+  - get
+  - list
+  - patch
+  - update
+  - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "typesense-operator.fullname" . }}-webhook-secret-rolebinding
+  namespace: {{ .Release.Namespace }}
+  labels:
+  {{- include "typesense-operator.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "typesense-operator.fullname" . }}-webhook-secret-role
+subjects:
+- kind: ServiceAccount
+  name: {{ include "typesense-operator.serviceAccountName" . }}
+  namespace: {{ .Release.Namespace }}
+{{- end }}
 {{- end }}
 endef
 export WEBHOOK_ROLE_TEMPLATE
