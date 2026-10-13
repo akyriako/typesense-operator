@@ -45,6 +45,10 @@ jobs:
             type=ref,event=tag
             type=semver,pattern={{version}}
 
+      - name: Determine short commit
+        id: commit
+        run: echo "short_sha=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+
       - name: Build and push Docker image
         uses: docker/build-push-action@v7.1.0
         with:
@@ -53,5 +57,10 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          # Same version information as `make docker-build`, logged by the operator on start
+          build-args: |
+            BIN_VERSION=${{ steps.meta.outputs.version }}
+            BIN_GIT_COMMIT=${{ steps.commit.outputs.short_sha }}
+            BIN_BUILD_DATE=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.created'] }}
           cache-from: type=gha
           cache-to: type=gha,mode=max

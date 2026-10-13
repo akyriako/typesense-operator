@@ -43,7 +43,7 @@ const (
 	typesenseImage      = "typesense/typesense:30.2"
 	typesenseImageOld   = "typesense/typesense:27.1"
 	exporterImage       = "quay.io/akyriako/typesense-prometheus-exporter:0.1.9"
-	healthcheckImage    = "quay.io/akyriako/typesense-healthcheck:0.1.8"
+	healthcheckImage    = "quay.io/akyriako/typesense-healthcheck:0.2.0"
 	nginxImage          = "nginx:alpine"
 	scraperImage        = "typesense/docsearch-scraper:0.3.0"
 	podPhaseRunning     = "Running"
