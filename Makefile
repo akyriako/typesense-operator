@@ -264,6 +264,7 @@ KUSTOMIZE_VERSION ?= v5.8.1
 CONTROLLER_TOOLS_VERSION ?= v0.21.0
 ENVTEST_VERSION := $(shell go list -m -f "{{ .Version }}" sigs.k8s.io/controller-runtime | awk -F'[v.]' '{printf "release-%d.%d", $$2, $$3}')
 GOLANGCI_LINT_VERSION ?= v2.12.2
+HELMIFY_VERSION ?= v0.4.20
 
 .PHONY: kustomize
 kustomize: $(KUSTOMIZE) ## Download kustomize locally if necessary.
@@ -387,7 +388,7 @@ HELMIFY ?= $(LOCALBIN)/helmify
 .PHONY: helmify
 helmify: $(HELMIFY) ## Download helmify locally if necessary.
 $(HELMIFY): $(LOCALBIN)
-	test -s $(LOCALBIN)/helmify || GOBIN=$(LOCALBIN) go install github.com/arttor/helmify/cmd/helmify@latest
+	$(call go-install-tool,$(HELMIFY),github.com/arttor/helmify/cmd/helmify,$(HELMIFY_VERSION))
 
 define WEBHOOK_ROLE_TEMPLATE
 {{- if and $$isNamespaced .Values.controllerManager.enableWebhooksInGappedMode }}
