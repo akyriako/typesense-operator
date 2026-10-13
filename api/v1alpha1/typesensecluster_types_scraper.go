@@ -8,7 +8,7 @@ import (
 )
 
 // DocSearchScraperSpec needs either a host, from which the DocSearch configuration is generated, or an explicit config.
-// +kubebuilder:validation:XValidation:rule="(has(self.host) && self.host != '') || (has(self.config) && self.config != '')",message="either host or config must be set"
+// +kubebuilder:validation:XValidation:rule="(has(self.host) && size(self.host) > 0) || (has(self.config) && size(self.config) > 0)",message="either host or config must be set"
 type DocSearchScraperSpec struct {
 	// Name specifies the name of the scraper. This will be used to name the corresponding Kubernetes CronJob.
 	Name string `json:"name"`

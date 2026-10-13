@@ -8,16 +8,18 @@ import (
 	"k8s.io/utils/ptr"
 )
 
+const scraperName = "docs"
+
 func TestValidateScrapersRequiresHostOrConfig(t *testing.T) {
 	cases := []struct {
 		name    string
 		scraper DocSearchScraperSpec
 		wantErr bool
 	}{
-		{"host only", DocSearchScraperSpec{Name: "docs", Host: ptr.To("docs.example.com")}, false},
-		{"config only", DocSearchScraperSpec{Name: "docs", Config: ptr.To(`{"index_name":"docs"}`)}, false},
-		{"neither", DocSearchScraperSpec{Name: "docs"}, true},
-		{"empty config", DocSearchScraperSpec{Name: "docs", Config: ptr.To("")}, true},
+		{"host only", DocSearchScraperSpec{Name: scraperName, Host: ptr.To("docs.example.com")}, false},
+		{"config only", DocSearchScraperSpec{Name: scraperName, Config: ptr.To(`{"index_name":"docs"}`)}, false},
+		{"neither", DocSearchScraperSpec{Name: scraperName}, true},
+		{"empty config", DocSearchScraperSpec{Name: scraperName, Config: ptr.To("")}, true},
 	}
 
 	for _, tc := range cases {

@@ -3829,8 +3829,8 @@ spec:
                   type: object
                   x-kubernetes-validations:
                   - message: either host or config must be set
-                    rule: (has(self.host) && self.host != '') || (has(self.config)
-                      && self.config != '')
+                    rule: (has(self.host) && size(self.host) > 0) || (has(self.config)
+                      && size(self.config) > 0)
                 type: array
               securityContext:
                 description: SecurityContext defines the security attributes (e.g.,

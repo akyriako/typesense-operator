@@ -43,7 +43,11 @@ import (
 )
 
 var _ = Describe("TypesenseCluster Controller", func() {
-	const defaultNamespace = "default"
+	const (
+		defaultNamespace   = "default"
+		testTypesenseImage = "typesense/typesense:30.0"
+		testStorageClass   = "default"
+	)
 
 	// Helper function moved to the top level so that ALL Context blocks can use it
 	newControllerReconciler := func() *TypesenseClusterReconciler {
@@ -93,12 +97,12 @@ var _ = Describe("TypesenseCluster Controller", func() {
 						Namespace: defaultNamespace,
 					},
 					Spec: tsv1alpha1.TypesenseClusterSpec{
-						Image:       "typesense/typesense:30.0",
+						Image:       testTypesenseImage,
 						Replicas:    1,
 						ApiPort:     8108,
 						PeeringPort: 8107,
 						Storage: &tsv1alpha1.StorageSpec{
-							StorageClassName: "default",
+							StorageClassName: testStorageClass,
 							Size:             resource.MustParse("1Gi"),
 						},
 					},
@@ -322,12 +326,12 @@ var _ = Describe("TypesenseCluster Controller", func() {
 						Namespace: customNamespace,
 					},
 					Spec: tsv1alpha1.TypesenseClusterSpec{
-						Image:       "typesense/typesense:30.0",
+						Image:       testTypesenseImage,
 						Replicas:    1,
 						ApiPort:     8108,
 						PeeringPort: 8107,
 						Storage: &tsv1alpha1.StorageSpec{
-							StorageClassName: "default",
+							StorageClassName: testStorageClass,
 							Size:             resource.MustParse("1Gi"),
 						},
 					},
@@ -383,12 +387,12 @@ var _ = Describe("TypesenseCluster Controller", func() {
 			return &tsv1alpha1.TypesenseCluster{
 				ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: defaultNamespace},
 				Spec: tsv1alpha1.TypesenseClusterSpec{
-					Image:       "typesense/typesense:30.0",
+					Image:       testTypesenseImage,
 					Replicas:    1,
 					ApiPort:     8108,
 					PeeringPort: 8107,
 					Storage: &tsv1alpha1.StorageSpec{
-						StorageClassName: "default",
+						StorageClassName: testStorageClass,
 						Size:             resource.MustParse("1Gi"),
 					},
 					Scrapers: []tsv1alpha1.DocSearchScraperSpec{scraper},
