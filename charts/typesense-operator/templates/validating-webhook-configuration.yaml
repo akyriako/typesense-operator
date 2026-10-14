@@ -4,8 +4,6 @@ apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingWebhookConfiguration
 metadata:
   name: {{ include "typesense-operator.fullname" . }}-validating-webhook-configuration
-  annotations:
-    cert-manager.io/inject-ca-from: {{ .Release.Namespace }}/{{ include "typesense-operator.fullname" . }}-
   labels:
   {{- include "typesense-operator.labels" . | nindent 4 }}
 webhooks:
@@ -16,7 +14,7 @@ webhooks:
       name: '{{ include "typesense-operator.fullname" . }}-webhook-service'
       namespace: '{{ .Release.Namespace }}'
       path: /validate-ts-opentelekomcloud-com-v1alpha1-typesensecluster
-  failurePolicy: Fail
+  failurePolicy: Ignore
   name: vtypesensecluster.kb.io
   rules:
   - apiGroups:

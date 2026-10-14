@@ -498,7 +498,8 @@ helm: manifests kustomize helmify
 	@echo "1. Generate Helm chart templates"
 	$(KUSTOMIZE) build config/default | $(HELMIFY) charts/typesense-operator
 	@echo "2. Update CRDs"
-	@awk '1; /name: typesenseclusters.ts.opentelekomcloud.com/ { print "  labels:\n  {{- include \"typesense-operator.labels\" . | nindent 4 }}" }' config/crd/bases/ts.opentelekomcloud.com_typesenseclusters.yaml > charts/typesense-operator/templates/typesensecluster-crd.yaml.tmp && mv charts/typesense-operator/templates/typesensecluster-crd.yaml.tmp charts/typesense-operator/templates/typesensecluster-crd.yaml
+	@# helm.sh/resource-policy: keep stops helm uninstall from deleting the CRD, which would delete every TypesenseCluster
+	@awk '1; /controller-gen.kubebuilder.io\/version:/ { print "    helm.sh/resource-policy: keep" } /name: typesenseclusters.ts.opentelekomcloud.com/ { print "  labels:\n  {{- include \"typesense-operator.labels\" . | nindent 4 }}" }' config/crd/bases/ts.opentelekomcloud.com_typesenseclusters.yaml > charts/typesense-operator/templates/typesensecluster-crd.yaml.tmp && mv charts/typesense-operator/templates/typesensecluster-crd.yaml.tmp charts/typesense-operator/templates/typesensecluster-crd.yaml
 	@echo "3. Inject dynamic Role/ClusterRole templating"
 	@for file in charts/typesense-operator/templates/manager-rbac.yaml charts/typesense-operator/templates/typesensecluster-viewer-*.yaml charts/typesense-operator/templates/typesensecluster-editor-*.yaml; do \
 		if [ -f "$$file" ]; then \
@@ -522,6 +523,10 @@ helm: manifests kustomize helmify
 			"$$file" > "$$file.tmp" && mv "$$file.tmp" "$$file"; \
 		fi; \
 	done
+	@# helmify adds a cert-manager CA injection annotation without a certificate name; the operator manages the webhook certificate itself
+	@awk '/^  annotations:$$/ { hold=$$0; next } hold != "" { if ($$0 ~ /cert-manager.io\/inject-ca-from/) { hold=""; next } print hold; hold="" } 1' \
+		charts/typesense-operator/templates/validating-webhook-configuration.yaml > charts/typesense-operator/templates/validating-webhook-configuration.yaml.tmp && \
+		mv charts/typesense-operator/templates/validating-webhook-configuration.yaml.tmp charts/typesense-operator/templates/validating-webhook-configuration.yaml
 	@echo "4. Update Chart versions & Deployment variables"
 	@sed -e 's|^appVersion:.*|appVersion: "$(IMG_TAG)"|' -e 's|^version:.*|version: $(IMG_TAG)|' ./charts/typesense-operator/Chart.yaml > ./charts/typesense-operator/Chart.yaml.tmp && mv ./charts/typesense-operator/Chart.yaml.tmp ./charts/typesense-operator/Chart.yaml
 	@sed -E 's/(- Latest version: \*\*)[^*]+(\*\*)/\1$(IMG_TAG)\2/' ./README.md > ./README.md.tmp && mv ./README.md.tmp ./README.md

@@ -11,7 +11,7 @@ webhooks:
       name: webhook-service
       namespace: system
       path: /validate-ts-opentelekomcloud-com-v1alpha1-typesensecluster
-  failurePolicy: Fail
+  failurePolicy: Ignore
   name: vtypesensecluster.kb.io
   rules:
   - apiGroups:
