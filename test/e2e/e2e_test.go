@@ -1641,9 +1641,23 @@ spec:
 			Expect(err).NotTo(HaveOccurred())
 			defer func() { _ = os.Remove(manifestPath) }()
 
-			cmd = exec.Command("kubectl", "apply", "-f", manifestPath)
-			_, err = utils.Run(cmd)
-			Expect(err).To(HaveOccurred())
+			// The webhook uses failurePolicy Ignore, so a request that cannot reach it yet (e.g. while the
+			// service routing catches up with the new pod) is admitted. Retry until the webhook itself rejects
+			// the resource, and remove a resource that slipped through before retrying.
+			verifyRejected := func() error {
+				cmd := exec.Command("kubectl", "apply", "-f", manifestPath)
+				output, err := utils.Run(cmd)
+				if err == nil {
+					cmd = exec.Command("kubectl", "delete", "-f", manifestPath, "--ignore-not-found", "--wait=false")
+					_, _ = utils.Run(cmd)
+					return fmt.Errorf("resource was admitted, webhook not reachable yet")
+				}
+				if !strings.Contains(string(output), "only allowed in namespace") {
+					return fmt.Errorf("unexpected error, expected a rejection by the webhook: %s", string(output))
+				}
+				return nil
+			}
+			EventuallyWithOffset(1, verifyRejected, 2*time.Minute, 5*time.Second).Should(Succeed())
 		})
 	})
 })

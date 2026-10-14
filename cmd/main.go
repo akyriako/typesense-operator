@@ -350,14 +350,7 @@ func main() {
 		}
 	}
 
-	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
-		setupLog.Error(err, "unable to set up health check")
-		os.Exit(1)
-	}
-	if err := mgr.AddReadyzCheck("readyz", healthz.Ping); err != nil {
-		setupLog.Error(err, "unable to set up ready check")
-		os.Exit(1)
-	}
+	addHealthChecks(mgr, webhookServer)
 
 	v := version.GetBuildInfo()
 	setupLog.Info("starting manager",
@@ -570,6 +563,27 @@ func isInCluster() bool {
 	}
 
 	return inCluster
+}
+
+// addHealthChecks registers the liveness and readiness checks. webhookServer is nil when webhooks are disabled.
+func addHealthChecks(mgr ctrl.Manager, webhookServer webhook.Server) {
+	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
+		setupLog.Error(err, "unable to set up health check")
+		os.Exit(1)
+	}
+	if err := mgr.AddReadyzCheck("readyz", healthz.Ping); err != nil {
+		setupLog.Error(err, "unable to set up ready check")
+		os.Exit(1)
+	}
+
+	// Only receive webhook traffic once the webhook server serves; with failurePolicy Ignore, requests that
+	// reach a pod that is not listening yet would otherwise be admitted without validation.
+	if webhookServer != nil {
+		if err := mgr.AddReadyzCheck("webhook", webhookServer.StartedChecker()); err != nil {
+			setupLog.Error(err, "unable to set up webhook ready check")
+			os.Exit(1)
+		}
+	}
 }
 
 // getOperatorNamespace returns the namespace the operator pod runs in, or "" when running out of cluster.
