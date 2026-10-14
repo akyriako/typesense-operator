@@ -302,6 +302,7 @@ func main() {
 		InCluster:               isInCluster(),
 		HttpClient:              mgr.GetHTTPClient(),
 		MaxConcurrentReconciles: maxConcurrentReconciles,
+		WatchNamespace:          watchNamespace,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "TypesenseCluster")
 		os.Exit(1)

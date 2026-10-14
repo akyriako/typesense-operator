@@ -75,12 +75,9 @@ func (r *TypesenseClusterReconciler) ReconcileHttpRoute(ctx context.Context, ts 
 				return err
 			}
 
-			if ptr.Deref(hrt.ReferenceGrant, false) {
-				err := r.createReferenceGrant(ctx, hrt, ts)
-				if err != nil {
-					log.FromContext(ctx).Error(err, "creating reference grant failed", "http_route", httpRouteName)
-					return err
-				}
+			if err := r.updateReferenceGrant(ctx, hrt, ts); err != nil {
+				log.FromContext(ctx).Error(err, "creating reference grant failed", "http_route", httpRouteName)
+				return err
 			}
 		} else {
 			if !hrt.Enabled {
@@ -553,6 +550,17 @@ func (r *TypesenseClusterReconciler) updateReferenceGrant(ctx context.Context, s
 		namespace = string(*spec.ParentRef.Namespace)
 	}
 	objectKey := client.ObjectKey{Namespace: namespace, Name: name}
+
+	// In gapped mode a Gateway in another namespace is out of reach: the grant can be neither read nor
+	// written there. Skip it instead of failing the whole reconcile, and point out the manual step.
+	if !r.canManageNamespace(namespace) {
+		if ptr.Deref(spec.ReferenceGrant, false) {
+			r.Recorder.Eventf(ts, "Warning", "ReferenceGrantNotManaged",
+				"ReferenceGrant %s for http route %s must be created manually in namespace %s: the operator only manages namespace %s",
+				name, spec.Name, namespace, r.WatchNamespace)
+		}
+		return nil
+	}
 
 	var referenceGrant gatewayv1beta1.ReferenceGrant
 	err := r.Get(ctx, objectKey, &referenceGrant)

@@ -17,6 +17,12 @@ import (
 
 const operatorFieldOwner = "typesense-operator"
 
+// canManageNamespace reports whether the operator can read and write objects in namespace. In gapped mode
+// both its cache and its RBAC are limited to the watched namespace.
+func (r *TypesenseClusterReconciler) canManageNamespace(namespace string) bool {
+	return r.WatchNamespace == "" || namespace == r.WatchNamespace
+}
+
 // migrateLegacyFieldOwnership moves the fields of obj that are owned by the operator's client-side
 // manager (objects created via Create before they were server-side applied) to operatorFieldOwner.
 // Without this, fields that were later removed from the spec stay co-owned by the legacy manager and

@@ -66,6 +66,9 @@ type TypesenseClusterReconciler struct {
 	// MaxConcurrentReconciles is the number of clusters reconciled in parallel; defaults to 1.
 	MaxConcurrentReconciles int
 
+	// WatchNamespace restricts the operator to a single namespace (gapped mode); empty means cluster-wide.
+	WatchNamespace string
+
 	serverVersionMu sync.Mutex
 	serverVersion   string
 }
