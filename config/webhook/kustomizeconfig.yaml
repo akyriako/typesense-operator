@@ -1,0 +1,21 @@
+# the following config is for teaching kustomize how to do var substitution
+nameReference:
+- kind: Service
+  version: v1
+  fieldSpecs:
+  - kind: MutatingWebhookConfiguration
+    group: admissionregistration.k8s.io
+    path: webhooks/clientConfig/service/name
+  - kind: ValidatingWebhookConfiguration
+    group: admissionregistration.k8s.io
+    path: webhooks/clientConfig/service/name
+
+namespace:
+- kind: MutatingWebhookConfiguration
+  group: admissionregistration.k8s.io
+  path: webhooks/clientConfig/service/namespace
+  create: true
+- kind: ValidatingWebhookConfiguration
+  group: admissionregistration.k8s.io
+  path: webhooks/clientConfig/service/namespace
+  create: true

@@ -6,6 +6,7 @@ import (
 	tsv1alpha1 "github.com/akyriako/typesense-operator/api/v1alpha1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 type ConditionQuorum string
@@ -15,6 +16,7 @@ const (
 	ConditionTypeReady = "Ready"
 
 	ConditionReasonReconciliationInProgress                              = "ReconciliationInProgress"
+	ConditionReasonInvalidClusterName                                    = "InvalidClusterName"
 	ConditionReasonSecretNotReady                                        = "SecretNotReady"
 	ConditionReasonConfigMapNotReady                                     = "ConfigMapNotReady"
 	ConditionReasonServicesNotReady                                      = "ServicesNotReady"
@@ -22,6 +24,9 @@ const (
 	ConditionReasonHttpRouteNotReady                                     = "HttpRouteNotReady"
 	ConditionReasonScrapersNotReady                                      = "ScrapersNotReady"
 	ConditionReasonMetricsExporterNotReady                               = "MetricsExporterNotReady"
+	ConditionReasonPodDisruptionBudgetNotReady                           = "PodDisruptionBudgetNotReady"
+	ConditionReasonUpgrading                             ConditionQuorum = "Upgrading"
+	ConditionReasonDegraded                              ConditionQuorum = "Degraded"
 	ConditionReasonQuorumStateUnknown                    ConditionQuorum = "QuorumStateUnknown"
 	ConditionReasonQuorumReady                           ConditionQuorum = "QuorumReady"
 	ConditionReasonQuorumNotReady                        ConditionQuorum = "QuorumNotReady"
@@ -44,7 +49,7 @@ func (r *TypesenseClusterReconciler) initConditions(ctx context.Context, ts *tsv
 			meta.SetStatusCondition(&ts.Status.Conditions, metav1.Condition{Type: ConditionTypeReady, Status: metav1.ConditionUnknown, Reason: ConditionReasonReconciliationInProgress, Message: InitReconciliationMessage})
 			status.Phase = "Bootstrapping"
 		}); err != nil {
-			r.logger.Error(err, UpdateStatusMessageFailed)
+			log.FromContext(ctx).Error(err, UpdateStatusMessageFailed)
 			return err
 		}
 	}
@@ -72,10 +77,23 @@ func (r *TypesenseClusterReconciler) setConditionReady(ctx context.Context, ts *
 }
 
 func (r *TypesenseClusterReconciler) getConditionReady(ts *tsv1alpha1.TypesenseCluster) *metav1.Condition {
+	if len(ts.Status.Conditions) == 0 {
+		return nil
+	}
+
 	condition := ts.Status.Conditions[0]
 	if condition.Type != ConditionTypeReady {
 		return nil
 	}
 
 	return &condition
+}
+
+func isQuorumRecoveryState(reason string) bool {
+	return reason == string(ConditionReasonQuorumDowngraded) ||
+		reason == string(ConditionReasonQuorumUpgraded) ||
+		reason == string(ConditionReasonQuorumQueuedWrites) ||
+		reason == string(ConditionReasonQuorumNotReady) ||
+		reason == string(ConditionReasonQuorumNotReadyWaitATerm) ||
+		reason == ConditionReasonStatefulSetNotReady
 }

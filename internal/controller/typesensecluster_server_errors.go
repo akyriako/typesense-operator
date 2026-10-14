@@ -1,10 +1,10 @@
 package controller
 
-import "github.com/pkg/errors"
+import "errors"
 
 var (
-	ErrFailedToStartPeeringState         = errors.New("Failed to start peering state")
-	ErrCannotTruncateLogsBeforeAppliedID = errors.New("Can't truncate logs before _applied_id")
+	ErrFailedToStartPeeringState         = errors.New("failed to start peering state")
+	ErrCannotTruncateLogsBeforeAppliedID = errors.New("can't truncate logs before _applied_id")
 )
 
 var (

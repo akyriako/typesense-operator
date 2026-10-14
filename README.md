@@ -19,8 +19,14 @@
 - Deploy highly-available **Typesense** clusters with a **single declarative YAML manifest**
 - Automates **Typesense** [lifecycle management](https://akyriako.github.io/typesense-operator-docs/docs/getting-started#key-features) (config maps, secrets, volumes, statefulsets, services, ingress or http routes, metrics, scrapers)
 - Automates **Raft quorum [configuration, discovery and recovery](https://akyriako.github.io/typesense-operator-docs/docs/how-it-works/recovering-a-cluster-that-has-lost-quorum)** without additional sidecars or manual interventions
+- **Self-Healing:** Automatically detects and instantly recovers deleted or modified managed resources (StatefulSets, Services, Ingress, etc.) to maintain the desired state
+- **Global or Gapped Mode:** Run the operator cluster-wide or restrict it to a specific namespace for strict multi-tenant and secure environments
 - Built with Go & Operator SDK — lightweight, Kubernetes-native, and flexible
 - Community-driven, with plethora of examples for Kind, CCE, AKS, EKS, GCP, and more
+
+## 📋 Prerequisites
+
+- **Kubernetes cluster**: v1.26 or higher.
 
 ## ⚡ Get Started
 
@@ -44,7 +50,7 @@ metadata:
     app.kubernetes.io/managed-by: kustomize
   name: ts-otc-1
 spec:
-  image: typesense/typesense:30.0
+  image: typesense/typesense:30.2
   replicas: 3
   storage:
     storageClassName: csi-disk
@@ -75,7 +81,7 @@ metadata:
     app.kubernetes.io/managed-by: kustomize
   name: ts-otc-2
 spec:
-  image: typesense/typesense:30.0
+  image: typesense/typesense:30.2
   replicas: 3
   storage:
     storageClassName: csi-obs
@@ -113,7 +119,7 @@ metadata:
     app.kubernetes.io/managed-by: kustomize
   name: ts-otc-3
 spec:
-  image: typesense/typesense:30.0
+  image: typesense/typesense:30.2
   replicas: 3
   storage:
     storageClassName: csi-obs
@@ -140,7 +146,7 @@ metadata:
     app.kubernetes.io/managed-by: kustomize
   name: ts-bm-k3s
 spec:
-  image: typesense/typesense:30.0
+  image: typesense/typesense:30.2
   replicas: 3
   storage:
     storageClassName: nfs
@@ -168,7 +174,7 @@ metadata:
     app.kubernetes.io/managed-by: kustomize
   name: ts-kind
 spec:
-  image: typesense/typesense:30.0
+  image: typesense/typesense:30.2
   replicas: 3
   storage:
     size: 150Mi
@@ -188,7 +194,7 @@ metadata:
     app.kubernetes.io/managed-by: kustomize
   name: ts-aws
 spec:
-  image: typesense/typesense:30.0
+  image: typesense/typesense:30.2
   replicas: 3
   storage:
     size: 100Mi
@@ -208,7 +214,7 @@ metadata:
     app.kubernetes.io/managed-by: kustomize
   name: ts-azure
 spec:
-  image: typesense/typesense:30.0
+  image: typesense/typesense:30.2
   replicas: 3
   storage:
     storageClassName: managed-csi
@@ -227,10 +233,69 @@ metadata:
     app.kubernetes.io/managed-by: kustomize
   name: ts-gcp
 spec:
-  image: typesense/typesense:30.0
+  image: typesense/typesense:30.2
   replicas: 3
   storage:
     storageClassName: standard-rwo
+```
+</details>
+
+<details>
+<summary>Full Configuration Example (Ingress, Metrics, Scheduling & Resources)</summary>
+
+```yaml
+apiVersion: ts.opentelekomcloud.com/v1alpha1
+kind: TypesenseCluster
+metadata:
+  name: my-full-cluster
+spec:
+  # Basic Configuration
+  image: typesense/typesense:30.2
+  replicas: 3
+  apiPort: 8108
+  peeringPort: 8107
+  enableCors: true
+  corsDomains: "https://example.com,https://app.example.com"
+  resetPeersOnError: true
+  
+  # Storage Configuration
+  storage:
+    size: 50Gi
+    storageClassName: standard
+    accessMode: ReadWriteOnce
+    
+  # Compute Resources & Scheduling
+  resources:
+    requests:
+      cpu: 500m
+      memory: 2Gi
+    limits:
+      cpu: 2
+      memory: 8Gi
+  nodeSelector:
+    env: production
+    
+  # Advanced Integrations
+  metrics:
+    release: kube-prometheus-stack
+    interval: 15
+    logLevel: 0
+    
+  ingress:
+    host: search.example.com
+    image: 'nginx:alpine'
+    ingressClassName: nginx
+    replicas: 2
+    
+  scrapers:
+    - name: my-website-scraper
+      image: algolia/docsearch-scraper
+      schedule: "0 0 * * *"
+      config: |
+        {
+          "index_name": "my_website",
+          "start_urls": ["https://www.example.com/docs/"]
+        }
 ```
 </details>
 
@@ -253,7 +318,7 @@ Join the conversation:
 
 TyKO is an **independently maintained** project (not affiliated with Typesense, Inc.).
 - Latest version: **0.4.1**
-- Tested on: Kubernetes 1.35 (earliest 1.26), Typesense 30.0 (earliest 26.0)
+- Tested on: Kubernetes 1.35 (earliest 1.26), Typesense 30.2 (earliest 26.0)
 - Contributions welcome! See [FAQ](https://akyriako.github.io/typesense-operator-docs/docs/faq) and [Development](https://akyriako.github.io/typesense-operator-docs/docs/development)
 
 ## ⭐ Help us Grow

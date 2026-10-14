@@ -6,28 +6,26 @@ import (
 
 	tsv1alpha1 "github.com/akyriako/typesense-operator/api/v1alpha1"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
-	appsv1 "k8s.io/api/apps/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 const prometheusApiGroup = "monitoring.coreos.com"
 
-func (r *TypesenseClusterReconciler) ReconcilePodMonitor(ctx context.Context, ts tsv1alpha1.TypesenseCluster) error {
-	// TODO Remove in future version 0.2.15+
-	r.deleteMetricsExporterServiceMonitor(ctx, ts)
-
+func (r *TypesenseClusterReconciler) ReconcilePodMonitor(ctx context.Context, ts *tsv1alpha1.TypesenseCluster) error {
 	if deployed, err := r.IsApiGroupDeployed(prometheusApiGroup); err != nil || !deployed {
 		if ts.Spec.Metrics != nil {
 			err := fmt.Errorf("prometheus api group %s was not found in cluster", prometheusApiGroup)
-			r.logger.Error(err, "reconciling podmonitor skipped")
+			log.FromContext(ctx).Error(err, "reconciling podmonitor skipped")
 		}
 		return nil
 	}
 
-	r.logger.V(debugLevel).Info("reconciling podmonitor")
+	log.FromContext(ctx).V(debugLevel).Info("reconciling podmonitor")
 
 	podMonitorName := fmt.Sprintf(ClusterMetricsPodMonitor, ts.Name)
 	podMonitorExists := true
@@ -38,7 +36,7 @@ func (r *TypesenseClusterReconciler) ReconcilePodMonitor(ctx context.Context, ts
 		if apierrors.IsNotFound(err) {
 			podMonitorExists = false
 		} else {
-			r.logger.Error(err, fmt.Sprintf("unable to fetch podmonitor: %s", podMonitorName))
+			log.FromContext(ctx).Error(err, fmt.Sprintf("unable to fetch podmonitor: %s", podMonitorName))
 			return err
 		}
 	}
@@ -55,26 +53,50 @@ func (r *TypesenseClusterReconciler) ReconcilePodMonitor(ctx context.Context, ts
 	}
 
 	if !podMonitorExists {
-		r.logger.V(debugLevel).Info("creating podmonitor", "podmonitor", podMonitorObjectKey.Name)
+		log.FromContext(ctx).V(debugLevel).Info("creating podmonitor", "podmonitor", podMonitorObjectKey.Name)
 
-		err := r.createMetricsExporterPodMonitor(ctx, podMonitorObjectKey, &ts)
+		err := r.createMetricsExporterPodMonitor(ctx, podMonitorObjectKey, ts)
 		if err != nil {
-			r.logger.Error(err, "creating podmonitor failed", "podmonitor", podMonitorObjectKey.Name)
+			log.FromContext(ctx).Error(err, "creating podmonitor failed", "podmonitor", podMonitorObjectKey.Name)
 			return err
 		}
 	} else {
-		if ts.Spec.Metrics.Release != podMonitor.ObjectMeta.Labels["release"] || monitoringv1.Duration(fmt.Sprintf("%ds", ts.Spec.Metrics.IntervalInSeconds)) != podMonitor.Spec.PodMetricsEndpoints[0].Interval {
-			r.logger.V(debugLevel).Info("updating podmonitor", "podmonitor", podMonitorObjectKey.Name)
+		if ts.Spec.Metrics.Release != podMonitor.Labels["release"] ||
+			len(podMonitor.Spec.PodMetricsEndpoints) == 0 ||
+			monitoringv1.Duration(fmt.Sprintf("%ds", ts.Spec.Metrics.IntervalInSeconds)) != podMonitor.Spec.PodMetricsEndpoints[0].Interval {
+			log.FromContext(ctx).V(debugLevel).Info("updating podmonitor", "podmonitor", podMonitorObjectKey.Name)
 
-			err := r.deleteMetricsExporterPodMonitor(ctx, podMonitor)
-			if err != nil {
-				r.logger.Error(err, "deleting podmonitor failed", "podmonitor", podMonitorObjectKey.Name)
-				return err
+			objectMeta := getPodMonitorObjectMeta(ts, &podMonitorObjectKey.Name, nil)
+			objectMeta.Labels["release"] = ts.Spec.Metrics.Release
+
+			desired := &monitoringv1.PodMonitor{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: monitoringv1.SchemeGroupVersion.String(),
+					Kind:       "PodMonitor",
+				},
+				ObjectMeta: objectMeta,
+				Spec: monitoringv1.PodMonitorSpec{
+					Selector: metav1.LabelSelector{
+						MatchLabels: getLabels(ts),
+					},
+					NamespaceSelector: monitoringv1.NamespaceSelector{
+						MatchNames: []string{ts.Namespace},
+					},
+					PodMetricsEndpoints: []monitoringv1.PodMetricsEndpoint{
+						{
+							Port:     ptr.To("metrics"),
+							Path:     "/metrics",
+							Interval: monitoringv1.Duration(fmt.Sprintf("%ds", ts.Spec.Metrics.IntervalInSeconds)),
+							Scheme:   ptr.To(monitoringv1.Scheme(protocolHttp)),
+						},
+					},
+				},
 			}
 
-			err = r.createMetricsExporterPodMonitor(ctx, podMonitorObjectKey, &ts)
+			//nolint:staticcheck
+			err := r.Patch(ctx, desired, client.Apply, client.ForceOwnership, client.FieldOwner("typesense-operator"))
 			if err != nil {
-				r.logger.Error(err, "creating podmonitor failed", "podmonitor", podMonitorObjectKey.Name)
+				log.FromContext(ctx).Error(err, "updating podmonitor failed", "podmonitor", podMonitorObjectKey.Name)
 				return err
 			}
 		}
@@ -98,10 +120,10 @@ func (r *TypesenseClusterReconciler) createMetricsExporterPodMonitor(ctx context
 			},
 			PodMetricsEndpoints: []monitoringv1.PodMetricsEndpoint{
 				{
-					Port:     "metrics",
+					Port:     ptr.To("metrics"),
 					Path:     "/metrics",
 					Interval: monitoringv1.Duration(fmt.Sprintf("%ds", ts.Spec.Metrics.IntervalInSeconds)),
-					Scheme:   "http",
+					Scheme:   ptr.To(monitoringv1.Scheme(protocolHttp)),
 				},
 			},
 		},
@@ -122,42 +144,5 @@ func (r *TypesenseClusterReconciler) createMetricsExporterPodMonitor(ctx context
 
 func (r *TypesenseClusterReconciler) deleteMetricsExporterPodMonitor(ctx context.Context, podMonitor *monitoringv1.PodMonitor) error {
 	err := r.Delete(ctx, podMonitor)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// TODO Remove in future version 0.2.15+
-func (r *TypesenseClusterReconciler) deleteMetricsExporterServiceMonitor(ctx context.Context, ts tsv1alpha1.TypesenseCluster) {
-	deploymentName := fmt.Sprintf(ClusterPrometheusExporterDeployment, ts.Name)
-	deploymentExists := true
-	deploymentObjectKey := client.ObjectKey{Namespace: ts.Namespace, Name: deploymentName}
-
-	var deployment = &appsv1.Deployment{}
-	if err := r.Get(ctx, deploymentObjectKey, deployment); err != nil {
-		if apierrors.IsNotFound(err) {
-			deploymentExists = false
-		} else {
-			r.logger.V(debugLevel).Error(err, fmt.Sprintf("unable to fetch metrics exporter deployment: %s", deploymentName))
-		}
-	}
-
-	if deploymentExists {
-		err := r.deleteMetricsExporterDeployment(ctx, deployment)
-		if err != nil {
-			r.logger.V(debugLevel).Error(err, fmt.Sprintf("unable to cleanup metrics exporter deployment: %s", deploymentName))
-		}
-	}
-}
-
-// TODO Remove in future version 0.2.15+
-func (r *TypesenseClusterReconciler) deleteMetricsExporterDeployment(ctx context.Context, deployment *appsv1.Deployment) error {
-	err := r.Delete(ctx, deployment)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return client.IgnoreNotFound(err)
 }

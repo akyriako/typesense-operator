@@ -7,15 +7,19 @@ import (
 
 type SecurityContextSpec struct {
 
+	// PodSecurityContext holds pod-level security attributes and common container settings.
 	// +kubebuilder:validation:Optional
 	PodSecurityContext *corev1.PodSecurityContext `json:"pod,omitempty"`
 
+	// TypesenseSecurityContext holds security configuration that will be applied to the Typesense container.
 	// +kubebuilder:validation:Optional
 	TypesenseSecurityContext *corev1.SecurityContext `json:"typesense,omitempty"`
 
+	// HealthcheckSecurityContext holds security configuration that will be applied to the health check sidecar container.
 	// +kubebuilder:validation:Optional
 	HealthcheckSecurityContext *corev1.SecurityContext `json:"healthcheck,omitempty"`
 
+	// MetricsSecurityContext holds security configuration that will be applied to the metrics exporter sidecar container.
 	// +kubebuilder:validation:Optional
 	MetricsSecurityContext *corev1.SecurityContext `json:"metrics,omitempty"`
 }

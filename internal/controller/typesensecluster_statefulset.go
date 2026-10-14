@@ -12,24 +12,32 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 const (
-	metricsPort                        = 9100
-	startupProbeFailureThreshold int32 = 30
-	startupProbePeriodSeconds    int32 = 10
-	hashAnnotationKey                  = "ts.opentelekomcloud.com/pod-template-hash"
-	readLagAnnotationKey               = "ts.opentelekomcloud.com/read-lag-threshold"
-	writeLagAnnotationKey              = "ts.opentelekomcloud.com/write-lag-threshold"
-	restartPodsAnnotationKey           = "kubectl.kubernetes.io/restartedAt"
-	rancherDomainAnnotationKey         = "cattle.io"
+	metricsPort                = 9100
+	hashAnnotationKey          = "ts.opentelekomcloud.com/pod-template-hash"
+	readLagAnnotationKey       = "ts.opentelekomcloud.com/read-lag-threshold"
+	writeLagAnnotationKey      = "ts.opentelekomcloud.com/write-lag-threshold"
+	restartPodsAnnotationKey   = "kubectl.kubernetes.io/restartedAt"
+	rancherDomainAnnotationKey = "cattle.io"
+
+	// terminationGracePeriodSeconds gives Typesense time to shut down gracefully on SIGTERM (stepping down
+	// as Raft leader and flushing its state) before it is killed.
+	terminationGracePeriodSeconds int64 = 30
+
+	// singleNodeStartupGracePeriod is how long the Typesense container of a single node cluster may run
+	// without answering before the node is considered stuck and its pod is purged.
+	singleNodeStartupGracePeriod = 5 * time.Minute
 )
 
 func (r *TypesenseClusterReconciler) ReconcileStatefulSet(ctx context.Context, ts *tsv1alpha1.TypesenseCluster) (*appsv1.StatefulSet, bool, error) {
-	r.logger.V(debugLevel).Info("reconciling statefulset")
+	log.FromContext(ctx).V(debugLevel).Info("reconciling statefulset")
 
 	stsName := fmt.Sprintf(ClusterStatefulSet, ts.Name)
 	stsExists := true
@@ -43,13 +51,13 @@ func (r *TypesenseClusterReconciler) ReconcileStatefulSet(ctx context.Context, t
 		if apierrors.IsNotFound(err) {
 			stsExists = false
 		} else {
-			r.logger.Error(err, fmt.Sprintf("unable to fetch statefulset: %s", stsName))
+			log.FromContext(ctx).Error(err, fmt.Sprintf("unable to fetch statefulset: %s", stsName))
 			return nil, false, err
 		}
 	}
 
 	if !stsExists {
-		r.logger.V(debugLevel).Info("creating statefulset", "sts", stsObjectKey.Name)
+		log.FromContext(ctx).V(debugLevel).Info("creating statefulset", "sts", stsObjectKey.Name)
 
 		sts, err := r.createStatefulSet(
 			ctx,
@@ -57,18 +65,23 @@ func (r *TypesenseClusterReconciler) ReconcileStatefulSet(ctx context.Context, t
 			ts,
 		)
 		if err != nil {
-			r.logger.Error(err, "creating statefulset failed", "sts", stsObjectKey.Name)
+			log.FromContext(ctx).Error(err, "creating statefulset failed", "sts", stsObjectKey.Name)
 			return nil, false, err
 		}
 
-		r.logLagThresholds(sts)
+		r.logLagThresholds(ctx, sts)
 		return sts, false, nil
 	} else {
+		err := r.expandPersistentVolumeClaims(ctx, sts, ts)
+		if err != nil {
+			log.FromContext(ctx).Error(err, "expanding pvcs failed", "sts", stsObjectKey.Name)
+		}
+
 		skipConditions := []string{
 			string(ConditionReasonQuorumDowngraded),
 			string(ConditionReasonQuorumUpgraded),
 			string(ConditionReasonQuorumNeedsAttentionMemoryOrDiskIssue),
-			//string(ConditionReasonQuorumNeedsAttentionClusterIsLagging),
+			// string(ConditionReasonQuorumNeedsAttentionClusterIsLagging),
 			string(ConditionReasonQuorumNotReady),
 			ConditionReasonStatefulSetNotReady,
 			ConditionReasonReconciliationInProgress,
@@ -79,50 +92,47 @@ func (r *TypesenseClusterReconciler) ReconcileStatefulSet(ctx context.Context, t
 
 		if condition != nil {
 			emergencyUpdateRequired := r.shouldEmergencyUpdateStatefulSet(sts, ts)
-			if _, contains := contains(skipConditions, condition.Reason); !contains || emergencyUpdateRequired {
+			if !contains(skipConditions, condition.Reason) || emergencyUpdateRequired {
 				desiredSts, err := r.buildStatefulSet(ctx, stsObjectKey, ts)
 				if err != nil {
-					r.logger.Error(err, "building statefulset failed", "sts", stsObjectKey.Name)
+					log.FromContext(ctx).Error(err, "building statefulset failed", "sts", stsObjectKey.Name)
+					return nil, false, err
+				}
+
+				// Prevent scaling operations fighting quorum recovery state
+				isScaleDown := ts.Spec.Replicas < ptr.Deref(sts.Spec.Replicas, 1)
+				if isQuorumRecoveryState(condition.Reason) && !isScaleDown {
+					desiredSts.Spec.Replicas = sts.Spec.Replicas
 				}
 
 				update, scaleOnly, triggers := r.shouldUpdateStatefulSet(sts, desiredSts, ts)
-				if update && !scaleOnly {
-					oldImage := getImageTag(sts.Spec.Template.Spec.Containers[0].Image)
+				if update {
+					oldImage := "unknown"
+					if len(sts.Spec.Template.Spec.Containers) > 0 {
+						oldImage = getImageTag(sts.Spec.Template.Spec.Containers[0].Image)
+					}
 					newImage := getImageTag(desiredSts.Spec.Template.Spec.Containers[0].Image)
-					if oldImage != newImage {
+					if oldImage != newImage && oldImage != "unknown" {
 						triggers = append(triggers, SpecTypesenseVersionChanged)
 						r.Recorder.Eventf(ts, "Normal", "TypesenseVersionUpdate", "Scheduled update from %s to %s", oldImage, newImage)
 					}
 
-					r.logger.V(debugLevel).Info("updating statefulset", "sts", sts.Name, "triggers", triggers)
+					log.FromContext(ctx).V(debugLevel).Info("updating statefulset", "sts", sts.Name, "triggers", triggers)
 
-					updatedSts, err := r.updateStatefulSet(ctx, sts, desiredSts)
+					updatedSts, err := r.updateStatefulSet(ctx, sts, desiredSts, ts)
 					if err != nil {
-						r.logger.Error(err, "updating statefulset failed", "sts", stsObjectKey.Name)
+						log.FromContext(ctx).Error(err, "updating statefulset failed", "sts", stsObjectKey.Name)
 						return nil, false, err
 					}
 
-					configMapName := fmt.Sprintf(ClusterNodesConfigMap, ts.Name)
-					configMapObjectKey := client.ObjectKey{Namespace: ts.Namespace, Name: configMapName}
-
-					var cm = &corev1.ConfigMap{}
-					if err := r.Get(ctx, configMapObjectKey, cm); err != nil {
-						r.logger.V(debugLevel).Error(err, fmt.Sprintf("unable to fetch config map: %s", configMapName))
+					if err := r.syncConfigMapWithStatefulSet(ctx, ts, updatedSts.Spec.Replicas); err != nil {
+						log.FromContext(ctx).Error(err, "unable to update config map", "configmap", fmt.Sprintf(ClusterNodesConfigMap, ts.Name))
 					}
 
-					_, _, updated, err := r.updateConfigMap(ctx, ts, cm, updatedSts.Spec.Replicas, true)
-					if err != nil {
-						r.logger.V(debugLevel).Error(err, fmt.Sprintf("unable to update config map: %s", configMapName))
-					}
-
-					if updated && ts.Spec.ForceResetPeersConfigOnUpdate {
-						_ = r.forcePodsConfigMapUpdate(ctx, ts)
-					}
-
-					r.logLagThresholds(updatedSts)
+					r.logLagThresholds(ctx, updatedSts)
 					return updatedSts, true, nil
-				} else if !update && scaleOnly {
-					r.logger.V(debugLevel).Info("scaling statefulset", "sts", sts.Name, "triggers", triggers)
+				} else if scaleOnly {
+					log.FromContext(ctx).V(debugLevel).Info("scaling statefulset", "sts", sts.Name, "triggers", triggers)
 
 					size := ts.Spec.Replicas
 					err = r.ScaleStatefulSet(ctx, stsObjectKey, size)
@@ -130,34 +140,46 @@ func (r *TypesenseClusterReconciler) ReconcileStatefulSet(ctx context.Context, t
 						return desiredSts, true, err
 					}
 
-					configMapName := fmt.Sprintf(ClusterNodesConfigMap, ts.Name)
-					configMapObjectKey := client.ObjectKey{Namespace: ts.Namespace, Name: configMapName}
-
-					var cm = &corev1.ConfigMap{}
-					if err := r.Get(ctx, configMapObjectKey, cm); err != nil {
-						r.logger.V(debugLevel).Error(err, fmt.Sprintf("unable to fetch config map: %s", configMapName))
-					}
-					_, _, updated, err := r.updateConfigMap(ctx, ts, cm, &size, true)
-					if err != nil {
+					if err := r.syncConfigMapWithStatefulSet(ctx, ts, &size); err != nil {
 						return desiredSts, true, err
 					}
 
-					if updated && ts.Spec.ForceResetPeersConfigOnUpdate {
-						_ = r.forcePodsConfigMapUpdate(ctx, ts)
-					}
-
-					r.logLagThresholds(desiredSts)
+					r.logLagThresholds(ctx, desiredSts)
 					return desiredSts, true, nil
 				}
 			}
 		}
 	}
 
-	r.logLagThresholds(sts)
+	r.logLagThresholds(ctx, sts)
 	return sts, false, nil
 }
 
-func (r *TypesenseClusterReconciler) logLagThresholds(sts *appsv1.StatefulSet) {
+// syncConfigMapWithStatefulSet rewrites the nodes config map for the given replica count after the
+// StatefulSet has been updated or scaled.
+func (r *TypesenseClusterReconciler) syncConfigMapWithStatefulSet(ctx context.Context, ts *tsv1alpha1.TypesenseCluster, replicas *int32) error {
+	configMapObjectKey := client.ObjectKey{Namespace: ts.Namespace, Name: fmt.Sprintf(ClusterNodesConfigMap, ts.Name)}
+
+	// Without the live config map there is nothing to patch; updateConfigMap would otherwise apply an
+	// object without a name.
+	var cm = &corev1.ConfigMap{}
+	if err := r.Get(ctx, configMapObjectKey, cm); err != nil {
+		return err
+	}
+
+	updated, err := r.updateConfigMap(ctx, ts, cm, replicas, true)
+	if err != nil {
+		return err
+	}
+
+	if updated && ts.Spec.ForceResetPeersConfigOnUpdate {
+		_ = r.forcePodsConfigMapUpdate(ctx, ts)
+	}
+
+	return nil
+}
+
+func (r *TypesenseClusterReconciler) logLagThresholds(ctx context.Context, sts *appsv1.StatefulSet) {
 	read := sts.Spec.Template.Annotations[readLagAnnotationKey]
 	write := sts.Spec.Template.Annotations[writeLagAnnotationKey]
 
@@ -169,7 +191,7 @@ func (r *TypesenseClusterReconciler) logLagThresholds(sts *appsv1.StatefulSet) {
 		write = strconv.Itoa(HealthyWriteLagDefaultValue)
 	}
 
-	r.logger.V(debugLevel).Info("reporting lag thresholds", "read", read, "write", write)
+	log.FromContext(ctx).V(debugLevel).Info("reporting lag thresholds", "read", read, "write", write)
 }
 
 func (r *TypesenseClusterReconciler) createStatefulSet(ctx context.Context, key client.ObjectKey, ts *tsv1alpha1.TypesenseCluster) (*appsv1.StatefulSet, error) {
@@ -191,17 +213,58 @@ func (r *TypesenseClusterReconciler) createStatefulSet(ctx context.Context, key 
 	return sts, nil
 }
 
-func (r *TypesenseClusterReconciler) updateStatefulSet(ctx context.Context, sts *appsv1.StatefulSet, desired *appsv1.StatefulSet) (*appsv1.StatefulSet, error) {
-	patch := client.MergeFrom(sts.DeepCopy())
-	sts.Spec = desired.Spec
-
-	sts.ObjectMeta.Annotations = desired.ObjectMeta.Annotations
-
-	if sts.Spec.Template.Annotations == nil {
-		sts.Spec.Template.Annotations = map[string]string{}
+func (r *TypesenseClusterReconciler) expandPersistentVolumeClaims(ctx context.Context, sts *appsv1.StatefulSet, ts *tsv1alpha1.TypesenseCluster) error {
+	labelSelector := labels.SelectorFromSet(sts.Spec.Selector.MatchLabels)
+	var pvcs corev1.PersistentVolumeClaimList
+	if err := r.List(ctx, &pvcs, &client.ListOptions{
+		Namespace:     sts.Namespace,
+		LabelSelector: labelSelector,
+	}); err != nil {
+		return err
 	}
-	sts.Spec.Template.Annotations[restartPodsAnnotationKey] = time.Now().Format(time.RFC3339)
-	sts.Spec.Template.Annotations[hashAnnotationKey] = desired.Spec.Template.Annotations[hashAnnotationKey]
+
+	desiredSize := ts.Spec.GetStorage().Size
+
+	var errs []error
+	for _, pvc := range pvcs.Items {
+		currentSize := pvc.Spec.Resources.Requests[corev1.ResourceStorage]
+		if currentSize.Cmp(desiredSize) < 0 {
+			patch := client.MergeFrom(pvc.DeepCopy())
+			if pvc.Spec.Resources.Requests == nil {
+				pvc.Spec.Resources.Requests = corev1.ResourceList{}
+			}
+			pvc.Spec.Resources.Requests[corev1.ResourceStorage] = desiredSize
+			if err := r.Patch(ctx, &pvc, patch); err != nil {
+				errs = append(errs, err)
+			} else {
+				log.FromContext(ctx).Info("expanded pvc", "pvc", pvc.Name, "newSize", desiredSize.String())
+			}
+		}
+	}
+
+	return utilerrors.NewAggregate(errs)
+}
+
+func (r *TypesenseClusterReconciler) updateStatefulSet(ctx context.Context, sts *appsv1.StatefulSet, desired *appsv1.StatefulSet, ts *tsv1alpha1.TypesenseCluster) (*appsv1.StatefulSet, error) {
+	patch := client.MergeFrom(sts.DeepCopy())
+
+	existingVolumeClaimTemplates := sts.Spec.VolumeClaimTemplates
+	existingStsAnnotations := sts.Annotations
+	existingPodAnnotations := sts.Spec.Template.Annotations
+
+	sts.Spec = desired.Spec
+	sts.Spec.VolumeClaimTemplates = existingVolumeClaimTemplates
+
+	// Preserve external StatefulSet annotations; values the operator sets itself take precedence
+	filters := append([]string{rancherDomainAnnotationKey}, ts.Spec.IgnoreAnnotationsFromExternalMutations...)
+	sts.Annotations = preserveExternalKeys(desired.Annotations, existingStsAnnotations, filters...)
+
+	// Preserve external Pod annotations; values the operator sets itself take precedence
+	podFilters := append([]string{restartPodsAnnotationKey, rancherDomainAnnotationKey}, ts.Spec.IgnoreAnnotationsFromExternalMutations...)
+	podAnnotations := preserveExternalKeys(desired.Spec.Template.Annotations, existingPodAnnotations, podFilters...)
+	podAnnotations[restartPodsAnnotationKey] = time.Now().Format(time.RFC3339)
+	podAnnotations[hashAnnotationKey] = desired.Spec.Template.Annotations[hashAnnotationKey]
+	sts.Spec.Template.Annotations = podAnnotations
 
 	if err := r.Patch(ctx, sts, patch); err != nil {
 		return nil, err
@@ -233,6 +296,13 @@ func (r *TypesenseClusterReconciler) buildStatefulSet(ctx context.Context, key c
 	}
 
 	clusterName := ts.Name
+
+	storageSpec := ts.Spec.GetStorage()
+	var storageClassName *string
+	if storageSpec.StorageClassName != "" {
+		storageClassName = &storageSpec.StorageClassName
+	}
+
 	sts := &appsv1.StatefulSet{
 		TypeMeta:   metav1.TypeMeta{},
 		ObjectMeta: getObjectMeta(ts, &key.Name, stsAnnotations),
@@ -240,6 +310,10 @@ func (r *TypesenseClusterReconciler) buildStatefulSet(ctx context.Context, key c
 			ServiceName:         fmt.Sprintf(ClusterHeadlessService, clusterName),
 			PodManagementPolicy: appsv1.ParallelPodManagement,
 			Replicas:            ptr.To[int32](ts.Spec.Replicas),
+			PersistentVolumeClaimRetentionPolicy: &appsv1.StatefulSetPersistentVolumeClaimRetentionPolicy{
+				WhenDeleted: appsv1.RetainPersistentVolumeClaimRetentionPolicyType,
+				WhenScaled:  appsv1.DeletePersistentVolumeClaimRetentionPolicyType,
+			},
 			Selector: &metav1.LabelSelector{
 				MatchLabels: getLabels(ts),
 			},
@@ -247,7 +321,7 @@ func (r *TypesenseClusterReconciler) buildStatefulSet(ctx context.Context, key c
 				ObjectMeta: getObjectMeta(ts, &key.Name, podAnnotations),
 				Spec: corev1.PodSpec{
 					SecurityContext:               ts.Spec.GetPodSecurityContext(),
-					TerminationGracePeriodSeconds: ptr.To[int64](5),
+					TerminationGracePeriodSeconds: ptr.To(terminationGracePeriodSeconds),
 					ReadinessGates: []corev1.PodReadinessGate{
 						{
 							ConditionType: QuorumReadinessGateCondition,
@@ -257,19 +331,19 @@ func (r *TypesenseClusterReconciler) buildStatefulSet(ctx context.Context, key c
 					ImagePullSecrets:  ts.Spec.ImagePullSecrets,
 					Containers: []corev1.Container{
 						{
-							Name:            "typesense",
+							Name:            containerTypesense,
 							Image:           ts.Spec.Image,
 							ImagePullPolicy: corev1.PullIfNotPresent,
 							SecurityContext: ts.Spec.GetTypesenseSecurityContext(),
 							Ports: []corev1.ContainerPort{
 								{
-									Name:          "http",
+									Name:          protocolHttp,
 									ContainerPort: int32(ts.Spec.ApiPort),
 								},
 							},
 							Env: []corev1.EnvVar{
 								{
-									Name: "TYPESENSE_API_KEY",
+									Name: envTypesenseApiKey,
 									ValueFrom: &corev1.EnvVarSource{
 										SecretKeyRef: &corev1.SecretKeySelector{
 											Key: ClusterAdminApiKeySecretKeyName,
@@ -281,7 +355,7 @@ func (r *TypesenseClusterReconciler) buildStatefulSet(ctx context.Context, key c
 								},
 								{
 									Name:  "TYPESENSE_NODES",
-									Value: "/usr/share/typesense/nodes",
+									Value: "/etc/typesense/nodes",
 								},
 								{
 									Name:  "TYPESENSE_DATA_DIR",
@@ -319,12 +393,12 @@ func (r *TypesenseClusterReconciler) buildStatefulSet(ctx context.Context, key c
 							Resources: ts.Spec.GetResources(),
 							VolumeMounts: []corev1.VolumeMount{
 								{
-									MountPath: "/usr/share/typesense",
+									MountPath: "/etc/typesense",
 									Name:      "nodeslist",
 								},
 								{
 									MountPath: "/usr/share/typesense/data",
-									Name:      "data",
+									Name:      volumeData,
 								},
 							},
 						},
@@ -341,7 +415,7 @@ func (r *TypesenseClusterReconciler) buildStatefulSet(ctx context.Context, key c
 							},
 							Env: []corev1.EnvVar{
 								{
-									Name: "TYPESENSE_API_KEY",
+									Name: envTypesenseApiKey,
 									ValueFrom: &corev1.EnvVarSource{
 										SecretKeyRef: &corev1.SecretKeySelector{
 											Key: ClusterAdminApiKeySecretKeyName,
@@ -356,15 +430,15 @@ func (r *TypesenseClusterReconciler) buildStatefulSet(ctx context.Context, key c
 									Value: strconv.Itoa(ts.Spec.GetMetricsExporterSpecs().LogLevel),
 								},
 								{
-									Name:  "TYPESENSE_PROTOCOL",
-									Value: "http",
+									Name:  envTypesenseProtocol,
+									Value: protocolHttp,
 								},
 								{
-									Name:  "TYPESENSE_HOST",
+									Name:  envTypesenseHost,
 									Value: "localhost",
 								},
 								{
-									Name:  "TYPESENSE_PORT",
+									Name:  envTypesensePort,
 									Value: strconv.Itoa(ts.Spec.ApiPort),
 								},
 								{
@@ -379,7 +453,7 @@ func (r *TypesenseClusterReconciler) buildStatefulSet(ctx context.Context, key c
 							Resources: ts.Spec.GetMetricsExporterResources(),
 						},
 						{
-							Name:            "healthcheck",
+							Name:            portHealthcheck,
 							Image:           ts.Spec.GetHealthCheckSidecarSpecs().Image,
 							ImagePullPolicy: corev1.PullIfNotPresent,
 							SecurityContext: ts.Spec.GetHealthcheckSecurityContext(),
@@ -391,7 +465,7 @@ func (r *TypesenseClusterReconciler) buildStatefulSet(ctx context.Context, key c
 							},
 							Env: []corev1.EnvVar{
 								{
-									Name: "TYPESENSE_API_KEY",
+									Name: envTypesenseApiKey,
 									ValueFrom: &corev1.EnvVarSource{
 										SecretKeyRef: &corev1.SecretKeySelector{
 											Key: ClusterAdminApiKeySecretKeyName,
@@ -406,8 +480,8 @@ func (r *TypesenseClusterReconciler) buildStatefulSet(ctx context.Context, key c
 									Value: strconv.Itoa(ts.Spec.GetHealthCheckSidecarSpecs().LogLevel),
 								},
 								{
-									Name:  "TYPESENSE_PROTOCOL",
-									Value: "http",
+									Name:  envTypesenseProtocol,
+									Value: protocolHttp,
 								},
 								{
 									Name:  "TYPESENSE_API_PORT",
@@ -423,7 +497,7 @@ func (r *TypesenseClusterReconciler) buildStatefulSet(ctx context.Context, key c
 								},
 								{
 									Name:  "TYPESENSE_NODES",
-									Value: "/usr/share/typesense/fallback",
+									Value: "/etc/typesense/fallback",
 								},
 								{
 									Name:  "CLUSTER_NAMESPACE",
@@ -433,7 +507,7 @@ func (r *TypesenseClusterReconciler) buildStatefulSet(ctx context.Context, key c
 							Resources: ts.Spec.GetHealthCheckSidecarResources(),
 							VolumeMounts: []corev1.VolumeMount{
 								{
-									MountPath: "/usr/share/typesense",
+									MountPath: "/etc/typesense",
 									Name:      "nodeslist",
 									ReadOnly:  true,
 								},
@@ -446,7 +520,7 @@ func (r *TypesenseClusterReconciler) buildStatefulSet(ctx context.Context, key c
 					TopologySpreadConstraints: ts.Spec.GetTopologySpreadConstraints(getLabels(ts)),
 					Volumes: []corev1.Volume{
 						{
-							Name: "nodeslist",
+							Name: volumeNodeslist,
 							VolumeSource: corev1.VolumeSource{
 								ConfigMap: &corev1.ConfigMapVolumeSource{
 									LocalObjectReference: corev1.LocalObjectReference{
@@ -456,10 +530,10 @@ func (r *TypesenseClusterReconciler) buildStatefulSet(ctx context.Context, key c
 							},
 						},
 						{
-							Name: "data",
+							Name: volumeData,
 							VolumeSource: corev1.VolumeSource{
 								PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-									ClaimName: "data",
+									ClaimName: volumeData,
 								},
 							},
 						},
@@ -469,20 +543,20 @@ func (r *TypesenseClusterReconciler) buildStatefulSet(ctx context.Context, key c
 			VolumeClaimTemplates: []corev1.PersistentVolumeClaim{
 				{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:        "data",
-						Labels:      getLabels(ts),
-						Annotations: ts.Spec.GetStorage().Annotations,
+						Name:        volumeData,
+						Labels:      getMergedLabels(getDefaultLabels(ts), getLabels(ts)),
+						Annotations: storageSpec.Annotations,
 					},
 					Spec: corev1.PersistentVolumeClaimSpec{
 						AccessModes: []corev1.PersistentVolumeAccessMode{
-							corev1.PersistentVolumeAccessMode(ts.Spec.GetStorage().AccessMode),
+							corev1.PersistentVolumeAccessMode(storageSpec.AccessMode),
 						},
 						Resources: corev1.VolumeResourceRequirements{
 							Requests: corev1.ResourceList{
-								corev1.ResourceStorage: ts.Spec.GetStorage().Size,
+								corev1.ResourceStorage: storageSpec.Size,
 							},
 						},
-						StorageClassName: &ts.Spec.Storage.StorageClassName,
+						StorageClassName: storageClassName,
 					},
 				},
 			},
@@ -494,7 +568,7 @@ func (r *TypesenseClusterReconciler) buildStatefulSet(ctx context.Context, key c
 		return nil, err
 	}
 
-	r.logger.V(debugLevel).Info("calculated hash", "hash", base16Hash)
+	log.FromContext(ctx).V(debugLevel).Info("calculated hash", "hash", base16Hash)
 
 	if sts.Spec.Template.Annotations == nil {
 		sts.Spec.Template.Annotations = map[string]string{}
@@ -510,15 +584,15 @@ func (r *TypesenseClusterReconciler) ScaleStatefulSet(ctx context.Context, stsOb
 		return err
 	}
 
-	if sts.Spec.Replicas != nil && *sts.Spec.Replicas == desiredReplicas {
-		r.logger.V(debugLevel).Info("statefulset already scaled to desired replicas", "name", sts.Name, "replicas", desiredReplicas)
+	if ptr.Deref(sts.Spec.Replicas, 1) == desiredReplicas {
+		log.FromContext(ctx).V(debugLevel).Info("statefulset already scaled to desired replicas", "name", sts.Name, "replicas", desiredReplicas)
 		return nil
 	}
 
-	desired := sts.DeepCopy()
-	desired.Spec.Replicas = &desiredReplicas
-	if err := r.Client.Update(ctx, desired); err != nil {
-		r.logger.Error(err, "updating stateful replicas failed", "name", desired.Name)
+	patch := client.MergeFrom(sts.DeepCopy())
+	sts.Spec.Replicas = &desiredReplicas
+	if err := r.Patch(ctx, sts, patch); err != nil {
+		log.FromContext(ctx).Error(err, "updating stateful replicas failed", "name", sts.Name)
 		return err
 	}
 
@@ -533,19 +607,36 @@ func (r *TypesenseClusterReconciler) PurgeStatefulSetPods(ctx context.Context, s
 		Namespace:     sts.Namespace,
 		LabelSelector: labelSelector,
 	}); err != nil {
-		r.logger.Error(err, "failed to list pods", "statefulset", sts.Name)
+		log.FromContext(ctx).Error(err, "failed to list pods", "statefulset", sts.Name)
 		return err
 	}
 
-	for _, pod := range pods.Items {
-		err := r.Delete(ctx, &pod)
+	var errs []error
+	for i := range pods.Items {
+		pod := &pods.Items[i]
+
+		pendingPVC, err := r.isPodPendingPersistentVolumeClaim(ctx, pod)
 		if err != nil {
-			r.logger.Error(err, "failed to delete pod", "pod", pod.Name)
+			log.FromContext(ctx).Error(err, "failed to inspect pod PVCs before purging statefulset pod", "pod", pod.Name)
 			return err
+		}
+		if pendingPVC {
+			log.FromContext(ctx).V(debugLevel).Info("skipping purge of pod because PVC is still pending", "pod", pod.Name)
+			continue
+		}
+
+		err = r.Delete(ctx, pod)
+		if err != nil {
+			log.FromContext(ctx).Error(err, "failed to delete pod", "pod", pod.Name)
+			errs = append(errs, err)
 		}
 	}
 
-	r.Recorder.Eventf(ts, "Warning", string(ConditionReasonQuorumPurged), toTitle("quorum has been purged"))
+	if len(errs) > 0 {
+		return utilerrors.NewAggregate(errs)
+	}
+
+	r.Recorder.Event(ts, "Warning", string(ConditionReasonQuorumPurged), toTitle("quorum has been purged"))
 
 	return nil
 }
@@ -558,18 +649,15 @@ func (r *TypesenseClusterReconciler) GetUnscheduledPods(ctx context.Context, sts
 		Namespace:     sts.Namespace,
 		LabelSelector: labelSelector,
 	}); err != nil {
-		r.logger.Error(err, "retrieving unscheduled pods: failed to list pods", "statefulset", sts.Name)
+		log.FromContext(ctx).Error(err, "retrieving unscheduled pods: failed to list pods", "statefulset", sts.Name)
 		return nil, err
 	}
 
 	unscheduledPods := make([]*corev1.Pod, 0, len(pods.Items))
-	for _, pod := range pods.Items {
-		if pod.Status.Phase == corev1.PodPending {
-			for _, cond := range pod.Status.Conditions {
-				if cond.Type == corev1.PodScheduled && cond.Status == corev1.ConditionFalse && cond.Reason == corev1.PodReasonUnschedulable {
-					unscheduledPods = append(unscheduledPods, &pod)
-				}
-			}
+	for i := range pods.Items {
+		pod := &pods.Items[i]
+		if isPodUnschedulable(pod) {
+			unscheduledPods = append(unscheduledPods, pod)
 		}
 	}
 
@@ -579,74 +667,67 @@ func (r *TypesenseClusterReconciler) GetUnscheduledPods(ctx context.Context, sts
 func (r *TypesenseClusterReconciler) RestartUnscheduledPods(ctx context.Context, pods []*corev1.Pod, ts *tsv1alpha1.TypesenseCluster) error {
 	removedAny := false
 	for _, pod := range pods {
-		if pod.Status.Phase == corev1.PodPending {
-			for _, cond := range pod.Status.Conditions {
-				if cond.Type == corev1.PodScheduled && cond.Status == corev1.ConditionFalse && cond.Reason == corev1.PodReasonUnschedulable {
-					r.logger.V(debugLevel).Info("removing unscheduled pod", "pod", pod.Name)
+		if !isPodUnschedulable(pod) {
+			continue
+		}
 
-					propagation := metav1.DeletePropagationBackground
-					err := r.Delete(ctx, pod, &client.DeleteOptions{PropagationPolicy: &propagation})
-					if err != nil {
-						r.logger.Error(err, "failed to remove unscheduled pod", "pod", pod.Name)
-					}
+		pendingPVC, err := r.isPodPendingPersistentVolumeClaim(ctx, pod)
+		if err != nil {
+			log.FromContext(ctx).Error(err, "failed to inspect pod PVCs before restarting unscheduled pod", "pod", pod.Name)
+			continue
+		}
+		if pendingPVC {
+			log.FromContext(ctx).V(debugLevel).Info("skipping restart of unscheduled pod because PVC is still pending", "pod", pod.Name)
+			continue
+		}
 
-					if !removedAny {
-						removedAny = err == nil
-					}
-				}
-			}
+		log.FromContext(ctx).V(debugLevel).Info("removing unscheduled pod", "pod", pod.Name)
+
+		propagation := metav1.DeletePropagationBackground
+		err = r.Delete(ctx, pod, &client.DeleteOptions{PropagationPolicy: &propagation})
+		if err != nil {
+			log.FromContext(ctx).Error(err, "failed to remove unscheduled pod", "pod", pod.Name)
+		}
+
+		if !removedAny {
+			removedAny = err == nil
 		}
 	}
 
 	if removedAny {
-		r.Recorder.Eventf(ts, "Warning", ConditionReasonStatefulSetNotReady, toTitle("removed unscheduled pods"))
+		r.Recorder.Event(ts, "Warning", ConditionReasonStatefulSetNotReady, toTitle("removed unscheduled pods"))
 	}
 
 	return nil
 }
 
-func (r *TypesenseClusterReconciler) RestartAllUnscheduledPods(ctx context.Context, sts *appsv1.StatefulSet, ts *tsv1alpha1.TypesenseCluster) error {
-	labelSelector := labels.SelectorFromSet(sts.Spec.Selector.MatchLabels)
+func (r *TypesenseClusterReconciler) isPodPendingPersistentVolumeClaim(ctx context.Context, pod *corev1.Pod) (bool, error) {
+	for _, volume := range pod.Spec.Volumes {
+		if volume.PersistentVolumeClaim == nil {
+			continue
+		}
 
-	var pods corev1.PodList
-	if err := r.List(ctx, &pods, &client.ListOptions{
-		Namespace:     sts.Namespace,
-		LabelSelector: labelSelector,
-	}); err != nil {
-		r.logger.Error(err, "deleting unscheduled pods: failed to list pods", "statefulset", sts.Name)
-		return err
-	}
-
-	removedAny := false
-	for _, pod := range pods.Items {
-		if pod.Status.Phase == corev1.PodPending {
-			for _, cond := range pod.Status.Conditions {
-				if cond.Type == corev1.PodScheduled && cond.Status == corev1.ConditionFalse && cond.Reason == corev1.PodReasonUnschedulable {
-					propagation := metav1.DeletePropagationBackground
-					err := r.Delete(ctx, &pod, &client.DeleteOptions{
-						PropagationPolicy: &propagation,
-					})
-
-					if !removedAny {
-						removedAny = err == nil
-					}
-				}
+		pvc := &corev1.PersistentVolumeClaim{}
+		if err := r.Get(ctx, client.ObjectKey{Namespace: pod.Namespace, Name: volume.PersistentVolumeClaim.ClaimName}, pvc); err != nil {
+			if apierrors.IsNotFound(err) {
+				continue
 			}
+			return false, err
+		}
+
+		if pvc.Status.Phase != corev1.ClaimBound {
+			return true, nil
 		}
 	}
 
-	if removedAny {
-		r.Recorder.Eventf(ts, "Warning", ConditionReasonStatefulSetNotReady, toTitle("removed unscheduled pods"))
-	}
-
-	return nil
+	return false, nil
 }
 
 func (r *TypesenseClusterReconciler) GetFreshStatefulSet(ctx context.Context, stsObjectKey client.ObjectKey) (*appsv1.StatefulSet, error) {
 	sts := &appsv1.StatefulSet{}
 	if err := r.Get(ctx, stsObjectKey, sts); err != nil {
 		if !apierrors.IsNotFound(err) {
-			r.logger.Error(err, fmt.Sprintf("unable to fetch statefulset: %s", stsObjectKey.Name))
+			log.FromContext(ctx).Error(err, fmt.Sprintf("unable to fetch statefulset: %s", stsObjectKey.Name))
 		}
 		return nil, err
 	}

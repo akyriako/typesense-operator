@@ -12,19 +12,21 @@ import (
 	v1 "k8s.io/api/core/v1"
 	discoveryv1 "k8s.io/api/discovery/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 const (
 	forceConfigMapUpdateAnnotationKey = "ts.opentelekomcloud.com/forced-configmap-update-time"
 )
 
-func (r *TypesenseClusterReconciler) ReconcileConfigMap(ctx context.Context, ts tsv1alpha1.TypesenseCluster) (*bool, error) {
-	r.logger.V(debugLevel).Info("reconciling config map")
+func (r *TypesenseClusterReconciler) ReconcileConfigMap(ctx context.Context, ts *tsv1alpha1.TypesenseCluster) (*bool, error) {
+	log.FromContext(ctx).V(debugLevel).Info("reconciling config map")
 
 	configMapName := fmt.Sprintf(ClusterNodesConfigMap, ts.Name)
 	configMapExists := true
@@ -35,24 +37,24 @@ func (r *TypesenseClusterReconciler) ReconcileConfigMap(ctx context.Context, ts 
 		if apierrors.IsNotFound(err) {
 			configMapExists = false
 		} else {
-			r.logger.Error(err, fmt.Sprintf("unable to fetch config map: %s", configMapName))
+			log.FromContext(ctx).Error(err, fmt.Sprintf("unable to fetch config map: %s", configMapName))
 			return nil, err
 		}
 	}
 
 	if !configMapExists {
-		r.logger.V(debugLevel).Info("creating config map", "configmap", configMapObjectKey.Name)
+		log.FromContext(ctx).V(debugLevel).Info("creating config map", "configmap", configMapObjectKey.Name)
 
-		_, err := r.createConfigMap(ctx, configMapObjectKey, &ts)
+		_, err := r.createConfigMap(ctx, configMapObjectKey, ts)
 		if err != nil {
-			r.logger.Error(err, "creating config map failed", "configmap", configMapObjectKey.Name)
+			log.FromContext(ctx).Error(err, "creating config map failed", "configmap", configMapObjectKey.Name)
 			return nil, err
 		}
 
 		return nil, nil
 	}
 
-	_, _, updated, err := r.updateConfigMap(ctx, &ts, cm, nil, false)
+	updated, err := r.updateConfigMap(ctx, ts, cm, nil, false)
 	if err != nil {
 		return ptr.To[bool](false), err
 	}
@@ -89,7 +91,7 @@ func (r *TypesenseClusterReconciler) createConfigMap(ctx context.Context, key cl
 	return cm, nil
 }
 
-func (r *TypesenseClusterReconciler) updateConfigMap(ctx context.Context, ts *tsv1alpha1.TypesenseCluster, cm *v1.ConfigMap, replicas *int32, resizeOp bool) (*v1.ConfigMap, int, bool, error) {
+func (r *TypesenseClusterReconciler) updateConfigMap(ctx context.Context, ts *tsv1alpha1.TypesenseCluster, cm *v1.ConfigMap, replicas *int32, resizeOp bool) (bool, error) {
 	stsName := fmt.Sprintf(ClusterStatefulSet, ts.Name)
 	stsObjectKey := client.ObjectKey{
 		Name:      stsName,
@@ -101,71 +103,80 @@ func (r *TypesenseClusterReconciler) updateConfigMap(ctx context.Context, ts *ts
 		if apierrors.IsNotFound(err) {
 			err := r.deleteConfigMap(ctx, cm)
 			if err != nil {
-				return nil, 0, false, err
+				return false, err
 			}
 		} else {
-			r.logger.Error(err, fmt.Sprintf("unable to fetch statefulset: %s", stsName))
+			log.FromContext(ctx).Error(err, fmt.Sprintf("unable to fetch statefulset: %s", stsName))
 		}
 
-		return nil, 0, false, err
+		return false, err
 	}
 
 	if replicas == nil {
-		replicas = &ts.Spec.Replicas
+		if sts.Spec.Replicas != nil {
+			replicas = sts.Spec.Replicas
+		} else {
+			replicas = &ts.Spec.Replicas
+		}
 	}
 
-	nodes, err := r.getNodes(ctx, ts, *replicas, false)
+	nodes, err := r.getNodes(ctx, ts, *replicas, resizeOp)
 	if err != nil {
-		return nil, 0, false, err
+		return false, err
 	}
 	fallback, err := r.getNodes(ctx, ts, *replicas, true)
 	if err != nil {
-		return nil, 0, false, err
+		return false, err
 	}
 
 	availableNodes := len(nodes)
-	if availableNodes == 0 {
-		r.logger.V(debugLevel).Info("empty quorum configuration")
-		return nil, 0, false, fmt.Errorf("empty quorum configuration")
+	if availableNodes < int(*replicas) {
+		log.FromContext(ctx).V(debugLevel).Info("incomplete quorum configuration, using fallback nodes")
+		nodes = fallback
+		availableNodes = len(nodes)
 	}
 
-	desired := cm.DeepCopy()
-	desired.Data = map[string]string{
-		"nodes":    strings.Join(nodes, ","),
-		"fallback": strings.Join(fallback, ","),
-	}
+	nodesStr := strings.Join(nodes, ",")
+	fallbackStr := strings.Join(fallback, ",")
 
 	if !resizeOp {
 		currentNodes := strings.Split(cm.Data["nodes"], ",")
-		sort.Strings(currentNodes)
-		r.logger.V(debugLevel).Info("current quorum configuration", "size", len(currentNodes), "nodes", currentNodes)
+		log.FromContext(ctx).V(debugLevel).Info("current quorum configuration", "size", len(currentNodes), "nodes", currentNodes)
 	}
 
 	updated := false
-	if cm.Data["nodes"] != desired.Data["nodes"] || cm.Data["fallback"] != desired.Data["fallback"] {
+	if cm.Data["nodes"] != nodesStr || cm.Data["fallback"] != fallbackStr {
 		if !resizeOp {
-			sort.Strings(nodes)
-			r.logger.Info("updating quorum configuration", "size", availableNodes, "nodes", nodes)
+			log.FromContext(ctx).Info("updating quorum configuration", "size", availableNodes, "nodes", nodes)
 		}
 
-		err := r.Update(ctx, desired)
+		desired := &v1.ConfigMap{
+			TypeMeta: metav1.TypeMeta{
+				APIVersion: v1.SchemeGroupVersion.String(),
+				Kind:       "ConfigMap",
+			},
+			ObjectMeta: getObjectMeta(ts, &cm.Name, nil),
+			Data: map[string]string{
+				"nodes":    nodesStr,
+				"fallback": fallbackStr,
+			},
+		}
+
+		//nolint:staticcheck
+		err := r.Patch(ctx, desired, client.Apply, client.ForceOwnership, client.FieldOwner("typesense-operator"))
 		if err != nil {
-			r.logger.Error(err, "updating quorum configuration failed")
-			return nil, 0, false, err
+			log.FromContext(ctx).Error(err, "updating quorum configuration failed")
+			return false, err
 		}
 		updated = true
 	}
 
-	return desired, availableNodes, updated, nil
+	return updated, nil
 }
 
 func (r *TypesenseClusterReconciler) deleteConfigMap(ctx context.Context, cm *v1.ConfigMap) error {
 	err := r.Delete(ctx, cm)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return client.IgnoreNotFound(err)
 }
 
 // ForcePodsConfigMapUpdate forces a configmap update for all pods in the statefulset
@@ -176,7 +187,7 @@ func (r *TypesenseClusterReconciler) forcePodsConfigMapUpdate(ctx context.Contex
 	labelSelector := labels.SelectorFromSet(labelMap)
 
 	var podList v1.PodList
-	if err := r.Client.List(ctx, &podList,
+	if err := r.List(ctx, &podList,
 		client.InNamespace(ts.Namespace),
 		client.MatchingLabelsSelector{Selector: labelSelector},
 	); err != nil {
@@ -198,12 +209,12 @@ func (r *TypesenseClusterReconciler) forcePodsConfigMapUpdate(ctx context.Contex
 		pod.Annotations[forceConfigMapUpdateAnnotationKey] = time.Now().Format(time.RFC3339)
 
 		if err := r.Patch(ctx, pod, client.MergeFrom(original)); err != nil {
-			r.logger.Error(err, "patching pod annotations failed", "pod", pod.Name)
+			log.FromContext(ctx).Error(err, "patching pod annotations failed", "pod", pod.Name)
 			errs = append(errs, fmt.Errorf("pod %s: %w", pod.Name, err))
 			continue
 		}
 
-		r.logger.V(debugLevel).Info("patching pod annotations", "pod", pod.Name, "annotation", forceConfigMapUpdateAnnotationKey)
+		log.FromContext(ctx).V(debugLevel).Info("patching pod annotations", "pod", pod.Name, "annotation", forceConfigMapUpdateAnnotationKey)
 	}
 
 	return utilerrors.NewAggregate(errs)
@@ -211,26 +222,10 @@ func (r *TypesenseClusterReconciler) forcePodsConfigMapUpdate(ctx context.Contex
 
 func (r *TypesenseClusterReconciler) getNodes(ctx context.Context, ts *tsv1alpha1.TypesenseCluster, replicas int32, bootstrapping bool) ([]string, error) {
 	nodes := make([]string, 0)
-	getFallbackNodes := func(nodes []string) ([]string, error) {
-		for i := 0; i < int(ts.Spec.Replicas); i++ {
-			nodeName := fmt.Sprintf("%s-sts-%d.%s-sts-svc", ts.Name, i, ts.Name)
-			if len(nodeName) > nodeNameLenLimit {
-				return nil, fmt.Errorf("raft error: node name should not exceed %d characters: %s", nodeNameLenLimit, nodeName)
-			}
 
-			nodes = append(nodes, fmt.Sprintf("%s:%d:%d", nodeName, ts.Spec.PeeringPort, ts.Spec.ApiPort))
-		}
-
-		return nodes, nil
-	}
-
-	if bootstrapping {
-		fallbackNodes := make([]string, 0)
-		return getFallbackNodes(fallbackNodes)
-	}
-
-	unscheduledPods := int32(0)
-	targetReplicas := replicas
+	podApiPortsByIP := make(map[string]int)
+	podApiPortsByName := make(map[string]int)
+	var pods v1.PodList
 
 	stsExists := true
 	stsName := fmt.Sprintf(ClusterStatefulSet, ts.Name)
@@ -244,24 +239,79 @@ func (r *TypesenseClusterReconciler) getNodes(ctx context.Context, ts *tsv1alpha
 			return nil, err
 		}
 		stsExists = false
-		unscheduledPods = replicas
 	}
 
 	if stsExists {
 		labelSelector := labels.SelectorFromSet(sts.Spec.Selector.MatchLabels)
 
-		var pods v1.PodList
 		if err := r.List(ctx, &pods, &client.ListOptions{
 			Namespace:     sts.Namespace,
 			LabelSelector: labelSelector,
 		}); err != nil {
-			r.logger.Error(err, "failed to list pods", "statefulset", sts.Name)
-			return getFallbackNodes(nodes)
+			log.FromContext(ctx).Error(err, "failed to list pods", "statefulset", sts.Name)
+		} else {
+			for _, pod := range pods.Items {
+				actualApiPort := ts.Spec.ApiPort
+				for _, c := range pod.Spec.Containers {
+					if c.Name == containerTypesense {
+						for _, p := range c.Ports {
+							if p.Name == protocolHttp {
+								actualApiPort = int(p.ContainerPort)
+								break
+							}
+						}
+						break
+					}
+				}
+				if pod.Status.PodIP != "" {
+					podApiPortsByIP[pod.Status.PodIP] = actualApiPort
+				}
+				podApiPortsByName[pod.Name] = actualApiPort
+			}
+		}
+	}
+
+	getFallbackNodes := func(nodes []string) ([]string, error) {
+		for i := 0; i < int(replicas); i++ {
+			nodeName := fmt.Sprintf("%s-sts-%d.%s-sts-svc", ts.Name, i, ts.Name)
+			podName := fmt.Sprintf("%s-sts-%d", ts.Name, i)
+
+			apiPort := ts.Spec.ApiPort
+			if p, ok := podApiPortsByName[podName]; ok {
+				apiPort = p
+			}
+
+			if len(nodeName) > nodeNameLenLimit {
+				return nil, fmt.Errorf("raft error: node name should not exceed %d characters: %s", nodeNameLenLimit, nodeName)
+			}
+
+			nodes = append(nodes, fmt.Sprintf("%s:%d:%d", nodeName, ts.Spec.PeeringPort, apiPort))
+		}
+
+		return nodes, nil
+	}
+
+	if bootstrapping {
+		fallbackNodes := make([]string, 0)
+		return getFallbackNodes(fallbackNodes)
+	}
+
+	unscheduledPods := int32(0)
+	targetReplicas := replicas
+
+	if !stsExists {
+		unscheduledPods = replicas
+	} else {
+
+		if len(pods.Items) == 0 {
+			fallbackNodes := make([]string, 0)
+			return getFallbackNodes(fallbackNodes)
 		}
 
 		for _, pod := range pods.Items {
 			markAsScheduled := false
 			// mark the pod as unscheduled if it's still pulling the image
+		CheckContainers:
 			for _, cs := range append(pod.Status.InitContainerStatuses, pod.Status.ContainerStatuses...) {
 				if cs.State.Waiting == nil {
 					continue
@@ -270,21 +320,12 @@ func (r *TypesenseClusterReconciler) getNodes(ctx context.Context, ts *tsv1alpha
 				switch cs.State.Waiting.Reason {
 				case "ContainerCreating", "ErrImagePull", "ImagePullBackOff":
 					markAsScheduled = true
-					break
+					break CheckContainers
 				}
 			}
 
-			if pod.Status.Phase != v1.PodPending {
-				continue
-			}
-
-			for _, cond := range pod.Status.Conditions {
-				if cond.Type == v1.PodScheduled &&
-					cond.Status == v1.ConditionFalse &&
-					cond.Reason == v1.PodReasonUnschedulable {
-					markAsScheduled = true
-					break
-				}
+			if isPodUnschedulable(&pod) {
+				markAsScheduled = true
 			}
 
 			if markAsScheduled {
@@ -305,27 +346,41 @@ func (r *TypesenseClusterReconciler) getNodes(ctx context.Context, ts *tsv1alpha
 		return nil, err
 	}
 
+	// The same endpoint may temporarily appear in more than one slice (e.g. while slices are rebalanced).
+	// Duplicates would let an incomplete peer list pass the replica count check.
+	seen := make(map[string]struct{})
 	for _, s := range eps {
 		for _, e := range s.Endpoints {
 			if len(e.Addresses) > 0 {
 				addr := e.Addresses[0]
-				//r.logger.V(debugLevel).Info("discovered slice endpoint", "slice", s.Name, "endpoint", e.Hostname, "address", addr)
-				nodes = append(nodes, fmt.Sprintf("%s:%d:%d", addr, ts.Spec.PeeringPort, ts.Spec.ApiPort))
+				if _, ok := seen[addr]; ok {
+					continue
+				}
+				seen[addr] = struct{}{}
+
+				apiPort := ts.Spec.ApiPort
+				if p, ok := podApiPortsByIP[addr]; ok {
+					apiPort = p
+				}
+
+				nodes = append(nodes, fmt.Sprintf("%s:%d:%d", addr, ts.Spec.PeeringPort, apiPort))
 			}
 		}
 	}
+
+	sort.Strings(nodes)
 
 	return nodes, nil
 }
 
 func (r *TypesenseClusterReconciler) getEndpointSlicesForStatefulSet(ctx context.Context, sts *appsv1.StatefulSet) ([]discoveryv1.EndpointSlice, error) {
-	r.logger.V(debugLevel).Info("collecting endpoint slices")
+	log.FromContext(ctx).V(debugLevel).Info("collecting endpoint slices")
 	svcName := sts.Spec.ServiceName
 	namespace := sts.Namespace
 
 	// 1) List EndpointSlices for headless Service
 	var sliceList discoveryv1.EndpointSliceList
-	if err := r.Client.List(ctx, &sliceList,
+	if err := r.List(ctx, &sliceList,
 		client.InNamespace(namespace),
 		client.MatchingLabels{discoveryv1.LabelServiceName: svcName},
 	); err != nil {
@@ -335,7 +390,7 @@ func (r *TypesenseClusterReconciler) getEndpointSlicesForStatefulSet(ctx context
 	// 2) Build a set of “live” Pod IPs for this StatefulSet
 	selector := labels.SelectorFromSet(sts.Spec.Selector.MatchLabels)
 	var podList v1.PodList
-	if err := r.Client.List(ctx, &podList,
+	if err := r.List(ctx, &podList,
 		client.InNamespace(namespace),
 		client.MatchingLabelsSelector{Selector: selector},
 	); err != nil {
@@ -352,7 +407,7 @@ func (r *TypesenseClusterReconciler) getEndpointSlicesForStatefulSet(ctx context
 	//    whose IP is still in liveIPs
 	var readySlices []discoveryv1.EndpointSlice
 	for _, slice := range sliceList.Items {
-		keep := false
+		var readyEndpoints []discoveryv1.Endpoint
 		for _, ep := range slice.Endpoints {
 			// only consider endpoints that reference a Pod and whose IP is still live
 			if ep.TargetRef != nil &&
@@ -360,12 +415,12 @@ func (r *TypesenseClusterReconciler) getEndpointSlicesForStatefulSet(ctx context
 				len(ep.Addresses) > 0 {
 				ip := ep.Addresses[0]
 				if _, ok := liveIPs[ip]; ok {
-					keep = true
-					break
+					readyEndpoints = append(readyEndpoints, ep)
 				}
 			}
 		}
-		if keep {
+		if len(readyEndpoints) > 0 {
+			slice.Endpoints = readyEndpoints
 			readySlices = append(readySlices, slice)
 		}
 	}
@@ -398,21 +453,4 @@ func (r *TypesenseClusterReconciler) getShortName(raftNodeEndpoint string) strin
 	}
 
 	return host
-}
-
-func (r *TypesenseClusterReconciler) hasBootstrapValues(ts *tsv1alpha1.TypesenseCluster, cm *v1.ConfigMap) (bool, error) {
-	rawNodeslist, ok := cm.Data["nodes"]
-	if !ok || rawNodeslist == "" {
-		err := fmt.Errorf("configmap is missing 'nodes' key")
-		return false, err
-	}
-
-	nodeslist := strings.Split(rawNodeslist, ",")
-	for _, node := range nodeslist {
-		if strings.Contains(node, fmt.Sprintf(ClusterStatefulSet, ts.Name)) {
-			return true, nil
-		}
-	}
-
-	return false, nil
 }

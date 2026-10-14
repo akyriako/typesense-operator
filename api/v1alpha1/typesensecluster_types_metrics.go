@@ -6,12 +6,15 @@ import (
 )
 
 type MetricsExporterSpec struct {
+	// Release specifies the Prometheus Operator release label to which the generated PodMonitor will be attached.
 	Release string `json:"release"`
 
+	// Image specifies the Docker image to use for the Typesense Prometheus exporter sidecar container.
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default:="quay.io/akyriako/typesense-prometheus-exporter:0.1.9"
 	Image string `json:"image,omitempty"`
 
+	// IntervalInSeconds specifies the scraping interval for the Prometheus exporter.
 	// +optional
 	// +kubebuilder:default=15
 	// +kubebuilder:validation:Minimum=15
@@ -21,9 +24,11 @@ type MetricsExporterSpec struct {
 	// +kubebuilder:validation:Type=integer
 	IntervalInSeconds int `json:"interval,omitempty"`
 
+	// Resources defines the compute resource requirements (CPU/Memory) for the Prometheus exporter sidecar container.
 	// +kubebuilder:validation:Optional
 	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
 
+	// LogLevel specifies the verbosity of the Prometheus exporter sidecar logs. Valid values are -4 (debug), 0 (info), 4 (warn), 8 (error).
 	// +optional
 	// +kubebuilder:default=0
 	// +kubebuilder:validation:Minimum=-4

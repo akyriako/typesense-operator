@@ -20,12 +20,38 @@ spec:
         kubectl.kubernetes.io/default-container: manager
     spec:
       containers:
-      - args: {{- toYaml .Values.controllerManager.manager.args | nindent 8 }}
+      - args:
+{{- range .Values.controllerManager.manager.args }}
+        - {{ . | quote }}
+{{- end }}
+{{- if .Values.controllerManager.watchNamespace }}
+        - --watch-namespace={{ .Values.controllerManager.watchNamespace }}
+{{- end }}
+{{- if .Values.controllerManager.watchCurrentNamespace }}
+        - --watch-current-namespace
+{{- end }}
+{{- if and (or .Values.controllerManager.watchNamespace .Values.controllerManager.watchCurrentNamespace) (not .Values.controllerManager.enableWebhooksInGappedMode) }}
+        - --enable-webhook=false
+{{- end }}
         command:
         - /manager
         env:
         - name: KUBERNETES_CLUSTER_DOMAIN
           value: {{ quote .Values.kubernetesClusterDomain }}
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: WEBHOOK_SERVICE_NAME
+          value: {{ include "typesense-operator.fullname" . }}-webhook-service
+{{- if .Values.controllerManager.watchNamespace }}
+        - name: WATCH_NAMESPACE
+          value: {{ .Values.controllerManager.watchNamespace | quote }}
+{{- end }}
+{{- if .Values.controllerManager.watchCurrentNamespace }}
+        - name: WATCH_CURRENT_NAMESPACE
+          value: "true"
+{{- end }}
         image: {{ .Values.controllerManager.manager.image.repository }}:{{ .Values.controllerManager.manager.image.tag
           | default .Chart.AppVersion }}
         imagePullPolicy: {{ .Values.controllerManager.manager.imagePullPolicy }}
@@ -36,6 +62,13 @@ spec:
           initialDelaySeconds: 15
           periodSeconds: 20
         name: manager
+        ports:
+        - containerPort: 9443
+          name: webhook-server
+          protocol: TCP
+        - containerPort: 8081
+          name: health
+          protocol: TCP
         readinessProbe:
           httpGet:
             path: /readyz
@@ -46,8 +79,18 @@ spec:
           }}
         securityContext: {{- toYaml .Values.controllerManager.manager.containerSecurityContext
           | nindent 10 }}
-      imagePullSecrets: {{ .Values.imagePullSecrets | default list | toJson }}
+        volumeMounts:
+        - mountPath: /tmp/k8s-webhook-server/serving-certs
+          name: cert-dir
+      nodeSelector: {{- toYaml .Values.controllerManager.nodeSelector | nindent 8 }}
       securityContext: {{- toYaml .Values.controllerManager.podSecurityContext | nindent
         8 }}
-      serviceAccountName: {{ include "typesense-operator.fullname" . }}-controller-manager
+      imagePullSecrets: {{ .Values.imagePullSecrets | default list | toJson }}
+      serviceAccountName: {{ include "typesense-operator.serviceAccountName" . }}
       terminationGracePeriodSeconds: 10
+      tolerations: {{- toYaml .Values.controllerManager.tolerations | nindent 8 }}
+      topologySpreadConstraints: {{- toYaml .Values.controllerManager.topologySpreadConstraints
+        | nindent 8 }}
+      volumes:
+      - emptyDir: {}
+        name: cert-dir

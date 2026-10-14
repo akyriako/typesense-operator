@@ -1,8 +1,9 @@
 package controller
 
 import (
-	v1 "k8s.io/api/core/v1"
 	"net"
+
+	v1 "k8s.io/api/core/v1"
 )
 
 type NodeState string
@@ -46,11 +47,12 @@ type NodeHealth struct {
 type NodeEndpoint struct {
 	PodName string
 	IP      net.IP
+	ApiPort int
 }
 
 type Quorum struct {
 	MinRequiredNodes   int
 	AvailableNodes     int
-	Nodes              map[string]net.IP
+	Nodes              map[string]NodeEndpoint
 	NodesListConfigMap *v1.ConfigMap
 }

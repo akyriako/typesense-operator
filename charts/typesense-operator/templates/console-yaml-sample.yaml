@@ -1,0 +1,69 @@
+{{- if .Capabilities.APIVersions.Has "console.openshift.io/v1" }}
+apiVersion: console.openshift.io/v1
+kind: ConsoleYAMLSample
+metadata:
+  name: typesensecluster-sample
+  labels:
+  {{- include "typesense-operator.labels" . | nindent 4 }}
+spec:
+  targetResource:
+    apiVersion: ts.opentelekomcloud.com/v1alpha1
+    kind: TypesenseCluster
+  title: Basic Typesense Cluster
+  description: A standard highly available Typesense cluster
+  yaml: |
+    apiVersion: ts.opentelekomcloud.com/v1alpha1
+    kind: TypesenseCluster
+    metadata:
+      name: my-typesense-cluster
+    spec:
+      image: typesense/typesense:30.2
+      storage:
+            storageClassName: ""
+---
+apiVersion: console.openshift.io/v1
+kind: ConsoleYAMLSample
+metadata:
+  name: typesensecluster-openshift-sample
+  labels:
+  {{- include "typesense-operator.labels" . | nindent 4 }}
+spec:
+  targetResource:
+    apiVersion: ts.opentelekomcloud.com/v1alpha1
+    kind: TypesenseCluster
+  title: Advanced OpenShift Typesense Cluster
+  description: A Typesense cluster optimized for OpenShift with route, resources, and security context.
+  yaml: |
+    apiVersion: ts.opentelekomcloud.com/v1alpha1
+    kind: TypesenseCluster
+    metadata:
+      name: typesense-openshift
+    spec:
+      image: typesense/typesense:30.2
+      replicas: 3
+      securityContext:
+        pod:
+          runAsNonRoot: true
+      resources:
+        limits:
+          cpu: 500m
+          memory: 2Gi
+        requests:
+          cpu: 10m
+          memory: 10Mi
+      storage:
+        size: 10Gi
+        storageClassName: ""
+      ingress:
+        host: typesense.apps.example.com
+        image: 'registry.access.redhat.com/ubi10/nginx-126:latest'
+        ingressClassName: openshift-default
+        replicas: 2
+        path: /
+        pathType: ImplementationSpecific
+        serviceType: ClusterIP
+        command: ["/bin/sh", "-c", "nginx -g 'daemon off;'"]
+        annotations:
+          route.openshift.io/termination: "edge"
+          route.openshift.io/ingress.allow-http: "false"
+{{- end }}

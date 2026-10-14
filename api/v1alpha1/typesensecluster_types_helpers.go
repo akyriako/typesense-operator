@@ -45,7 +45,7 @@ func (s *TypesenseClusterSpec) GetCorsDomains() string {
 }
 
 func (s *TypesenseClusterSpec) GetTopologySpreadConstraints(labels map[string]string) []corev1.TopologySpreadConstraint {
-	tscs := make([]corev1.TopologySpreadConstraint, 0)
+	tscs := make([]corev1.TopologySpreadConstraint, 0, len(s.TopologySpreadConstraints))
 
 	for _, tsc := range s.TopologySpreadConstraints {
 		if tsc.LabelSelector == nil {

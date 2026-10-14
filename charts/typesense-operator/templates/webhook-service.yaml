@@ -1,0 +1,16 @@
+{{- $isNamespaced := or .Values.controllerManager.watchNamespace .Values.controllerManager.watchCurrentNamespace -}}
+{{- if or (not $isNamespaced) .Values.controllerManager.enableWebhooksInGappedMode }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "typesense-operator.fullname" . }}-webhook-service
+  labels:
+  {{- include "typesense-operator.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.webhookService.type }}
+  selector:
+    control-plane: controller-manager
+    {{- include "typesense-operator.selectorLabels" . | nindent 4 }}
+  ports:
+  {{- .Values.webhookService.ports | toYaml | nindent 2 }}
+{{- end }}

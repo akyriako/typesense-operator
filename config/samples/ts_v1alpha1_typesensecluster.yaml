@@ -1,13 +1,9 @@
 apiVersion: ts.opentelekomcloud.com/v1alpha1
 kind: TypesenseCluster
 metadata:
-  labels:
-    app.kubernetes.io/name: typesense-operator
-    app.kubernetes.io/managed-by: kustomize
-  name: cluster-1
+  name: my-typesense-cluster
 spec:
-  image: typesense/typesense:27.1
-  replicas: 3
+  image: typesense/typesense:30.2
   storage:
-    size: 100Mi
-    storageClassName: standard
+    size: 1Gi
+    storageClassName: ""

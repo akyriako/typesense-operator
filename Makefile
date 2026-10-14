@@ -48,7 +48,7 @@ endif
 
 # Set the Operator SDK version to use. By default, what is installed on the system is used.
 # This is useful for CI or a project to utilize a specific version of the operator-sdk toolkit.
-OPERATOR_SDK_VERSION ?= v1.39.0
+OPERATOR_SDK_VERSION ?= v1.42.2
 # Image URL to use all building/pushing image targets
 DOCKER_HUB_NAME ?= quay.io/akyriako#$(shell docker info | sed '/Username:/!d;s/.* //')
 IMG_NAME ?= typesense-operator
@@ -114,12 +114,13 @@ help: ## Display this help.
 ##@ Development
 
 .PHONY: manifests
-manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
-	$(CONTROLLER_GEN) rbac:roleName=manager-role crd webhook paths="./..." output:crd:artifacts:config=config/crd/bases
+manifests: ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
+	go run sigs.k8s.io/controller-tools/cmd/controller-gen@$(CONTROLLER_TOOLS_VERSION) crd webhook paths=./api/v1alpha1 output:crd:artifacts:config=config/crd/bases
+	go run sigs.k8s.io/controller-tools/cmd/controller-gen@$(CONTROLLER_TOOLS_VERSION) rbac:roleName=manager-role paths=./internal/controller output:rbac:artifacts:config=config/rbac
 
 .PHONY: generate
-generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
-	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
+generate: ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
+	go run sigs.k8s.io/controller-tools/cmd/controller-gen@$(CONTROLLER_TOOLS_VERSION) object:headerFile="hack/boilerplate.go.txt" paths=./api/v1alpha1
 
 .PHONY: fmt
 fmt: ## Run go fmt against code.
@@ -133,11 +134,15 @@ vet: ## Run go vet against code.
 test: manifests generate fmt vet setup-envtest ## Run tests.
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)"  go test $(shell go list ./... | grep -v /test/) -coverprofile cover.out
 
+.PHONY: test-all
+test-all: lint test test-e2e ## Run linting, unit tests, and e2e tests sequentially.
+	@echo "All tests passed successfully! 🚀"
+
 # TODO(user): To use a different vendor for e2e tests, modify the setup under 'tests/e2e'.
 # The default setup assumes Kind is pre-installed and builds/loads the Manager Docker image locally.
 # CertManager is installed by default; skip with:
 # - CERT_MANAGER_INSTALL_SKIP=true
-KIND_CLUSTER ?= memcached-operator-test-e2e
+KIND_CLUSTER ?= typesense-operator-test-e2e
 
 .PHONY: setup-test-e2e
 setup-test-e2e: ## Set up a Kind cluster for e2e tests if it does not exist
@@ -155,7 +160,7 @@ setup-test-e2e: ## Set up a Kind cluster for e2e tests if it does not exist
 
 .PHONY: test-e2e
 test-e2e: setup-test-e2e manifests generate fmt vet ## Run the e2e tests. Expected an isolated environment using Kind.
-	KIND_CLUSTER=$(KIND_CLUSTER) go test ./test/e2e/ -v -ginkgo.v
+	KIND_CLUSTER=$(KIND_CLUSTER) go test ./test/e2e/ -v -ginkgo.v -timeout 30m
 	$(MAKE) cleanup-test-e2e
 
 .PHONY: cleanup-test-e2e
@@ -189,7 +194,7 @@ run: manifests generate fmt vet ## Run a controller from your host.
 # More info: https://docs.docker.com/develop/develop-images/build_enhancements/
 .PHONY: docker-build
 docker-build: ## Build docker image with the manager.
-	$(CONTAINER_TOOL) build $(DOCKER_BUILD_ARGS) -t ${IMG} .
+	DOCKER_BUILDKIT=1 $(CONTAINER_TOOL) build $(DOCKER_BUILD_ARGS) -t ${IMG} .
 
 .PHONY: docker-push
 docker-push: ## Push docker image with the manager.
@@ -263,16 +268,18 @@ $(LOCALBIN):
 
 ## Tool Binaries
 KUBECTL ?= kubectl
+KIND ?= kind
 KUSTOMIZE ?= $(LOCALBIN)/kustomize
 CONTROLLER_GEN ?= $(LOCALBIN)/controller-gen
 ENVTEST ?= $(LOCALBIN)/setup-envtest
 GOLANGCI_LINT = $(LOCALBIN)/golangci-lint
 
 ## Tool Versions
-KUSTOMIZE_VERSION ?= v5.4.3
-CONTROLLER_TOOLS_VERSION ?= v0.18.0
+KUSTOMIZE_VERSION ?= v5.8.1
+CONTROLLER_TOOLS_VERSION ?= v0.21.0
 ENVTEST_VERSION := $(shell go list -m -f "{{ .Version }}" sigs.k8s.io/controller-runtime | awk -F'[v.]' '{printf "release-%d.%d", $$2, $$3}')
-GOLANGCI_LINT_VERSION ?= v2.1.0
+GOLANGCI_LINT_VERSION ?= v2.12.2
+HELMIFY_VERSION ?= v0.4.20
 
 .PHONY: kustomize
 kustomize: $(KUSTOMIZE) ## Download kustomize locally if necessary.
@@ -396,10 +403,133 @@ HELMIFY ?= $(LOCALBIN)/helmify
 .PHONY: helmify
 helmify: $(HELMIFY) ## Download helmify locally if necessary.
 $(HELMIFY): $(LOCALBIN)
-	test -s $(LOCALBIN)/helmify || GOBIN=$(LOCALBIN) go install github.com/arttor/helmify/cmd/helmify@latest
+	$(call go-install-tool,$(HELMIFY),github.com/arttor/helmify/cmd/helmify,$(HELMIFY_VERSION))
+
+define WEBHOOK_ROLE_TEMPLATE
+{{- if and $$isNamespaced .Values.controllerManager.enableWebhooksInGappedMode }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "typesense-operator.fullname" . }}-webhook-role
+  labels:
+  {{- include "typesense-operator.labels" . | nindent 4 }}
+rules:
+- apiGroups:
+  - admissionregistration.k8s.io
+  resources:
+  - validatingwebhookconfigurations
+  verbs:
+  - get
+  - list
+  - patch
+  - update
+  - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "typesense-operator.fullname" . }}-webhook-rolebinding
+  labels:
+  {{- include "typesense-operator.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ include "typesense-operator.fullname" . }}-webhook-role
+subjects:
+- kind: ServiceAccount
+  name: {{ include "typesense-operator.serviceAccountName" . }}
+  namespace: {{ .Release.Namespace }}
+{{- if ne $$targetNamespace .Release.Namespace }}
+---
+# The webhook certificate secret is kept in the operator's own namespace, which is not covered by the
+# manager role when a different namespace is watched.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "typesense-operator.fullname" . }}-webhook-secret-role
+  namespace: {{ .Release.Namespace }}
+  labels:
+  {{- include "typesense-operator.labels" . | nindent 4 }}
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - secrets
+  verbs:
+  - create
+- apiGroups:
+  - ""
+  resources:
+  - secrets
+  resourceNames:
+  - typesense-operator-webhook-cert
+  verbs:
+  - get
+  - list
+  - patch
+  - update
+  - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "typesense-operator.fullname" . }}-webhook-secret-rolebinding
+  namespace: {{ .Release.Namespace }}
+  labels:
+  {{- include "typesense-operator.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "typesense-operator.fullname" . }}-webhook-secret-role
+subjects:
+- kind: ServiceAccount
+  name: {{ include "typesense-operator.serviceAccountName" . }}
+  namespace: {{ .Release.Namespace }}
+{{- end }}
+{{- end }}
+endef
+export WEBHOOK_ROLE_TEMPLATE
 
 helm: manifests kustomize helmify
-	$(KUSTOMIZE) build config/default | $(HELMIFY) -image-pull-secrets charts/typesense-operator
-	sed -i -e 's|^appVersion:.*|appVersion: "$(IMG_TAG)"|' -e 's|^version:.*|version: $(IMG_TAG)|' ./charts/typesense-operator/Chart.yaml
-	sed -i -E 's/(- Latest version: \*\*)[^*]+(\*\*)/\1$(IMG_TAG)\2/' ./README.md
-
+	@echo "0. Clean up old Helm templates"
+	@find charts/typesense-operator/templates -type f ! -name 'console-yaml-sample.yaml' ! -name 'NOTES.txt' ! -name '_helpers.tpl' -delete
+	@rm -f charts/typesense-operator/values.yaml
+	@echo "1. Generate Helm chart templates"
+	$(KUSTOMIZE) build config/default | $(HELMIFY) charts/typesense-operator
+	@echo "2. Update CRDs"
+	@# helm.sh/resource-policy: keep stops helm uninstall from deleting the CRD, which would delete every TypesenseCluster
+	@awk '1; /controller-gen.kubebuilder.io\/version:/ { print "    helm.sh/resource-policy: keep" } /name: typesenseclusters.ts.opentelekomcloud.com/ { print "  labels:\n  {{- include \"typesense-operator.labels\" . | nindent 4 }}" }' config/crd/bases/ts.opentelekomcloud.com_typesenseclusters.yaml > charts/typesense-operator/templates/typesensecluster-crd.yaml.tmp && mv charts/typesense-operator/templates/typesensecluster-crd.yaml.tmp charts/typesense-operator/templates/typesensecluster-crd.yaml
+	@echo "3. Inject dynamic Role/ClusterRole templating"
+	@for file in charts/typesense-operator/templates/manager-rbac.yaml charts/typesense-operator/templates/typesensecluster-viewer-*.yaml charts/typesense-operator/templates/typesensecluster-editor-*.yaml; do \
+		if [ -f "$$file" ]; then \
+			awk 'BEGIN { r=0; b=0 } /^kind: ClusterRole$$/ { if(b==0){ print "{{ $$isNamespaced := or .Values.controllerManager.watchNamespace .Values.controllerManager.watchCurrentNamespace -}}\n{{ $$targetNamespace := .Values.controllerManager.watchNamespace | default .Release.Namespace -}}\nkind: {{ if $$isNamespaced }}Role{{ else }}ClusterRole{{ end }}"; r=1; next } } /^kind: ClusterRoleBinding$$/ { print "kind: {{ if $$isNamespaced }}RoleBinding{{ else }}ClusterRoleBinding{{ end }}"; b=1; next } /^  name: / && r==1 { print $$0 "\n  {{- if $$isNamespaced }}\n  namespace: {{ $$targetNamespace }}\n  {{- end }}"; r=0; next } /^  name: / && b==1 { print $$0 "\n  {{- if $$isNamespaced }}\n  namespace: {{ $$targetNamespace }}\n  {{- end }}"; b=2; next } /^  kind: ClusterRole$$/ && b { print "  kind: {{ if $$isNamespaced }}Role{{ else }}ClusterRole{{ end }}"; next } 1' "$$file" > "$$file.tmp" && mv "$$file.tmp" "$$file"; \
+		fi; \
+	done
+	@echo "3.5 Wrap cluster-scoped RBAC rules"
+	@if [ -f charts/typesense-operator/templates/manager-rbac.yaml ]; then \
+		awk '/^- apiGroups:/ { if (in_rule) { print buf; if (is_cluster) print "{{- end }}"; } in_rule=1; is_cluster=0; buf=$$0; next } /^---/ { if (in_rule) { print buf; if (is_cluster) print "{{- end }}"; in_rule=0; } print $$0; next } in_rule { buf = buf "\n" $$0; if ($$0 ~ /- admissionregistration.k8s.io/) { is_cluster=1; buf="{{- if not $$isNamespaced }}\n" buf; } next } { print $$0 } END { if (in_rule) { print buf; if (is_cluster) print "{{- end }}"; } }' charts/typesense-operator/templates/manager-rbac.yaml > charts/typesense-operator/templates/manager-rbac.yaml.tmp && mv charts/typesense-operator/templates/manager-rbac.yaml.tmp charts/typesense-operator/templates/manager-rbac.yaml; \
+		echo "$${WEBHOOK_ROLE_TEMPLATE}" >> charts/typesense-operator/templates/manager-rbac.yaml; \
+	fi
+	@for file in charts/typesense-operator/templates/metrics-auth-rbac.yaml charts/typesense-operator/templates/metrics-reader-*.yaml; do \
+		if [ -f "$$file" ]; then \
+			awk 'BEGIN{print "{{- $$isNamespaced := or .Values.controllerManager.watchNamespace .Values.controllerManager.watchCurrentNamespace -}}\n{{- if not $$isNamespaced }}"} 1; END{print "{{- end }}"}' \
+			"$$file" > "$$file.tmp" && mv "$$file.tmp" "$$file"; \
+		fi; \
+	done
+	@for file in charts/typesense-operator/templates/webhook*.yaml charts/typesense-operator/templates/validating-webhook-configuration.yaml; do \
+		if [ -f "$$file" ]; then \
+			awk 'BEGIN{print "{{- $$isNamespaced := or .Values.controllerManager.watchNamespace .Values.controllerManager.watchCurrentNamespace -}}\n{{- if or (not $$isNamespaced) .Values.controllerManager.enableWebhooksInGappedMode }}"} 1; END{print "{{- end }}"}' \
+			"$$file" > "$$file.tmp" && mv "$$file.tmp" "$$file"; \
+		fi; \
+	done
+	@# helmify adds a cert-manager CA injection annotation without a certificate name; the operator manages the webhook certificate itself
+	@awk '/^  annotations:$$/ { hold=$$0; next } hold != "" { if ($$0 ~ /cert-manager.io\/inject-ca-from/) { hold=""; next } print hold; hold="" } 1' \
+		charts/typesense-operator/templates/validating-webhook-configuration.yaml > charts/typesense-operator/templates/validating-webhook-configuration.yaml.tmp && \
+		mv charts/typesense-operator/templates/validating-webhook-configuration.yaml.tmp charts/typesense-operator/templates/validating-webhook-configuration.yaml
+	@echo "4. Update Chart versions & Deployment variables"
+	@sed -e 's|^appVersion:.*|appVersion: "$(IMG_TAG)"|' -e 's|^version:.*|version: $(IMG_TAG)|' ./charts/typesense-operator/Chart.yaml > ./charts/typesense-operator/Chart.yaml.tmp && mv ./charts/typesense-operator/Chart.yaml.tmp ./charts/typesense-operator/Chart.yaml
+	@sed -E 's/(- Latest version: \*\*)[^*]+(\*\*)/\1$(IMG_TAG)\2/' ./README.md > ./README.md.tmp && mv ./README.md.tmp ./README.md
+	@awk '/- args: \{\{- toYaml/ { print "      - args:\n{{- range .Values.controllerManager.manager.args }}\n        - {{ . | quote }}\n{{- end }}\n{{- if .Values.controllerManager.watchNamespace }}\n        - --watch-namespace={{ .Values.controllerManager.watchNamespace }}\n{{- end }}\n{{- if .Values.controllerManager.watchCurrentNamespace }}\n        - --watch-current-namespace\n{{- end }}\n{{- if and (or .Values.controllerManager.watchNamespace .Values.controllerManager.watchCurrentNamespace) (not .Values.controllerManager.enableWebhooksInGappedMode) }}\n        - --enable-webhook=false\n{{- end }}"; next } /value: \{\{ quote \.Values\.kubernetesClusterDomain \}\}/ { print $$0 "\n        - name: POD_NAMESPACE\n          valueFrom:\n            fieldRef:\n              fieldPath: metadata.namespace\n        - name: WEBHOOK_SERVICE_NAME\n          value: {{ include \"typesense-operator.fullname\" . }}-webhook-service\n{{- if .Values.controllerManager.watchNamespace }}\n        - name: WATCH_NAMESPACE\n          value: {{ .Values.controllerManager.watchNamespace | quote }}\n{{- end }}\n{{- if .Values.controllerManager.watchCurrentNamespace }}\n        - name: WATCH_CURRENT_NAMESPACE\n          value: \"true\"\n{{- end }}"; next } /^      serviceAccountName:/ { print "      imagePullSecrets: {{ .Values.imagePullSecrets | default list | toJson }}\n" $$0; next } 1' charts/typesense-operator/templates/deployment.yaml > charts/typesense-operator/templates/deployment.yaml.tmp && mv charts/typesense-operator/templates/deployment.yaml.tmp charts/typesense-operator/templates/deployment.yaml
+	@echo "5. Post-process values.yaml"
+	@awk 'BEGIN { i=0; s=0; w=0 } /^controllerManager:/ { print $$0 "\n  # Restrict the operator to watch a specific target namespace (e.g. run in namespace X, watch namespace Y).\n  watchNamespace: \"\"\n  # Restrict the operator to watch only the namespace it is deployed in (run in X, watch X).\n  watchCurrentNamespace: false\n  # Allow webhooks to be created and grant cluster-wide validatingwebhookconfiguration permissions even in gapped mode.\n  enableWebhooksInGappedMode: false"; next } /^imagePullSecrets:/ { i=1 } /^serviceAccount:/ { s=1 } /^webhookService:/ { w=1 } 1; END { if(!s) print "\nserviceAccount:\n  create: true\n  automount: true\n  annotations: {}"; if(!i) print "imagePullSecrets: []"; if(!w) print "webhookService:\n  type: ClusterIP\n  ports:\n  - port: 443\n    protocol: TCP\n    targetPort: 9443" }' charts/typesense-operator/values.yaml > charts/typesense-operator/values.yaml.tmp && mv charts/typesense-operator/values.yaml.tmp charts/typesense-operator/values.yaml

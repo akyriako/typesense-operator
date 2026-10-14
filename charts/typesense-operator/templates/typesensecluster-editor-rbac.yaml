@@ -1,7 +1,12 @@
 apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRole
+{{ $isNamespaced := or .Values.controllerManager.watchNamespace .Values.controllerManager.watchCurrentNamespace -}}
+{{ $targetNamespace := .Values.controllerManager.watchNamespace | default .Release.Namespace -}}
+kind: {{ if $isNamespaced }}Role{{ else }}ClusterRole{{ end }}
 metadata:
   name: {{ include "typesense-operator.fullname" . }}-typesensecluster-editor-role
+  {{- if $isNamespaced }}
+  namespace: {{ $targetNamespace }}
+  {{- end }}
   labels:
   {{- include "typesense-operator.labels" . | nindent 4 }}
 rules:

@@ -34,6 +34,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	tsv1alpha1 "github.com/akyriako/typesense-operator/api/v1alpha1"
+	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
+	discoveryv1 "k8s.io/api/discovery/v1"
+	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
+	gatewayv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -79,6 +83,18 @@ var _ = BeforeSuite(func() {
 	Expect(cfg).NotTo(BeNil())
 
 	err = tsv1alpha1.AddToScheme(scheme.Scheme)
+	Expect(err).NotTo(HaveOccurred())
+
+	err = gatewayv1.Install(scheme.Scheme)
+	Expect(err).NotTo(HaveOccurred())
+
+	err = gatewayv1beta1.Install(scheme.Scheme)
+	Expect(err).NotTo(HaveOccurred())
+
+	err = monitoringv1.AddToScheme(scheme.Scheme)
+	Expect(err).NotTo(HaveOccurred())
+
+	err = discoveryv1.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
 
 	// +kubebuilder:scaffold:scheme

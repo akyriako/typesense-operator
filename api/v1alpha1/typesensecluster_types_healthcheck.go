@@ -6,13 +6,16 @@ import (
 )
 
 type HealthCheckSpec struct {
+	// Image specifies the Docker image to use for the Typesense health check sidecar container.
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default:="quay.io/akyriako/typesense-healthcheck:0.2.0"
 	Image string `json:"image,omitempty"`
 
+	// Resources defines the compute resource requirements (CPU/Memory) for the health check sidecar container.
 	// +kubebuilder:validation:Optional
 	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
 
+	// LogLevel specifies the verbosity of the health check sidecar logs. Valid values are -4 (debug), 0 (info), 4 (warn), 8 (error).
 	// +optional
 	// +kubebuilder:default=0
 	// +kubebuilder:validation:Minimum=-4

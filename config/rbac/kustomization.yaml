@@ -24,4 +24,3 @@ resources:
 # if you do not want those helpers be installed with your Project.
 - typesensecluster_editor_role.yaml
 - typesensecluster_viewer_role.yaml
-

@@ -17,16 +17,14 @@ limitations under the License.
 package e2e
 
 import (
-	"fmt"
 	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
 
-// Run e2e tests using the Ginkgo runner.
+// TestE2E runs the end-to-end tests for the operator.
 func TestE2E(t *testing.T) {
 	RegisterFailHandler(Fail)
-	_, _ = fmt.Fprintf(GinkgoWriter, "Starting typesense-operator suite\n")
-	RunSpecs(t, "e2e suite")
+	RunSpecs(t, "Typesense Operator E2E Suite")
 }

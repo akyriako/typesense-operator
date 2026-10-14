@@ -1,0 +1,5 @@
+# Check out text files with LF on every platform, so tools running on Windows and in WSL (gofmt,
+# controller-gen, make) agree on line endings and do not leave unrelated files modified.
+* text=auto eol=lf
+
+*.png binary
