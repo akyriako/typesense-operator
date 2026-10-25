@@ -52,7 +52,7 @@ OPERATOR_SDK_VERSION ?= v1.39.0
 # Image URL to use all building/pushing image targets
 DOCKER_HUB_NAME ?= quay.io/akyriako#$(shell docker info | sed '/Username:/!d;s/.* //')
 IMG_NAME ?= typesense-operator
-IMG_TAG ?= 0.5.0-dev.1
+IMG_TAG ?= 0.4.2
 IMG ?= $(DOCKER_HUB_NAME)/$(IMG_NAME):$(IMG_TAG)
 
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
@@ -189,7 +189,7 @@ run: manifests generate fmt vet ## Run a controller from your host.
 # More info: https://docs.docker.com/develop/develop-images/build_enhancements/
 .PHONY: docker-build
 docker-build: ## Build docker image with the manager.
-	$(CONTAINER_TOOL) build $(DOCKER_BUILD_ARGS) -t ${IMG} .
+	$(CONTAINER_TOOL) build --pull --no-cache $(DOCKER_BUILD_ARGS) -t ${IMG} .
 
 .PHONY: docker-push
 docker-push: ## Push docker image with the manager.
@@ -208,7 +208,7 @@ docker-buildx: ## Build and push docker image for the manager for cross-platform
 	sed -e '1 s/\(^FROM\)/FROM --platform=\$$\{BUILDPLATFORM\}/; t' -e ' 1,// s//FROM --platform=\$$\{BUILDPLATFORM\}/' Dockerfile > Dockerfile.cross
 	- $(CONTAINER_TOOL) buildx create --name typesense-operator-builder
 	$(CONTAINER_TOOL) buildx use typesense-operator-builder
-	- $(CONTAINER_TOOL) buildx build --push --platform=$(PLATFORMS) $(DOCKER_BUILD_ARGS) --tag ${IMG} -f Dockerfile.cross .
+	- $(CONTAINER_TOOL) buildx build --push --no-cache --push --platform=$(PLATFORMS) $(DOCKER_BUILD_ARGS) --tag ${IMG} -f Dockerfile.cross .
 	- $(CONTAINER_TOOL) buildx rm typesense-operator-builder
 	rm Dockerfile.cross
 
