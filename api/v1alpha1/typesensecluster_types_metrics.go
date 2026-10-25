@@ -9,7 +9,7 @@ type MetricsExporterSpec struct {
 	Release string `json:"release"`
 
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default:="quay.io/akyriako/typesense-prometheus-exporter:0.1.9"
+	// +kubebuilder:default:="quay.io/akyriako/typesense-prometheus-exporter:0.1.10"
 	Image string `json:"image,omitempty"`
 
 	// +optional
@@ -42,7 +42,7 @@ func (s *TypesenseClusterSpec) GetMetricsExporterSpecs() MetricsExporterSpec {
 
 	return MetricsExporterSpec{
 		Release:           "promstack",
-		Image:             "quay.io/akyriako/typesense-prometheus-exporter:0.1.9",
+		Image:             "quay.io/akyriako/typesense-prometheus-exporter:0.1.10",
 		IntervalInSeconds: 15,
 	}
 }
