@@ -1,4 +1,5 @@
 controllerManager:
+  affinity: {}
   manager:
     args:
     - --metrics-bind-address=:8443
@@ -21,11 +22,13 @@ controllerManager:
       requests:
         cpu: 10m
         memory: 64Mi
+  nodeSelector: {}
   podSecurityContext:
     runAsNonRoot: true
   replicas: 1
   serviceAccount:
     annotations: {}
+  tolerations: []
 imagePullSecrets: []
 kubernetesClusterDomain: cluster.local
 metricsService:
