@@ -32,6 +32,25 @@ helm repo update
 helm upgrade --install typesense-operator tyko/typesense-operator -n typesense-system --create-namespace --reset-values
 ```
 
+Alternatively, install the Operator from the OCI registry (GitHub Container Registry):
+
+```bash
+# Install the Operator from the OCI registry
+helm upgrade --install typesense-operator oci://ghcr.io/akyriako/charts/typesense-operator --version <version> -n typesense-system --create-namespace --reset-values
+```
+
+<details>
+<summary>Verify the signature of the OCI chart</summary>
+
+Charts published to the OCI registry are signed with keyless [cosign](https://docs.sigstore.dev/cosign/) by the release workflow:
+
+```bash
+cosign verify ghcr.io/akyriako/charts/typesense-operator:<version> \
+  --certificate-identity https://github.com/akyriako/typesense-operator/.github/workflows/releases.yaml@refs/heads/main \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com
+```
+</details>
+
 <details>
 <summary>Quick example for Open Telekom Cloud CCE</summary>
 
