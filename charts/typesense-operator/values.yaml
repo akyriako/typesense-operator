@@ -11,6 +11,7 @@ controllerManager:
       capabilities:
         drop:
         - ALL
+      readOnlyRootFilesystem: true
     image:
       repository: quay.io/akyriako/typesense-operator
       tag: 0.4.2
