@@ -47,10 +47,33 @@ spec:
           }}
         securityContext: {{- toYaml .Values.controllerManager.manager.containerSecurityContext
           | nindent 10 }}
+        volumeMounts:
+        - name: serviceaccount
+          mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+          readOnly: true
+      volumes:
+      - name: serviceaccount
+        projected:
+          sources:
+          - configMap:
+              name: kube-root-ca.crt
+              items:
+              - key: ca.crt
+                path: ca.crt
+          - downwardAPI:
+              items:
+              - fieldRef:
+                  apiVersion: v1
+                  fieldPath: metadata.namespace
+                path: namespace
+          - serviceAccountToken:
+              expirationSeconds: 3600
+              path: token
       imagePullSecrets: {{ .Values.imagePullSecrets | default list | toJson }}
       nodeSelector: {{- toYaml .Values.controllerManager.nodeSelector | nindent 8 }}
       securityContext: {{- toYaml .Values.controllerManager.podSecurityContext | nindent
         8 }}
       serviceAccountName: {{ include "typesense-operator.fullname" . }}-controller-manager
+      automountServiceAccountToken: false
       terminationGracePeriodSeconds: 10
       tolerations: {{- toYaml .Values.controllerManager.tolerations | nindent 8 }}
