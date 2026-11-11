@@ -94,7 +94,28 @@ spec:
           requests:
             cpu: 10m
             memory: 64Mi
-        volumeMounts: []
-      volumes: []
+        volumeMounts:
+        - name: serviceaccount
+          mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+          readOnly: true
+      volumes:
+      - name: serviceaccount
+        projected:
+          sources:
+          - configMap:
+              name: kube-root-ca.crt
+              items:
+              - key: ca.crt
+                path: ca.crt
+          - downwardAPI:
+              items:
+              - fieldRef:
+                  apiVersion: v1
+                  fieldPath: metadata.namespace
+                path: namespace
+          - serviceAccountToken:
+              expirationSeconds: 3600
+              path: token
       serviceAccountName: controller-manager
+      automountServiceAccountToken: false
       terminationGracePeriodSeconds: 10
