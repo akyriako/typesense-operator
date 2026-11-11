@@ -1,5 +1,6 @@
 controllerManager:
   manager:
+    affinity: {}
     args:
     - --metrics-bind-address=:8443
     - --leader-elect
@@ -21,6 +22,7 @@ controllerManager:
       requests:
         cpu: 10m
         memory: 64Mi
+    tolerations: []
   podSecurityContext:
     runAsNonRoot: true
   replicas: 1
