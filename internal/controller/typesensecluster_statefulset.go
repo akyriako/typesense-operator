@@ -246,6 +246,7 @@ func (r *TypesenseClusterReconciler) buildStatefulSet(ctx context.Context, key c
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: getObjectMeta(ts, &key.Name, podAnnotations),
 				Spec: corev1.PodSpec{
+					AutomountServiceAccountToken:  ptr.To[bool](false),
 					SecurityContext:               ts.Spec.GetPodSecurityContext(),
 					TerminationGracePeriodSeconds: ptr.To[int64](5),
 					ReadinessGates: []corev1.PodReadinessGate{
