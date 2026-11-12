@@ -1,4 +1,8 @@
 name: Release Charts
+
+# The file name is part of the cosign certificate identity documented in the README.
+# Renaming .github/workflows/releases.yaml@refs/heads/main breaks signature verification.
+
 on:
 #  push:
 #    branches:
@@ -12,8 +16,11 @@ on:
 
 jobs:
   chart-release:
+    if: github.ref == 'refs/heads/main'
     permissions:
       contents: write
+      packages: write
+      id-token: write
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -30,3 +37,70 @@ jobs:
         uses: helm/chart-releaser-action@v1.6.0
         env:
           CR_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+
+      - name: Install cosign
+        uses: sigstore/cosign-installer@756fe2d284c7292c4e9b62c8a28f1e5629c59532 # v4.1.3
+
+      - name: Log in to GHCR
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: echo "${GHCR_TOKEN}" | docker login ghcr.io --username "${GITHUB_ACTOR}" --password-stdin
+
+      - name: Push charts to GHCR, sign and verify them
+        run: |
+          shopt -s nullglob
+          oci_repo="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/charts"
+          cert_identity="https://github.com/${GITHUB_REPOSITORY}/.github/workflows/releases.yaml@refs/heads/main"
+          cert_oidc_issuer="https://token.actions.githubusercontent.com"
+
+          # Github Actions helper to ensure error annotations are properly escaped
+          fail() {
+            local msg="$*"
+            msg="${msg//'%'/'%25'}"
+            msg="${msg//$'\r'/'%0D'}"
+            msg="${msg//$'\n'/'%0A'}"
+            echo "::error::${msg}"
+            exit 1
+          }
+
+          pkgs=(.cr-release-packages/*.tgz)
+          if (( ${#pkgs[@]} == 0 )); then
+            fail "No chart packages found in .cr-release-packages/ (did chart-releaser detect any chart changes?) - nothing to push to ${oci_repo}"
+          fi
+
+          for pkg in "${pkgs[@]}"; do
+            # Pushed:/Digest: lines are printed to stderr by Helm 3 and stdout by Helm 4, so we capture both
+            out=$(helm push "${pkg}" "oci://${oci_repo}" 2>&1) || {
+              echo "${out}"
+              fail "helm push failed for ${pkg}"
+            }
+            echo "${out}"
+
+            ref=$(sed -n 's/^Pushed: //p' <<< "${out}")
+            digest=$(sed -n 's/^Digest: //p' <<< "${out}")
+
+            if [[ -z "${ref}" ]]; then
+              fail "helm push output for ${pkg} contains no 'Pushed:' reference"
+            fi
+            if [[ -z "${digest}" ]]; then
+              fail "helm push output for ${pkg} contains no 'Digest:'"
+            fi
+
+            if [[ ! "${ref}" =~ ^"${oci_repo}"/[a-z0-9._-]+:[A-Za-z0-9_][A-Za-z0-9._-]{0,127}$ ]]; then
+              fail "Unexpected 'Pushed:' reference for ${pkg}: '${ref}' (expected ${oci_repo}/<chart>:<version>)"
+            fi
+            if [[ ! "${digest}" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+              fail "Unexpected 'Digest:' for ${pkg}: '${digest}' (expected sha256:<64 hex characters>)"
+            fi
+
+            image="${ref%:*}@${digest}"
+
+            echo "Signing ${image}"
+            cosign sign --yes "${image}" || fail "cosign sign failed for ${image}"
+
+            echo "Verifying ${image} (certificate identity ${cert_identity}, OIDC issuer ${cert_oidc_issuer})"
+            cosign verify "${image}" \
+              --certificate-identity "${cert_identity}" \
+              --certificate-oidc-issuer "${cert_oidc_issuer}" \
+              || fail "cosign verify failed for ${image} (certificate identity ${cert_identity}, OIDC issuer ${cert_oidc_issuer})"
+          done
