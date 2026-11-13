@@ -42,8 +42,7 @@ func (r *TypesenseClusterReconciler) shouldUpdateStatefulSet(sts *appsv1.Statefu
 	}
 
 	// SpecReplicasChanged
-	if *sts.Spec.Replicas != ts.Spec.Replicas &&
-		(condition.Reason != string(ConditionReasonQuorumDowngraded) || condition.Reason != string(ConditionReasonQuorumQueuedWrites)) {
+	if *sts.Spec.Replicas != ts.Spec.Replicas && !r.shouldHoldScaleUp(sts, ts, condition.Reason) {
 		triggers = append(triggers, SpecReplicasChanged)
 		update = false
 		scaleOnly = true
@@ -120,8 +119,7 @@ func (r *TypesenseClusterReconciler) shouldEmergencyUpdateStatefulSet(sts *appsv
 		return false
 	}
 
-	if *sts.Spec.Replicas != ts.Spec.Replicas &&
-		(condition.Reason != string(ConditionReasonQuorumDowngraded) || condition.Reason != string(ConditionReasonQuorumQueuedWrites)) {
+	if *sts.Spec.Replicas != ts.Spec.Replicas && !r.shouldHoldScaleUp(sts, ts, condition.Reason) {
 		return true
 	}
 
@@ -156,6 +154,23 @@ func (r *TypesenseClusterReconciler) shouldEmergencyUpdateStatefulSet(sts *appsv
 	}
 
 	return false
+}
+
+// shouldHoldScaleUp reports whether a scale up is left to ReconcileQuorum, which adds the replicas through
+// upgradeQuorum once the quorum is ready and has no queued writes. Scaling down is never held, and neither is
+// scaling up from zero, as without pods there is no quorum to wait for.
+func (r *TypesenseClusterReconciler) shouldHoldScaleUp(sts *appsv1.StatefulSet, ts *tsv1alpha1.TypesenseCluster, reason string) bool {
+	if *sts.Spec.Replicas == 0 || *sts.Spec.Replicas >= ts.Spec.Replicas {
+		return false
+	}
+
+	// held here rather than in skipConditions, so that other updates still roll out
+	if reason == string(ConditionReasonQuorumQueuedWrites) || reason == string(ConditionReasonQuorumNeedsAttentionClusterIsLagging) {
+		return true
+	}
+
+	_, hold := contains(skipConditions, reason)
+	return hold
 }
 
 func (r *TypesenseClusterReconciler) buildStatefulSetHash(ctx context.Context, sts *appsv1.StatefulSet, ts *tsv1alpha1.TypesenseCluster) (*string, error) {
