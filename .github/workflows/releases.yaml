@@ -1,25 +1,28 @@
 name: Release Charts
+
 on:
-#  push:
-#    branches:
-#      - main
-#    tags:
-#      - "v*.*.*"
   workflow_dispatch:
-    paths-ignore:
-      - '**/README.md'
-      - "**/.github/workflows/**"
+
+permissions: {}
+
+concurrency:
+  group: release-charts
+  cancel-in-progress: false
 
 jobs:
   chart-release:
+    if: github.ref == 'refs/heads/main'
     permissions:
       contents: write
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+          # chart-releaser pushes index.yaml to gh-pages from a git worktree, which needs the persisted credentials
+          persist-credentials: true
 
       - name: Configure Git
         run: |
@@ -27,6 +30,6 @@ jobs:
           git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
 
       - name: Run chart-releaser
-        uses: helm/chart-releaser-action@v1.6.0
+        uses: helm/chart-releaser-action@92c6b97fa9f664492a2592e0d1d80bc6bf378957 # v1.9.0
         env:
           CR_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
