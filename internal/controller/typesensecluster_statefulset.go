@@ -28,6 +28,19 @@ const (
 	rancherDomainAnnotationKey         = "cattle.io"
 )
 
+// skipConditions are the Ready reasons under which ReconcileStatefulSet leaves the StatefulSet to ReconcileQuorum,
+// apart from emergency updates
+var skipConditions = []string{
+	string(ConditionReasonQuorumDowngraded),
+	string(ConditionReasonQuorumUpgraded),
+	string(ConditionReasonQuorumNeedsAttentionMemoryOrDiskIssue),
+	// string(ConditionReasonQuorumNeedsAttentionClusterIsLagging),
+	string(ConditionReasonQuorumNotReady),
+	ConditionReasonStatefulSetNotReady,
+	ConditionReasonReconciliationInProgress,
+	string(ConditionReasonQuorumNotReadyWaitATerm),
+}
+
 func (r *TypesenseClusterReconciler) ReconcileStatefulSet(ctx context.Context, ts *tsv1alpha1.TypesenseCluster) (*appsv1.StatefulSet, bool, error) {
 	r.logger.V(debugLevel).Info("reconciling statefulset")
 
@@ -64,17 +77,6 @@ func (r *TypesenseClusterReconciler) ReconcileStatefulSet(ctx context.Context, t
 		r.logLagThresholds(sts)
 		return sts, false, nil
 	} else {
-		skipConditions := []string{
-			string(ConditionReasonQuorumDowngraded),
-			string(ConditionReasonQuorumUpgraded),
-			string(ConditionReasonQuorumNeedsAttentionMemoryOrDiskIssue),
-			//string(ConditionReasonQuorumNeedsAttentionClusterIsLagging),
-			string(ConditionReasonQuorumNotReady),
-			ConditionReasonStatefulSetNotReady,
-			ConditionReasonReconciliationInProgress,
-			string(ConditionReasonQuorumNotReadyWaitATerm),
-		}
-
 		condition := r.getConditionReady(ts)
 
 		if condition != nil {
@@ -193,7 +195,10 @@ func (r *TypesenseClusterReconciler) createStatefulSet(ctx context.Context, key 
 
 func (r *TypesenseClusterReconciler) updateStatefulSet(ctx context.Context, sts *appsv1.StatefulSet, desired *appsv1.StatefulSet) (*appsv1.StatefulSet, error) {
 	patch := client.MergeFrom(sts.DeepCopy())
+	replicas := sts.Spec.Replicas
 	sts.Spec = desired.Spec
+	// replicas are only changed by ScaleStatefulSet, so that an update does not override a held scale up
+	sts.Spec.Replicas = replicas
 
 	sts.ObjectMeta.Annotations = desired.ObjectMeta.Annotations
 
