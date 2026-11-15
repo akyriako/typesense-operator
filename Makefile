@@ -208,9 +208,10 @@ docker-buildx: ## Build and push docker image for the manager for cross-platform
 	sed -e '1 s/\(^FROM\)/FROM --platform=\$$\{BUILDPLATFORM\}/; t' -e ' 1,// s//FROM --platform=\$$\{BUILDPLATFORM\}/' Dockerfile > Dockerfile.cross
 	- $(CONTAINER_TOOL) buildx create --name typesense-operator-builder
 	$(CONTAINER_TOOL) buildx use typesense-operator-builder
-	- $(CONTAINER_TOOL) buildx build --push --no-cache --push --platform=$(PLATFORMS) $(DOCKER_BUILD_ARGS) --tag ${IMG} -f Dockerfile.cross .
-	- $(CONTAINER_TOOL) buildx rm typesense-operator-builder
-	rm Dockerfile.cross
+	status=0; $(CONTAINER_TOOL) buildx build --push --no-cache --platform=$(PLATFORMS) $(DOCKER_BUILD_ARGS) --tag ${IMG} -f Dockerfile.cross . || status=$$?; \
+		$(CONTAINER_TOOL) buildx rm typesense-operator-builder || true; \
+		rm -f Dockerfile.cross; \
+		exit $$status
 
 .PHONY: docker-release
 docker-release:
