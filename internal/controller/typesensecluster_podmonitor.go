@@ -16,13 +16,14 @@ import (
 const prometheusApiGroup = "monitoring.coreos.com"
 
 func (r *TypesenseClusterReconciler) ReconcilePodMonitor(ctx context.Context, ts tsv1alpha1.TypesenseCluster) error {
-	// TODO Remove in future version 0.2.15+
-	r.deleteMetricsExporterServiceMonitor(ctx, ts)
+	deployed, err := r.IsApiGroupDeployed(prometheusApiGroup)
+	if err != nil {
+		return err
+	}
 
-	if deployed, err := r.IsApiGroupDeployed(prometheusApiGroup); err != nil || !deployed {
+	if !deployed {
 		if ts.Spec.Metrics != nil {
-			err := fmt.Errorf("prometheus api group %s was not found in cluster", prometheusApiGroup)
-			r.logger.Error(err, "reconciling podmonitor skipped")
+			r.logger.V(debugLevel).Info("reconciling podmonitor skipped: prometheus API group not found", "apiGroup", prometheusApiGroup)
 		}
 		return nil
 	}
