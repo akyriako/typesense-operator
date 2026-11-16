@@ -22,6 +22,7 @@ import (
 	"strings"
 	"time"
 
+	tsv1alpha1 "github.com/akyriako/typesense-operator/api/v1alpha1"
 	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -32,13 +33,8 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/predicate"
-
-	tsv1alpha1 "github.com/akyriako/typesense-operator/api/v1alpha1"
 )
 
 // TypesenseClusterReconciler reconciles a TypesenseCluster object
@@ -59,20 +55,6 @@ type TypesenseClusterReconciliationPhase struct {
 }
 
 var (
-	eventFilters = builder.WithPredicates(predicate.Funcs{
-		UpdateFunc: func(e event.UpdateEvent) bool {
-			// We only need to check generation changes here, because it is only
-			// updated on spec changes. On the other hand RevisionVersion
-			// changes also on status changes. We want to omit reconciliation
-			// for status updates.
-			return e.ObjectOld.GetGeneration() != e.ObjectNew.GetGeneration()
-		},
-		DeleteFunc: func(e event.DeleteEvent) bool {
-			// DeleteStateUnknown evaluates to false only if the object
-			// has been confirmed as deleted by the api server.
-			return !e.DeleteStateUnknown
-		},
-	})
 	// kubelets sync configmaps by default every minute so let's wait for 2 minutes
 	configMapRequeuePeriod = 2 * time.Minute
 	reconcileRequeuePeriod = 60 * time.Second
@@ -249,7 +231,7 @@ func (r *TypesenseClusterReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		r.Recorder.Eventf(&ts, "Warning", string(cond), toTitle(err.Error()))
 	}
 
-	condition, _, err := r.ReconcileQuorum(ctx, &ts, secret, client.ObjectKeyFromObject(sts))
+	condition, size, rao, err := r.ReconcileQuorum(ctx, &ts, secret, client.ObjectKeyFromObject(sts))
 	if err != nil {
 		r.logger.Error(err, "reconciling quorum health failed")
 	}
@@ -283,6 +265,12 @@ func (r *TypesenseClusterReconciler) Reconcile(ctx context.Context, req ctrl.Req
 			}
 
 			r.Recorder.Eventf(&ts, "Warning", string(condition), toTitle(err.Error()))
+
+			if cond != ConditionReasonQuorumNotReadyWaitATerm {
+				requeueAfterOverride := time.Duration(RequeueFastOnErrorInSeconds) * time.Second
+				requeueAfter = min(requeueAfterOverride, requeueAfter)
+			}
+
 		} else {
 			report := ts.Status.Conditions[0].Status != metav1.ConditionTrue
 
@@ -294,19 +282,20 @@ func (r *TypesenseClusterReconciler) Reconcile(ctx context.Context, req ctrl.Req
 			if report {
 				r.Recorder.Eventf(&ts, "Normal", string(condition), toTitle("quorum is ready"))
 			}
+
+			if size != 0 && int32(size) < ts.Spec.Replicas {
+				requeueAfterOverride := time.Duration(RequeueFastOnErrorInSeconds) * time.Second
+				requeueAfter = min(requeueAfterOverride, requeueAfter)
+			}
 		}
 	}
 
 	cond = condition
+	if rao > 0 {
+		requeueAfterOverride := time.Duration(rao) * time.Second
+		requeueAfter = min(requeueAfterOverride, requeueAfter)
+	}
 
 	r.logger.Info(fmt.Sprintf("%s cluster completed", string(action)), "condition", cond, "requeueAfter", requeueAfter)
 	return ctrl.Result{RequeueAfter: requeueAfter}, nil
-}
-
-// SetupWithManager sets up the controller with the Manager.
-func (r *TypesenseClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewControllerManagedBy(mgr).
-		For(&tsv1alpha1.TypesenseCluster{}, eventFilters).
-		Named("typesense-kubernetes-operator").
-		Complete(r)
 }

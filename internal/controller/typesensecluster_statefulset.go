@@ -3,6 +3,7 @@ package controller
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strconv"
 	"time"
 
@@ -652,4 +653,37 @@ func (r *TypesenseClusterReconciler) GetFreshStatefulSet(ctx context.Context, st
 	}
 
 	return sts, nil
+}
+
+func (r *TypesenseClusterReconciler) hasPodsInStartupGracePeriod(ctx context.Context, sts *appsv1.StatefulSet) (bool, error) {
+	labelSelector := labels.SelectorFromSet(sts.Spec.Selector.MatchLabels)
+
+	var pods corev1.PodList
+	if err := r.List(ctx, &pods, &client.ListOptions{
+		Namespace:     sts.Namespace,
+		LabelSelector: labelSelector,
+	}); err != nil {
+		r.logger.Error(err, "fetching pods: failed to list pods", "statefulset", sts.Name)
+		return false, err
+	}
+
+	terminationGracePeriod := int64(30)
+	if sts.Spec.Template.Spec.TerminationGracePeriodSeconds != nil {
+		terminationGracePeriod = *sts.Spec.Template.Spec.TerminationGracePeriodSeconds
+	}
+
+	gracePeriod := reconcileRequeuePeriod + time.Duration(terminationGracePeriod)*time.Second
+	hasRestarted := func(status corev1.ContainerStatus) bool {
+		return status.RestartCount > 0
+	}
+
+	for _, pod := range pods.Items {
+		if time.Since(pod.CreationTimestamp.Time) < gracePeriod &&
+			!slices.ContainsFunc(pod.Status.ContainerStatuses, hasRestarted) &&
+			!slices.ContainsFunc(pod.Status.InitContainerStatuses, hasRestarted) {
+			return true, nil
+		}
+	}
+
+	return false, nil
 }
