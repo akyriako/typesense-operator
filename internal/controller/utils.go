@@ -12,6 +12,7 @@ import (
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
 	corev1 "k8s.io/api/core/v1"
+	discoveryv1 "k8s.io/api/discovery/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -326,4 +327,26 @@ func externalTrafficPolicyEqual(
 	}
 
 	return current == *desired
+}
+
+func endpointSliceMembers(es *discoveryv1.EndpointSlice) []string {
+	members := make([]string, 0)
+
+	for _, endpoint := range es.Endpoints {
+		target := ""
+
+		if endpoint.TargetRef != nil {
+			target = endpoint.TargetRef.Name
+		}
+
+		for _, address := range endpoint.Addresses {
+			members = append(
+				members,
+				target+"|"+address,
+			)
+		}
+	}
+
+	sort.Strings(members)
+	return members
 }

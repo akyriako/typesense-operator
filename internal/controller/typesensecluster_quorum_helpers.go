@@ -296,9 +296,11 @@ func (r *TypesenseClusterReconciler) getHealthyLagThresholds(ctx context.Context
 }
 
 func (r *TypesenseClusterReconciler) getHttpClient(ts *tsv1alpha1.TypesenseCluster) (*http.Client, error) {
+	timeout := time.Duration(ts.Spec.HealthProbeTimeoutInMilliseconds) * time.Millisecond
+
 	if r.InCluster {
 		return &http.Client{
-			Timeout: time.Duration(ts.Spec.HealthProbeTimeoutInMilliseconds) * time.Millisecond,
+			Timeout: timeout,
 		}, nil
 	}
 
@@ -309,7 +311,7 @@ func (r *TypesenseClusterReconciler) getHttpClient(ts *tsv1alpha1.TypesenseClust
 		return nil, err
 	}
 
-	httpClient.Timeout = time.Duration(ts.Spec.HealthProbeTimeoutInMilliseconds) * time.Millisecond
+	httpClient.Timeout = timeout
 	r.logger.V(debugLevel).Info("fallback to kube-proxy for http calls")
 
 	return httpClient, nil
