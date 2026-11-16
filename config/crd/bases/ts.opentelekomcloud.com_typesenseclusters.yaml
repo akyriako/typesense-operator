@@ -3518,6 +3518,10 @@ spec:
                 type: object
               metrics:
                 properties:
+                  annotations:
+                    additionalProperties:
+                      type: string
+                    type: object
                   image:
                     default: quay.io/akyriako/typesense-prometheus-exporter:0.1.10
                     type: string
@@ -3526,6 +3530,10 @@ spec:
                     maximum: 60
                     minimum: 15
                     type: integer
+                  labels:
+                    additionalProperties:
+                      type: string
+                    type: object
                   logLevel:
                     default: 0
                     enum:
@@ -3598,8 +3606,6 @@ spec:
                           More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
                         type: object
                     type: object
-                required:
-                - release
                 type: object
               nodeSelector:
                 additionalProperties:

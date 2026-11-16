@@ -135,9 +135,18 @@ func getReverseProxyObjectMeta(ts *tsv1alpha1.TypesenseCluster, name *string, an
 }
 
 func getPodMonitorLabels(ts *tsv1alpha1.TypesenseCluster) map[string]string {
-	return map[string]string{
-		"app": fmt.Sprintf(ClusterMetricsPodMonitorAppLabel, ts.Name),
+	labels := make(map[string]string)
+	labels["app"] = fmt.Sprintf(ClusterMetricsPodMonitorAppLabel, ts.Name)
+
+	if ts.Spec.Metrics.Release != "" {
+		labels["release"] = ts.Spec.Metrics.Release
 	}
+
+	if ts.Spec.Metrics != nil && ts.Spec.Metrics.Labels != nil {
+		labels = mergeLabels(labels, ts.Spec.Metrics.Labels)
+	}
+
+	return labels
 }
 
 func getIngressObjectMeta(ts *tsv1alpha1.TypesenseCluster, name *string, labels, annotations map[string]string) metav1.ObjectMeta {
@@ -158,6 +167,10 @@ func getIngressObjectMeta(ts *tsv1alpha1.TypesenseCluster, name *string, labels,
 func getPodMonitorObjectMeta(ts *tsv1alpha1.TypesenseCluster, name *string, annotations map[string]string) metav1.ObjectMeta {
 	if name == nil {
 		name = &ts.Name
+	}
+
+	if ts.Spec.Metrics != nil && ts.Spec.Metrics.Annotations != nil {
+		annotations = mergeAnnotations(annotations, ts.Spec.Metrics.Annotations)
 	}
 
 	return metav1.ObjectMeta{

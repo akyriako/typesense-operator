@@ -7,6 +7,7 @@ import (
 	tsv1alpha1 "github.com/akyriako/typesense-operator/api/v1alpha1"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	appsv1 "k8s.io/api/apps/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -64,7 +65,10 @@ func (r *TypesenseClusterReconciler) ReconcilePodMonitor(ctx context.Context, ts
 			return err
 		}
 	} else {
-		if ts.Spec.Metrics.Release != podMonitor.ObjectMeta.Labels["release"] || monitoringv1.Duration(fmt.Sprintf("%ds", ts.Spec.Metrics.IntervalInSeconds)) != podMonitor.Spec.PodMetricsEndpoints[0].Interval {
+		objectMeta := getPodMonitorObjectMeta(&ts, &podMonitorObjectKey.Name, nil)
+		if !apiequality.Semantic.DeepEqual(ts.Spec.Metrics.Labels, objectMeta.Labels) ||
+			!apiequality.Semantic.DeepEqual(ts.Spec.Metrics.Annotations, objectMeta.Annotations) ||
+			monitoringv1.Duration(fmt.Sprintf("%ds", ts.Spec.Metrics.IntervalInSeconds)) != podMonitor.Spec.PodMetricsEndpoints[0].Interval {
 			r.logger.V(debugLevel).Info("updating podmonitor", "podmonitor", podMonitorObjectKey.Name)
 
 			err := r.deleteMetricsExporterPodMonitor(ctx, podMonitor)
@@ -86,7 +90,6 @@ func (r *TypesenseClusterReconciler) ReconcilePodMonitor(ctx context.Context, ts
 
 func (r *TypesenseClusterReconciler) createMetricsExporterPodMonitor(ctx context.Context, key client.ObjectKey, ts *tsv1alpha1.TypesenseCluster) error {
 	objectMeta := getPodMonitorObjectMeta(ts, &key.Name, nil)
-	objectMeta.Labels["release"] = ts.Spec.Metrics.Release
 
 	podMonitor := &monitoringv1.PodMonitor{
 		ObjectMeta: objectMeta,
