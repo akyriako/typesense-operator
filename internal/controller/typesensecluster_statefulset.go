@@ -441,7 +441,7 @@ func (r *TypesenseClusterReconciler) buildStatefulSet(ctx context.Context, key c
 							},
 						},
 					},
-					Affinity:                  ts.Spec.Affinity,
+					Affinity:                  ts.Spec.GetAffinity(getLabels(ts)),
 					NodeSelector:              ts.Spec.NodeSelector,
 					Tolerations:               ts.Spec.Tolerations,
 					TopologySpreadConstraints: ts.Spec.GetTopologySpreadConstraints(getLabels(ts)),
