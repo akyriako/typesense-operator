@@ -87,7 +87,7 @@ func (r *TypesenseClusterReconciler) ReconcileStatefulSet(ctx context.Context, t
 				}
 
 				update, scaleOnly, triggers := r.shouldUpdateStatefulSet(sts, desiredSts, ts)
-				if update && !scaleOnly {
+				if update {
 					oldImage := getImageTag(sts.Spec.Template.Spec.Containers[0].Image)
 					newImage := getImageTag(desiredSts.Spec.Template.Spec.Containers[0].Image)
 					if oldImage != newImage {
@@ -122,7 +122,7 @@ func (r *TypesenseClusterReconciler) ReconcileStatefulSet(ctx context.Context, t
 
 					r.logLagThresholds(updatedSts)
 					return updatedSts, true, nil
-				} else if !update && scaleOnly {
+				} else if scaleOnly {
 					r.logger.V(debugLevel).Info("scaling statefulset", "sts", sts.Name, "triggers", triggers)
 
 					size := ts.Spec.Replicas
