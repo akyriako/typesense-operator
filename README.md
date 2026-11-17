@@ -24,23 +24,44 @@
 
 ## ⚡ Get Started
 
+The Typesense Operator can be installed using Helm, making it easy to deploy and manage the Operator within your Kubernetes cluster.
+
+Choose one of the following installation methods to get started.
+
+> [!NOTE] 
+> Before installing the Typesense Kubernetes Operator, ensure that you have a running Kubernetes cluster, `kubectl` configured 
+> to communicate with it, and Helm installed on your local machine.
+
+### Option 1: Install from the Helm Repository
+
+The recommended way to install the Typesense Kubernetes Operator is through its official Helm chart repository. First, 
+add the repository and update your local Helm chart index. Then, install the operator into the dedicated namespace:
+
 ```bash
-# Install the Operator
+# Add the Helm repository
 helm repo add tyko https://akyriako.github.io/typesense-operator/
 helm repo update
 
+# Install the Operator
 helm upgrade --install typesense-operator tyko/typesense-operator -n typesense-system --create-namespace --reset-values
 ```
 
-Alternatively, install the Operator from the OCI registry (GitHub Container Registry):
+Helm will automatically create the namespace if it does not already exist and deploy the Operator using the chart's default configuration.
+
+### Option 2: Install from the OCI Registry
+
+Alternatively, the Typesense Kubernetes Operator Helm chart is available as an OCI artifact through GitHub 
+Container Registry (GHCR):
 
 ```bash
 # Install the Operator from the OCI registry
 helm upgrade --install typesense-operator oci://ghcr.io/akyriako/charts/typesense-operator --version <version> -n typesense-system --create-namespace --reset-values
 ```
 
-<details>
-<summary>Verify the signature of the OCI chart</summary>
+> [!NOTE]
+> Replace `<version>` with the desired chart version.
+
+#### Verify the signature of the OCI chart</summary>
 
 Charts published to the OCI registry are signed with keyless [cosign](https://docs.sigstore.dev/cosign/) by the release workflow:
 
@@ -49,7 +70,8 @@ cosign verify ghcr.io/akyriako/charts/typesense-operator:<version> \
   --certificate-identity https://github.com/akyriako/typesense-operator/.github/workflows/releases.yaml@refs/heads/main \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com
 ```
-</details>
+
+### Quick-start Examples
 
 <details>
 <summary>Quick example for Open Telekom Cloud CCE</summary>
