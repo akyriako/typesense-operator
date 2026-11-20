@@ -108,7 +108,7 @@ func (r *TypesenseClusterReconciler) ReconcileQuorum(ctx context.Context, ts *ts
 			ne.IP,
 			"queued_writes",
 			status.QueuedWrites,
-			"commited_index",
+			"committed_index",
 			status.CommittedIndex,
 		)
 		nodesStatus[ne.PodName] = status
