@@ -22,7 +22,7 @@ import (
 	"os/exec"
 	"strings"
 
-	. "github.com/onsi/ginkgo/v2" //nolint:golint,revive
+	. "github.com/onsi/ginkgo/v2" //nolint:staticcheck // ST1001: Ginkgo dot import per kubebuilder convention
 )
 
 const (

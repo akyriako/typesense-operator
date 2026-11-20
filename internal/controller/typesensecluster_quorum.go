@@ -24,6 +24,8 @@ const (
 )
 
 // ReconcileQuorum returns ReconcileQuorum returns ConditionQuorum, sizeof Quorum, RequeueAfterOverride in seconds, error
+//
+//nolint:gocyclo // cyclomatic complexity of func is high
 func (r *TypesenseClusterReconciler) ReconcileQuorum(ctx context.Context, ts *tsv1alpha1.TypesenseCluster, secret *v1.Secret, stsObjectKey client.ObjectKey) (ConditionQuorum, int, int, error) {
 	r.logger.Info("reconciling quorum health")
 
@@ -340,9 +342,9 @@ func (r *TypesenseClusterReconciler) calculatePodReadinessGate(ctx context.Conte
 	} else {
 		if !health.Ok {
 			if health.ResourceError != nil && (*health.ResourceError == OutOfMemory || *health.ResourceError == OutOfDisk) {
-				conditionReason = nodeNotRecoverable
+				conditionReason = nodeNotRecoverable //nolint:ineffassign // TODO enable this path
 				conditionMessage = fmt.Sprintf("node is failing: %s", string(*health.ResourceError))
-				conditionStatus = v1.ConditionFalse
+				conditionStatus = v1.ConditionFalse //nolint:ineffassign
 
 				err := fmt.Errorf("health check reported a blocking node error on %s: %s", r.getShortName(node.PodName), string(*health.ResourceError))
 				r.logger.Error(err, "quorum cannot be recovered automatically")

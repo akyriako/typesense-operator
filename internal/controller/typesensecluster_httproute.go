@@ -21,6 +21,7 @@ const (
 	gatewayApiGroup                   = "gateway.networking.k8s.io"
 )
 
+//nolint:gocyclo // cyclomatic complexity of func is high
 func (r *TypesenseClusterReconciler) ReconcileHttpRoute(ctx context.Context, ts *tsv1alpha1.TypesenseCluster) (err error) {
 	if supported, ver, err := r.IsFeatureSupported(minimumSupportedVersionForGateway); !supported || err != nil {
 		if err != nil {

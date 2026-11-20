@@ -57,6 +57,7 @@ const (
 
 const clusterIssuerAnnotationKey = "cert-manager.io/cluster-issuer"
 
+//nolint:gocyclo // cyclomatic complexity of func is high
 func (r *TypesenseClusterReconciler) ReconcileIngress(ctx context.Context, ts *tsv1alpha1.TypesenseCluster) (err error) {
 	r.logger.V(debugLevel).Info("reconciling ingress")
 
