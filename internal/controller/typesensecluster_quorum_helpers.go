@@ -189,7 +189,7 @@ func (r *TypesenseClusterReconciler) getQuorum(ctx context.Context, ts *tsv1alph
 		}
 	}
 
-	return &Quorum{minRequiredNodes, int(availableNodes), qn, cm}, nil
+	return &Quorum{minRequiredNodes, availableNodes, qn, cm}, nil
 }
 
 func getMinimumRequiredNodes(availableNodes int) int {
