@@ -272,7 +272,10 @@ func main() {
 	}
 
 	v := version.GetBuildInfo()
-	setupLog.Info("starting manager", "version", fmt.Sprintf("%s+%s", v.Version, v.Commit), "buildDate", v.BuildDate, "goVersion", v.GoVersion)
+	setupLog.Info("starting manager",
+		"version", fmt.Sprintf("%s+%s", v.Version, v.Commit),
+		"buildDate", v.BuildDate,
+		"goVersion", v.GoVersion)
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
 		setupLog.Error(err, "problem running manager")
 		os.Exit(1)
