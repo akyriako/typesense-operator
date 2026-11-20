@@ -18,7 +18,6 @@ import (
 )
 
 const (
-	letters    = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 	debugLevel = 1
 )
 
@@ -31,19 +30,6 @@ func generateToken() (string, error) {
 
 	base64EncodedToken := base64.StdEncoding.EncodeToString(token)
 	return base64EncodedToken, nil
-}
-
-func generateSecureRandomString(length int) (string, error) {
-	result := make([]byte, length)
-	_, err := rand.Read(result)
-	if err != nil {
-		return "", err
-	}
-
-	for i := range result {
-		result[i] = letters[int(result[i])%len(letters)]
-	}
-	return string(result), nil
 }
 
 func mergeMaps(maps ...map[string]string) map[string]string {
@@ -211,22 +197,6 @@ func getReferenceGrantObjectMeta(ts *tsv1alpha1.TypesenseCluster, spec tsv1alpha
 		Namespace: string(*spec.ParentRef.Namespace), // namespace of the *target* (Gateway)
 		Labels:    getHttpRouteLabels(ts, spec),
 	}
-}
-
-const (
-	minDelayPerReplicaFactor = 1
-	maxDelayPerReplicaFactor = 3
-)
-
-func getDelayPerReplicaFactor(size int) int64 {
-	if size != 0 {
-		if size <= maxDelayPerReplicaFactor {
-			return int64(size)
-		} else {
-			return maxDelayPerReplicaFactor
-		}
-	}
-	return minDelayPerReplicaFactor
 }
 
 func contains(values []string, value string) (int, bool) {
