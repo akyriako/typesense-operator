@@ -199,16 +199,16 @@ func getReferenceGrantObjectMeta(ts *tsv1alpha1.TypesenseCluster, spec tsv1alpha
 	}
 }
 
-func contains(values []string, value string) (int, bool) {
+func contains(values []string, value string) bool {
 	//sort.Strings(values)
 
-	for i, v := range values {
+	for _, v := range values {
 		if v == value {
-			return i, true
+			return true
 		}
 	}
 
-	return -1, false
+	return false
 }
 
 func normalizeVolumes(vols []corev1.Volume) []corev1.Volume {

@@ -183,7 +183,7 @@ func (r *TypesenseClusterReconciler) getQuorum(ctx context.Context, ts *tsv1alph
 	for _, pod := range pods.Items {
 		if pod.Status.PodIP != "" {
 			raftEndpoint := fmt.Sprintf("%s:%d:%d", pod.Status.PodIP, ts.Spec.PeeringPort, ts.Spec.ApiPort)
-			if _, contains := contains(nodes, raftEndpoint); contains {
+			if contains(nodes, raftEndpoint) {
 				qn[pod.Name] = net.ParseIP(pod.Status.PodIP)
 			}
 		}

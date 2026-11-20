@@ -80,7 +80,7 @@ func (r *TypesenseClusterReconciler) ReconcileStatefulSet(ctx context.Context, t
 
 		if condition != nil {
 			emergencyUpdateRequired := r.shouldEmergencyUpdateStatefulSet(sts, ts)
-			if _, contains := contains(skipConditions, condition.Reason); !contains || emergencyUpdateRequired {
+			if !contains(skipConditions, condition.Reason) || emergencyUpdateRequired {
 				desiredSts, err := r.buildStatefulSet(ctx, stsObjectKey, ts)
 				if err != nil {
 					r.logger.Error(err, "building statefulset failed", "sts", stsObjectKey.Name)
