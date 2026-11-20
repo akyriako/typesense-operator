@@ -77,7 +77,7 @@ func (r *TypesenseClusterReconciler) ReconcileHttpRoute(ctx context.Context, ts 
 			}
 
 			if *hrt.ReferenceGrant {
-				_, err := r.createReferenceGrant(ctx, hrt, ts)
+				err := r.createReferenceGrant(ctx, hrt, ts)
 				if err != nil {
 					r.logger.Error(err, "creating reference grant failed", "http_route", httpRouteName)
 					return err
@@ -342,7 +342,7 @@ func (r *TypesenseClusterReconciler) getGatewayParentRef(spec tsv1alpha1.HttpRou
 	return parentRef
 }
 
-func (r *TypesenseClusterReconciler) createReferenceGrant(ctx context.Context, spec tsv1alpha1.HttpRouteSpec, ts *tsv1alpha1.TypesenseCluster) (*gatewayv1beta1.ReferenceGrant, error) {
+func (r *TypesenseClusterReconciler) createReferenceGrant(ctx context.Context, spec tsv1alpha1.HttpRouteSpec, ts *tsv1alpha1.TypesenseCluster) error {
 	parentRefName := gatewayv1beta1.ObjectName(spec.ParentRef.Name)
 	referenceGrant := &gatewayv1beta1.ReferenceGrant{
 		ObjectMeta: getReferenceGrantObjectMeta(ts, spec),
@@ -371,10 +371,10 @@ func (r *TypesenseClusterReconciler) createReferenceGrant(ctx context.Context, s
 
 	err := r.Create(ctx, referenceGrant)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	return referenceGrant, nil
+	return nil
 }
 
 func (r *TypesenseClusterReconciler) deleteReferenceGrant(ctx context.Context, rg *gatewayv1beta1.ReferenceGrant) error {
@@ -461,7 +461,7 @@ func (r *TypesenseClusterReconciler) updateReferenceGrant(ctx context.Context, s
 	}
 
 	if cre {
-		_, err := r.createReferenceGrant(ctx, spec, ts)
+		err := r.createReferenceGrant(ctx, spec, ts)
 		if err != nil {
 			r.logger.Error(err, "creating reference grant failed", "http_route", spec.Name)
 			return err
