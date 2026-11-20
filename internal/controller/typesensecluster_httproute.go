@@ -70,7 +70,7 @@ func (r *TypesenseClusterReconciler) ReconcileHttpRoute(ctx context.Context, ts 
 		if !httpRouteExists && hrt.Enabled {
 			r.logger.V(debugLevel).Info("creating http route", "http_route", httpRouteName)
 
-			httpRoute, err = r.createHttpRoute(ctx, httpRouteObjectKey, hrt, ts)
+			err = r.createHttpRoute(ctx, httpRouteObjectKey, hrt, ts)
 			if err != nil {
 				r.logger.Error(err, "creating http route failed", "http_route", httpRouteName)
 				return err
@@ -145,7 +145,7 @@ func (r *TypesenseClusterReconciler) ReconcileHttpRoute(ctx context.Context, ts 
 
 				r.logger.V(debugLevel).Info("updating http route", "http_route", httpRouteName)
 
-				httpRoute, err = r.updateHttpRoute(ctx, hrt, httpRoute, ts)
+				err = r.updateHttpRoute(ctx, hrt, httpRoute, ts)
 				if err != nil {
 					r.logger.Error(err, "updating http route failed", "http_route", httpRouteName)
 					return err
@@ -162,7 +162,7 @@ func (r *TypesenseClusterReconciler) ReconcileHttpRoute(ctx context.Context, ts 
 	return nil
 }
 
-func (r *TypesenseClusterReconciler) createHttpRoute(ctx context.Context, key client.ObjectKey, spec tsv1alpha1.HttpRouteSpec, ts *tsv1alpha1.TypesenseCluster) (*gatewayv1.HTTPRoute, error) {
+func (r *TypesenseClusterReconciler) createHttpRoute(ctx context.Context, key client.ObjectKey, spec tsv1alpha1.HttpRouteSpec, ts *tsv1alpha1.TypesenseCluster) error {
 	annotations := map[string]string{}
 	if spec.Annotations != nil {
 		maps.Copy(annotations, spec.Annotations)
@@ -220,15 +220,15 @@ func (r *TypesenseClusterReconciler) createHttpRoute(ctx context.Context, key cl
 
 	err := ctrl.SetControllerReference(ts, httpRoute, r.Scheme)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	err = r.Create(ctx, httpRoute)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	return httpRoute, nil
+	return nil
 }
 
 func (r *TypesenseClusterReconciler) deleteHttpRoute(ctx context.Context, httpRoute *gatewayv1.HTTPRoute) error {
@@ -276,7 +276,7 @@ func (r *TypesenseClusterReconciler) deleteOrphanedHttpRoutes(ctx context.Contex
 	return nil
 }
 
-func (r *TypesenseClusterReconciler) updateHttpRoute(ctx context.Context, spec tsv1alpha1.HttpRouteSpec, httpRoute *gatewayv1.HTTPRoute, ts *tsv1alpha1.TypesenseCluster) (*gatewayv1.HTTPRoute, error) {
+func (r *TypesenseClusterReconciler) updateHttpRoute(ctx context.Context, spec tsv1alpha1.HttpRouteSpec, httpRoute *gatewayv1.HTTPRoute, ts *tsv1alpha1.TypesenseCluster) error {
 	patch := client.MergeFrom(httpRoute.DeepCopy())
 
 	parentRef := r.getGatewayParentRef(spec, ts)
@@ -298,10 +298,10 @@ func (r *TypesenseClusterReconciler) updateHttpRoute(ctx context.Context, spec t
 	httpRoute.Annotations = annotations
 
 	if err := r.Patch(ctx, httpRoute, patch); err != nil {
-		return nil, err
+		return err
 	}
 
-	return httpRoute, nil
+	return nil
 }
 
 func (r *TypesenseClusterReconciler) getHttpRouteAnnotations(httpRoute *gatewayv1.HTTPRoute, ts *tsv1alpha1.TypesenseCluster) map[string]string {
