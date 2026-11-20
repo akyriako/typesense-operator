@@ -145,7 +145,7 @@ func (r *TypesenseClusterReconciler) ReconcileQuorum(ctx context.Context, ts *ts
 		nodesHealth[key], _ = strconv.ParseBool(string(condition.Status))
 
 		podPrefix := fmt.Sprintf(ClusterStatefulSet, ts.Name)
-		podIndex := strings.Replace(key, fmt.Sprintf("%s-", podPrefix), "", -1)
+		podIndex := strings.ReplaceAll(key, fmt.Sprintf("%s-", podPrefix), "")
 		podName := fmt.Sprintf("%s-%s", podPrefix, podIndex)
 		podObjectKey := client.ObjectKey{Namespace: ts.Namespace, Name: podName}
 
