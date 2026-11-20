@@ -225,11 +225,8 @@ func (r *TypesenseClusterReconciler) getHealthyWriteLagThreshold(ctx context.Con
 }
 
 func (r *TypesenseClusterReconciler) getHealthyLagThresholds(ctx context.Context, ts *tsv1alpha1.TypesenseCluster) (read int, write int) {
-	read = HealthyReadLagDefaultValue
-	write = HealthyWriteLagDefaultValue
-
 	if ts.Spec.AdditionalServerConfiguration == nil {
-		return
+		return HealthyReadLagDefaultValue, HealthyWriteLagDefaultValue
 	}
 
 	configMapName := ts.Spec.AdditionalServerConfiguration.Name
@@ -238,7 +235,7 @@ func (r *TypesenseClusterReconciler) getHealthyLagThresholds(ctx context.Context
 	var cm = &v1.ConfigMap{}
 	if err := r.Get(ctx, configMapObjectKey, cm); err != nil {
 		r.logger.Error(err, "unable to additional server configuration config map", "configMap", configMapName)
-		return
+		return HealthyReadLagDefaultValue, HealthyWriteLagDefaultValue
 	}
 
 	healthyReadLagValue := cm.Data[HealthyReadLagKey]
@@ -261,10 +258,7 @@ func (r *TypesenseClusterReconciler) getHealthyLagThresholds(ctx context.Context
 		r.logger.Error(err, "unable to parse server configuration value", "configMap", configMapName, "key", HealthyWriteLagKey)
 	}
 
-	read = healthyReadLag
-	write = healthyWriteLag
-
-	return
+	return healthyReadLag, healthyWriteLag
 }
 
 func (r *TypesenseClusterReconciler) getHttpClient(ts *tsv1alpha1.TypesenseCluster) (*http.Client, error) {
