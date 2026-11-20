@@ -409,8 +409,8 @@ func (r *TypesenseClusterReconciler) deleteIngress(ctx context.Context, ig *netw
 }
 
 func (r *TypesenseClusterReconciler) getIngressLabels(ig *networkingv1.Ingress, ts *tsv1alpha1.TypesenseCluster, key client.ObjectKey) map[string]string {
-	var filters []string
 	defaultLabels := getIngressObjectMeta(ts, &key.Name, nil, nil).Labels
+	filters := make([]string, 0, len(defaultLabels))
 	for k := range defaultLabels {
 		filters = append(filters, k)
 	}
