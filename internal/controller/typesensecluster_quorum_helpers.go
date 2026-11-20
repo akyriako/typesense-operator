@@ -42,7 +42,8 @@ func (r *TypesenseClusterReconciler) getNodeStatus(ctx context.Context, httpClie
 		r.logger.Error(err, "request failed")
 		return NodeStatus{State: UnreachableState}, nil
 	}
-	defer resp.Body.Close()
+	// anonymous func, so errcheck sees we intentionally ignore err
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		r.logger.Error(err, "error executing node status request", "httpStatusCode", resp.StatusCode, "ip", node.IP.String())
@@ -128,7 +129,8 @@ func (r *TypesenseClusterReconciler) getNodeHealth(ctx context.Context, httpClie
 		r.logger.Error(err, "request failed")
 		return NodeHealth{Ok: false}, nil
 	}
-	defer resp.Body.Close()
+	// anonymous func, so errcheck sees we intentionally ignore err
+	defer func() { _ = resp.Body.Close() }()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
