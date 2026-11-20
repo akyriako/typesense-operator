@@ -21,7 +21,6 @@ var (
 	HashAnnotationChanged           UpdateStatefulSetTrigger = "HashAnnotationChanged"
 	PodAnnotationsChanged           UpdateStatefulSetTrigger = "PodAnnotationsChanged"
 	StatefulSetAnnotationsChanged   UpdateStatefulSetTrigger = "StatefulSetAnnotationsChanged"
-	SpecResourcesChanged            UpdateStatefulSetTrigger = "SpecResourcesChanged"
 	PodSecurityContextChanged       UpdateStatefulSetTrigger = "PodSecurityContextChanged"
 	InvalidContainerCount           UpdateStatefulSetTrigger = "InvalidContainerCount"
 	ContainerSecurityContextChanged UpdateStatefulSetTrigger = "ContainerSecurityContextChanged"
@@ -70,12 +69,6 @@ func (r *TypesenseClusterReconciler) shouldUpdateStatefulSet(sts *appsv1.Statefu
 		triggers = append(triggers, StatefulSetAnnotationsChanged)
 		update = true
 	}
-
-	//// SpecResourcesChanged
-	//if !apiequality.Semantic.DeepEqual(sts.Spec.Template.Spec.Containers[0].Resources, ts.Spec.GetResources()) {
-	//	triggers = append(triggers, SpecResourcesChanged)
-	//	update = true
-	//}
 
 	// PodSecurityContextChanged
 	if !apiequality.Semantic.DeepEqual(sts.Spec.Template.Spec.SecurityContext, ts.Spec.GetPodSecurityContext()) {

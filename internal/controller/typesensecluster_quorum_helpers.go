@@ -310,7 +310,6 @@ func (r *TypesenseClusterReconciler) getPodLogs(ctx context.Context, node NodeEn
 	opts := &v1.PodLogOptions{
 		Container: "typesense",
 		TailLines: ptr.To[int64](50),
-		//SinceSeconds: ptr.To[int64](120),
 	}
 
 	req := r.ClientSet.CoreV1().Pods(namespace).GetLogs(node.PodName, opts)

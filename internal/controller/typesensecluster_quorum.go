@@ -87,7 +87,7 @@ func (r *TypesenseClusterReconciler) ReconcileQuorum(ctx context.Context, ts *ts
 		logs[ne.PodName] = l
 	}
 
-	//quorum.Nodes are coming straight from the PodList of Statefulset
+	// quorum.Nodes are coming straight from the PodList of Statefulset
 	for _, ne := range nodeEndpoints {
 		status, err := r.getNodeStatus(ctx, httpClient, ne, ts, secret, logs[ne.PodName])
 		if err != nil {
@@ -249,7 +249,6 @@ func (r *TypesenseClusterReconciler) downgradeQuorum(
 	stsObjectKey client.ObjectKey,
 	healthyNodes, minRequiredNodes int32,
 ) (ConditionQuorum, int, int, error) {
-	//r.logger.Info("downgrading quorum")
 	r.logger.V(debugLevel).Info("scaling statefulset", "sts", stsObjectKey.Name, "triggers", QuorumDowngraded)
 
 	sts, err := r.GetFreshStatefulSet(ctx, stsObjectKey)
@@ -291,7 +290,6 @@ func (r *TypesenseClusterReconciler) upgradeQuorum(
 	cm *v1.ConfigMap,
 	stsObjectKey client.ObjectKey,
 ) (ConditionQuorum, int, int, error) {
-	//r.logger.Info("upgrading quorum", "incremental", ts.Spec.IncrementalQuorumRecovery)
 	r.logger.V(debugLevel).Info("scaling statefulset", "sts", stsObjectKey.Name, "triggers", QuorumUpgraded, "incremental", ts.Spec.IncrementalQuorumRecovery)
 
 	sts, err := r.GetFreshStatefulSet(ctx, stsObjectKey)
@@ -399,6 +397,5 @@ func (r *TypesenseClusterReconciler) updatePodReadinessGate(ctx context.Context,
 		return err
 	}
 
-	//r.logger.V(debugLevel).Info("updating pod readiness gate condition", "pod", pod.Name, "condition", condition.Type, "conditionStatus", condition.Status)
 	return nil
 }

@@ -200,8 +200,6 @@ func getReferenceGrantObjectMeta(ts *tsv1alpha1.TypesenseCluster, spec tsv1alpha
 }
 
 func contains(values []string, value string) bool {
-	//sort.Strings(values)
-
 	for _, v := range values {
 		if v == value {
 			return true

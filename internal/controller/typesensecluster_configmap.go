@@ -309,7 +309,6 @@ func (r *TypesenseClusterReconciler) getNodes(ctx context.Context, ts *tsv1alpha
 		for _, e := range s.Endpoints {
 			if len(e.Addresses) > 0 {
 				addr := e.Addresses[0]
-				//r.logger.V(debugLevel).Info("discovered slice endpoint", "slice", s.Name, "endpoint", e.Hostname, "address", addr)
 				nodes = append(nodes, fmt.Sprintf("%s:%d:%d", addr, ts.Spec.PeeringPort, ts.Spec.ApiPort))
 			}
 		}

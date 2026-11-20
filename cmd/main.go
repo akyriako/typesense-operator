@@ -232,11 +232,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	//discoveryClient, err := discovery.NewDiscoveryClientForConfig(kubeConfig)
-	//if err != nil {
-	//	setupLog.Error(err, "unable to create discovery client")
-	//}
-
 	if err = (&controller.TypesenseClusterReconciler{
 		Client:          mgr.GetClient(),
 		Scheme:          mgr.GetScheme(),

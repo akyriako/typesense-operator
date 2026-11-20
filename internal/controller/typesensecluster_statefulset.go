@@ -69,7 +69,6 @@ func (r *TypesenseClusterReconciler) ReconcileStatefulSet(ctx context.Context, t
 			string(ConditionReasonQuorumDowngraded),
 			string(ConditionReasonQuorumUpgraded),
 			string(ConditionReasonQuorumNeedsAttentionMemoryOrDiskIssue),
-			//string(ConditionReasonQuorumNeedsAttentionClusterIsLagging),
 			string(ConditionReasonQuorumNotReady),
 			ConditionReasonStatefulSetNotReady,
 			ConditionReasonReconciliationInProgress,
