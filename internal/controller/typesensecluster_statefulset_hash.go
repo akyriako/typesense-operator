@@ -55,7 +55,7 @@ func (r *TypesenseClusterReconciler) shouldUpdateStatefulSet(sts *appsv1.Statefu
 	}
 
 	mutatedAnnotations := ts.Spec.IgnoreAnnotationsFromExternalMutations
-	stsAnnotations := filterMap(sts.ObjectMeta.Annotations, append([]string{rancherDomainAnnotationKey}, mutatedAnnotations...)...)
+	stsAnnotations := filterMap(sts.Annotations, append([]string{rancherDomainAnnotationKey}, mutatedAnnotations...)...)
 	podAnnotations := filterMap(sts.Spec.Template.Annotations, append([]string{restartPodsAnnotationKey, rancherDomainAnnotationKey}, mutatedAnnotations...)...)
 
 	// PodAnnotationsChanged
@@ -65,7 +65,7 @@ func (r *TypesenseClusterReconciler) shouldUpdateStatefulSet(sts *appsv1.Statefu
 	}
 
 	// StatefulSetAnnotationsChanged
-	if !apiequality.Semantic.DeepEqual(stsAnnotations, desired.ObjectMeta.Annotations) {
+	if !apiequality.Semantic.DeepEqual(stsAnnotations, desired.Annotations) {
 		triggers = append(triggers, StatefulSetAnnotationsChanged)
 		update = true
 	}

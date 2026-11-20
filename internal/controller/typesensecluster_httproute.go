@@ -280,7 +280,7 @@ func (r *TypesenseClusterReconciler) updateHttpRoute(ctx context.Context, spec t
 	patch := client.MergeFrom(httpRoute.DeepCopy())
 
 	parentRef := r.getGatewayParentRef(spec, ts)
-	httpRoute.Spec.CommonRouteSpec.ParentRefs[0] = parentRef
+	httpRoute.Spec.ParentRefs[0] = parentRef
 
 	hostnames := make([]gatewayv1.Hostname, 0, len(spec.Hostnames))
 	for _, h := range spec.Hostnames {

@@ -176,7 +176,7 @@ func (r *TypesenseClusterReconciler) forcePodsConfigMapUpdate(ctx context.Contex
 	labelSelector := labels.SelectorFromSet(labelMap)
 
 	var podList v1.PodList
-	if err := r.Client.List(ctx, &podList,
+	if err := r.List(ctx, &podList,
 		client.InNamespace(ts.Namespace),
 		client.MatchingLabelsSelector{Selector: labelSelector},
 	); err != nil {
@@ -324,7 +324,7 @@ func (r *TypesenseClusterReconciler) getEndpointSlicesForStatefulSet(ctx context
 
 	// 1) List EndpointSlices for headless Service
 	var sliceList discoveryv1.EndpointSliceList
-	if err := r.Client.List(ctx, &sliceList,
+	if err := r.List(ctx, &sliceList,
 		client.InNamespace(namespace),
 		client.MatchingLabels{discoveryv1.LabelServiceName: svcName},
 	); err != nil {
@@ -334,7 +334,7 @@ func (r *TypesenseClusterReconciler) getEndpointSlicesForStatefulSet(ctx context
 	// 2) Build a set of “live” Pod IPs for this StatefulSet
 	selector := labels.SelectorFromSet(sts.Spec.Selector.MatchLabels)
 	var podList v1.PodList
-	if err := r.Client.List(ctx, &podList,
+	if err := r.List(ctx, &podList,
 		client.InNamespace(namespace),
 		client.MatchingLabelsSelector{Selector: selector},
 	); err != nil {

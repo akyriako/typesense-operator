@@ -216,7 +216,7 @@ func normalizeVolumes(vols []corev1.Volume) []corev1.Volume {
 
 	vcopy := append([]corev1.Volume(nil), vols...)
 	for i := range vcopy {
-		if cm := vcopy[i].VolumeSource.ConfigMap; cm != nil {
+		if cm := vcopy[i].ConfigMap; cm != nil {
 			cm.DefaultMode = nil
 		}
 	}

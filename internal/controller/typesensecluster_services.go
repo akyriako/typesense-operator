@@ -225,10 +225,10 @@ func (r *TypesenseClusterReconciler) updateService(ctx context.Context, svc *v1.
 		svc.Spec.ExternalTrafficPolicy = *svcExternalTrafficPolicy
 	}
 
-	if svc.ObjectMeta.Annotations == nil {
-		svc.ObjectMeta.Annotations = map[string]string{}
+	if svc.Annotations == nil {
+		svc.Annotations = map[string]string{}
 	}
-	svc.ObjectMeta.Annotations = getMergedAnnotations(ts)
+	svc.Annotations = getMergedAnnotations(ts)
 
 	if err := r.Patch(ctx, svc, patch); err != nil {
 		return err

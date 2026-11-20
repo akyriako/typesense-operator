@@ -654,10 +654,10 @@ func (r *TypesenseClusterReconciler) createIngressService(ctx context.Context, k
 
 func (r *TypesenseClusterReconciler) updateIngressService(ctx context.Context, svc *v1.Service, ts *tsv1alpha1.TypesenseCluster) error {
 	patch := client.MergeFrom(svc.DeepCopy())
-	if svc.ObjectMeta.Annotations == nil {
-		svc.ObjectMeta.Annotations = map[string]string{}
+	if svc.Annotations == nil {
+		svc.Annotations = map[string]string{}
 	}
-	svc.ObjectMeta.Annotations = ts.Spec.Ingress.ServiceAnnotations
+	svc.Annotations = ts.Spec.Ingress.ServiceAnnotations
 
 	if err := r.Patch(ctx, svc, patch); err != nil {
 		return err

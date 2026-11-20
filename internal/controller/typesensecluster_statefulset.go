@@ -195,7 +195,7 @@ func (r *TypesenseClusterReconciler) updateStatefulSet(ctx context.Context, sts 
 	patch := client.MergeFrom(sts.DeepCopy())
 	sts.Spec = desired.Spec
 
-	sts.ObjectMeta.Annotations = desired.ObjectMeta.Annotations
+	sts.Annotations = desired.Annotations
 
 	if sts.Spec.Template.Annotations == nil {
 		sts.Spec.Template.Annotations = map[string]string{}
@@ -517,7 +517,7 @@ func (r *TypesenseClusterReconciler) ScaleStatefulSet(ctx context.Context, stsOb
 
 	desired := sts.DeepCopy()
 	desired.Spec.Replicas = &desiredReplicas
-	if err := r.Client.Update(ctx, desired); err != nil {
+	if err := r.Update(ctx, desired); err != nil {
 		r.logger.Error(err, "updating stateful replicas failed", "name", desired.Name)
 		return err
 	}
