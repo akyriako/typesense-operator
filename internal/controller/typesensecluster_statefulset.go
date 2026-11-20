@@ -257,28 +257,18 @@ func (r *TypesenseClusterReconciler) buildStatefulSet(ctx context.Context, key c
 					ImagePullSecrets:  ts.Spec.ImagePullSecrets,
 					Containers: []corev1.Container{
 						{
-							Name:            "typesense",
+							Name:            typesenseContainerName,
 							Image:           ts.Spec.Image,
 							ImagePullPolicy: corev1.PullIfNotPresent,
 							SecurityContext: ts.Spec.GetTypesenseSecurityContext(),
 							Ports: []corev1.ContainerPort{
 								{
-									Name:          "http",
+									Name:          httpPortName,
 									ContainerPort: int32(ts.Spec.ApiPort),
 								},
 							},
 							Env: []corev1.EnvVar{
-								{
-									Name: "TYPESENSE_API_KEY",
-									ValueFrom: &corev1.EnvVarSource{
-										SecretKeyRef: &corev1.SecretKeySelector{
-											Key: ClusterAdminApiKeySecretKeyName,
-											LocalObjectReference: corev1.LocalObjectReference{
-												Name: r.getAdminApiKeyObjectKey(ts).Name,
-											},
-										},
-									},
-								},
+								r.getAdminApiKeyEnvVar(ts),
 								{
 									Name:  "TYPESENSE_NODES",
 									Value: "/usr/share/typesense/nodes",
@@ -320,11 +310,11 @@ func (r *TypesenseClusterReconciler) buildStatefulSet(ctx context.Context, key c
 							VolumeMounts: []corev1.VolumeMount{
 								{
 									MountPath: "/usr/share/typesense",
-									Name:      "nodeslist",
+									Name:      nodesListVolumeName,
 								},
 								{
 									MountPath: "/usr/share/typesense/data",
-									Name:      "data",
+									Name:      dataVolumeName,
 								},
 							},
 						},
@@ -335,29 +325,19 @@ func (r *TypesenseClusterReconciler) buildStatefulSet(ctx context.Context, key c
 							SecurityContext: ts.Spec.GetMetricsSecurityContext(),
 							Ports: []corev1.ContainerPort{
 								{
-									Name:          "metrics",
+									Name:          metricsPortName,
 									ContainerPort: metricsPort,
 								},
 							},
 							Env: []corev1.EnvVar{
-								{
-									Name: "TYPESENSE_API_KEY",
-									ValueFrom: &corev1.EnvVarSource{
-										SecretKeyRef: &corev1.SecretKeySelector{
-											Key: ClusterAdminApiKeySecretKeyName,
-											LocalObjectReference: corev1.LocalObjectReference{
-												Name: r.getAdminApiKeyObjectKey(ts).Name,
-											},
-										},
-									},
-								},
+								r.getAdminApiKeyEnvVar(ts),
 								{
 									Name:  "LOG_LEVEL",
 									Value: strconv.Itoa(ts.Spec.GetMetricsExporterSpecs().LogLevel),
 								},
 								{
-									Name:  "TYPESENSE_PROTOCOL",
-									Value: "http",
+									Name:  typesenseProtocolEnvVar,
+									Value: httpScheme,
 								},
 								{
 									Name:  "TYPESENSE_HOST",
@@ -379,35 +359,25 @@ func (r *TypesenseClusterReconciler) buildStatefulSet(ctx context.Context, key c
 							Resources: ts.Spec.GetMetricsExporterResources(),
 						},
 						{
-							Name:            "healthcheck",
+							Name:            healthcheckContainerName,
 							Image:           ts.Spec.GetHealthCheckSidecarSpecs().Image,
 							ImagePullPolicy: corev1.PullIfNotPresent,
 							SecurityContext: ts.Spec.GetHealthcheckSecurityContext(),
 							Ports: []corev1.ContainerPort{
 								{
-									Name:          "healthcheck",
+									Name:          healthcheckPortName,
 									ContainerPort: 8808,
 								},
 							},
 							Env: []corev1.EnvVar{
-								{
-									Name: "TYPESENSE_API_KEY",
-									ValueFrom: &corev1.EnvVarSource{
-										SecretKeyRef: &corev1.SecretKeySelector{
-											Key: ClusterAdminApiKeySecretKeyName,
-											LocalObjectReference: corev1.LocalObjectReference{
-												Name: r.getAdminApiKeyObjectKey(ts).Name,
-											},
-										},
-									},
-								},
+								r.getAdminApiKeyEnvVar(ts),
 								{
 									Name:  "LOG_LEVEL",
 									Value: strconv.Itoa(ts.Spec.GetHealthCheckSidecarSpecs().LogLevel),
 								},
 								{
-									Name:  "TYPESENSE_PROTOCOL",
-									Value: "http",
+									Name:  typesenseProtocolEnvVar,
+									Value: httpScheme,
 								},
 								{
 									Name:  "TYPESENSE_API_PORT",
@@ -434,7 +404,7 @@ func (r *TypesenseClusterReconciler) buildStatefulSet(ctx context.Context, key c
 							VolumeMounts: []corev1.VolumeMount{
 								{
 									MountPath: "/usr/share/typesense",
-									Name:      "nodeslist",
+									Name:      nodesListVolumeName,
 									ReadOnly:  true,
 								},
 							},
@@ -446,7 +416,7 @@ func (r *TypesenseClusterReconciler) buildStatefulSet(ctx context.Context, key c
 					TopologySpreadConstraints: ts.Spec.GetTopologySpreadConstraints(getLabels(ts)),
 					Volumes: []corev1.Volume{
 						{
-							Name: "nodeslist",
+							Name: nodesListVolumeName,
 							VolumeSource: corev1.VolumeSource{
 								ConfigMap: &corev1.ConfigMapVolumeSource{
 									LocalObjectReference: corev1.LocalObjectReference{
@@ -456,10 +426,10 @@ func (r *TypesenseClusterReconciler) buildStatefulSet(ctx context.Context, key c
 							},
 						},
 						{
-							Name: "data",
+							Name: dataVolumeName,
 							VolumeSource: corev1.VolumeSource{
 								PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-									ClaimName: "data",
+									ClaimName: dataVolumeName,
 								},
 							},
 						},
@@ -469,7 +439,7 @@ func (r *TypesenseClusterReconciler) buildStatefulSet(ctx context.Context, key c
 			VolumeClaimTemplates: []corev1.PersistentVolumeClaim{
 				{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:        "data",
+						Name:        dataVolumeName,
 						Labels:      getLabels(ts),
 						Annotations: ts.Spec.GetStorage().Annotations,
 					},

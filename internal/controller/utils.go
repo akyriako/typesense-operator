@@ -76,15 +76,15 @@ func getMergedLabels(def map[string]string, scoped map[string]string) map[string
 
 func getDefaultLabels(ts *tsv1alpha1.TypesenseCluster) map[string]string {
 	return map[string]string{
-		"app.kubernetes.io/managed-by": "typesense-operator",
-		"app.kubernetes.io/name":       "typesense",
-		"app.kubernetes.io/instance":   ts.Name,
+		managedByLabelKey: managedByLabelValue,
+		nameLabelKey:      nameLabelValue,
+		instanceLabelKey:  ts.Name,
 	}
 }
 
 func getLabels(ts *tsv1alpha1.TypesenseCluster) map[string]string {
 	return map[string]string{
-		"app": fmt.Sprintf(ClusterAppLabel, ts.Name),
+		appLabelKey: fmt.Sprintf(ClusterAppLabel, ts.Name),
 	}
 }
 
@@ -103,7 +103,7 @@ func getObjectMeta(ts *tsv1alpha1.TypesenseCluster, name *string, annotations ma
 
 func getReverseProxyLabels(ts *tsv1alpha1.TypesenseCluster) map[string]string {
 	return map[string]string{
-		"app": fmt.Sprintf(ClusterReverseProxyAppLabel, ts.Name),
+		appLabelKey: fmt.Sprintf(ClusterReverseProxyAppLabel, ts.Name),
 	}
 }
 
@@ -122,7 +122,7 @@ func getReverseProxyObjectMeta(ts *tsv1alpha1.TypesenseCluster, name *string, an
 
 func getPodMonitorLabels(ts *tsv1alpha1.TypesenseCluster) map[string]string {
 	labels := make(map[string]string)
-	labels["app"] = fmt.Sprintf(ClusterMetricsPodMonitorAppLabel, ts.Name)
+	labels[appLabelKey] = fmt.Sprintf(ClusterMetricsPodMonitorAppLabel, ts.Name)
 
 	if ts.Spec.Metrics.Release != "" {
 		labels["release"] = ts.Spec.Metrics.Release
@@ -169,8 +169,8 @@ func getPodMonitorObjectMeta(ts *tsv1alpha1.TypesenseCluster, name *string, anno
 
 func getHttpRouteLabels(ts *tsv1alpha1.TypesenseCluster, spec tsv1alpha1.HttpRouteSpec) map[string]string {
 	route := map[string]string{
-		"app":   fmt.Sprintf(ClusterAppLabel, ts.Name),
-		"route": fmt.Sprintf(ClusterHttpRoute, ts.Name, spec.Name),
+		appLabelKey: fmt.Sprintf(ClusterAppLabel, ts.Name),
+		"route":     fmt.Sprintf(ClusterHttpRoute, ts.Name, spec.Name),
 	}
 
 	defaults := getDefaultLabels(ts)

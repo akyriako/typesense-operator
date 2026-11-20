@@ -101,10 +101,10 @@ func (r *TypesenseClusterReconciler) createMetricsExporterPodMonitor(ctx context
 			},
 			PodMetricsEndpoints: []monitoringv1.PodMetricsEndpoint{
 				{
-					Port:     "metrics",
+					Port:     metricsPortName,
 					Path:     "/metrics",
 					Interval: monitoringv1.Duration(fmt.Sprintf("%ds", ts.Spec.Metrics.IntervalInSeconds)),
-					Scheme:   "http",
+					Scheme:   httpScheme,
 				},
 			},
 		},

@@ -434,7 +434,7 @@ func (r *TypesenseClusterReconciler) createIngressConfigMap(ctx context.Context,
 	icm := &v1.ConfigMap{
 		ObjectMeta: getReverseProxyObjectMeta(ts, &key.Name, nil),
 		Data: map[string]string{
-			"nginx.conf": nginxConf,
+			nginxConfKey: nginxConf,
 		},
 	}
 
@@ -459,7 +459,7 @@ func (r *TypesenseClusterReconciler) updateIngressConfigMap(ctx context.Context,
 
 	desired := cm.DeepCopy()
 	desired.Data = map[string]string{
-		"nginx.conf": nginxConf,
+		nginxConfKey: nginxConf,
 	}
 
 	err = r.Update(ctx, desired)
@@ -477,7 +477,7 @@ func (r *TypesenseClusterReconciler) shouldUpdateIngressConfigMap(cm *v1.ConfigM
 		return false, err
 	}
 
-	return cm.Data["nginx.conf"] != nginxConf, nil
+	return cm.Data[nginxConfKey] != nginxConf, nil
 }
 
 func (r *TypesenseClusterReconciler) getIngressNginxConf(ts *tsv1alpha1.TypesenseCluster) (string, error) {
@@ -537,7 +537,7 @@ func (r *TypesenseClusterReconciler) getIngressNginxConf(ts *tsv1alpha1.Typesens
 func (r *TypesenseClusterReconciler) getDefaultReverseProxyVolumes(tsClusterName string) []v1.Volume {
 	return []v1.Volume{
 		{
-			Name: "nginx-config",
+			Name: nginxConfigVolumeName,
 			VolumeSource: v1.VolumeSource{
 				ConfigMap: &v1.ConfigMapVolumeSource{
 					LocalObjectReference: v1.LocalObjectReference{
@@ -552,9 +552,9 @@ func (r *TypesenseClusterReconciler) getDefaultReverseProxyVolumes(tsClusterName
 func (r *TypesenseClusterReconciler) getDefaultReverseProxyVolumeMounts() []v1.VolumeMount {
 	return []v1.VolumeMount{
 		{
-			Name:      "nginx-config",
+			Name:      nginxConfigVolumeName,
 			MountPath: "/etc/nginx/nginx.conf",
-			SubPath:   "nginx.conf",
+			SubPath:   nginxConfKey,
 		},
 	}
 }
@@ -633,7 +633,7 @@ func (r *TypesenseClusterReconciler) createIngressService(ctx context.Context, k
 					Protocol:   v1.ProtocolTCP,
 					Port:       80,
 					TargetPort: intstr.IntOrString{Type: intstr.Int, IntVal: int32(80)},
-					Name:       "http",
+					Name:       httpPortName,
 				},
 			},
 		},

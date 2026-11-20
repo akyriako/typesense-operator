@@ -304,7 +304,7 @@ func (r *TypesenseClusterReconciler) buildUrl(node NodeEndpoint, ts *tsv1alpha1.
 
 func (r *TypesenseClusterReconciler) getPodLogs(ctx context.Context, node NodeEndpoint, namespace string) (string, error) {
 	opts := &v1.PodLogOptions{
-		Container: "typesense",
+		Container: typesenseContainerName,
 		TailLines: ptr.To[int64](50),
 	}
 

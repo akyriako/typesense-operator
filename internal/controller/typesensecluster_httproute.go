@@ -388,7 +388,7 @@ func (r *TypesenseClusterReconciler) deleteReferenceGrant(ctx context.Context, r
 
 func (r *TypesenseClusterReconciler) deleteOrphanedReferenceGrants(ctx context.Context) error {
 	referenceGrantsLabelSelector := labels.SelectorFromSet(map[string]string{
-		"app.kubernetes.io/managed-by": "typesense-operator",
+		managedByLabelKey: managedByLabelValue,
 	})
 
 	var referenceGrants gatewayv1beta1.ReferenceGrantList
@@ -410,7 +410,7 @@ func (r *TypesenseClusterReconciler) deleteOrphanedReferenceGrants(ctx context.C
 	for _, rg := range referenceGrants.Items {
 		exists := false
 		for _, cluster := range typesenseClusters.Items {
-			if rg.Labels["app"] == fmt.Sprintf(ClusterAppLabel, cluster.Name) {
+			if rg.Labels[appLabelKey] == fmt.Sprintf(ClusterAppLabel, cluster.Name) {
 				exists = true
 				break
 			}

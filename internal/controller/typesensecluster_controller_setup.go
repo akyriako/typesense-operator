@@ -33,9 +33,9 @@ func (r *TypesenseClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		predicate.NewPredicateFuncs(func(obj client.Object) bool {
 			labels := obj.GetLabels()
 
-			return labels["app.kubernetes.io/managed-by"] == "typesense-operator" &&
-				labels["app.kubernetes.io/name"] == "typesense" &&
-				labels["app.kubernetes.io/instance"] != ""
+			return labels[managedByLabelKey] == managedByLabelValue &&
+				labels[nameLabelKey] == nameLabelValue &&
+				labels[instanceLabelKey] != ""
 		}),
 		predicate.Funcs{
 			CreateFunc: func(e event.CreateEvent) bool {
@@ -156,12 +156,12 @@ func (r *TypesenseClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 			labels := svc.GetLabels()
 
-			if labels["app.kubernetes.io/managed-by"] != "typesense-operator" ||
-				labels["app.kubernetes.io/name"] != "typesense" {
+			if labels[managedByLabelKey] != managedByLabelValue ||
+				labels[nameLabelKey] != nameLabelValue {
 				return nil
 			}
 
-			clusterName := labels["app.kubernetes.io/instance"]
+			clusterName := labels[instanceLabelKey]
 			if clusterName == "" {
 				return nil
 			}
@@ -196,7 +196,7 @@ func (r *TypesenseClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 					return []reconcile.Request{{
 						NamespacedName: types.NamespacedName{
 							Namespace: obj.GetNamespace(),
-							Name:      obj.GetLabels()["app.kubernetes.io/instance"],
+							Name:      obj.GetLabels()[instanceLabelKey],
 						},
 					}}
 				},

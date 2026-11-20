@@ -125,7 +125,7 @@ func (r *TypesenseClusterReconciler) createHeadlessService(ctx context.Context, 
 			Selector:                 getLabels(ts),
 			Ports: []v1.ServicePort{
 				{
-					Name:       "http",
+					Name:       httpPortName,
 					Port:       int32(ts.Spec.ApiPort),
 					TargetPort: intstr.IntOrString{IntVal: 8108},
 				},
@@ -165,12 +165,12 @@ func (r *TypesenseClusterReconciler) createService(ctx context.Context, key clie
 			Selector: getLabels(ts),
 			Ports: []v1.ServicePort{
 				{
-					Name:       "http",
+					Name:       httpPortName,
 					Port:       int32(ts.Spec.ApiPort),
 					TargetPort: intstr.IntOrString{IntVal: 8108},
 				},
 				{
-					Name:       "healthcheck",
+					Name:       healthcheckPortName,
 					Port:       8808,
 					TargetPort: intstr.IntOrString{IntVal: 8808},
 				},
