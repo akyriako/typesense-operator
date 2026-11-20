@@ -267,8 +267,8 @@ func (r *TypesenseClusterReconciler) getNodes(ctx context.Context, ts *tsv1alpha
 					continue
 				}
 
-				switch cs.State.Waiting.Reason {
-				case "ContainerCreating", "ErrImagePull", "ImagePullBackOff":
+				reason := cs.State.Waiting.Reason
+				if reason == "ContainerCreating" || reason == "ErrImagePull" || reason == "ImagePullBackOff" {
 					markAsScheduled = true
 					break
 				}
