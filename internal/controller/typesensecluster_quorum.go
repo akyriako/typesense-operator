@@ -273,7 +273,7 @@ func (r *TypesenseClusterReconciler) downgradeQuorum(
 		}
 	}
 
-	_, size, updated, err := r.updateConfigMap(ctx, ts, cm, ptr.To[int32](desiredReplicas), true)
+	size, updated, err := r.updateConfigMap(ctx, ts, cm, ptr.To[int32](desiredReplicas), true)
 	if err != nil {
 		return ConditionReasonQuorumNotReady, 0, 0, err
 	}
@@ -308,7 +308,7 @@ func (r *TypesenseClusterReconciler) upgradeQuorum(
 		return ConditionReasonQuorumNotReady, 0, 0, err
 	}
 
-	_, _, updated, err := r.updateConfigMap(ctx, ts, cm, &size, true)
+	_, updated, err := r.updateConfigMap(ctx, ts, cm, &size, true)
 	if err != nil {
 		return ConditionReasonQuorumNotReady, 0, 0, err
 	}

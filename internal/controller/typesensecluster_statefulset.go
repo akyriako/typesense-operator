@@ -111,7 +111,7 @@ func (r *TypesenseClusterReconciler) ReconcileStatefulSet(ctx context.Context, t
 						r.logger.V(debugLevel).Error(err, fmt.Sprintf("unable to fetch config map: %s", configMapName))
 					}
 
-					_, _, updated, err := r.updateConfigMap(ctx, ts, cm, updatedSts.Spec.Replicas, true)
+					_, updated, err := r.updateConfigMap(ctx, ts, cm, updatedSts.Spec.Replicas, true)
 					if err != nil {
 						r.logger.V(debugLevel).Error(err, fmt.Sprintf("unable to update config map: %s", configMapName))
 					}
@@ -138,7 +138,7 @@ func (r *TypesenseClusterReconciler) ReconcileStatefulSet(ctx context.Context, t
 					if err := r.Get(ctx, configMapObjectKey, cm); err != nil {
 						r.logger.V(debugLevel).Error(err, fmt.Sprintf("unable to fetch config map: %s", configMapName))
 					}
-					_, _, updated, err := r.updateConfigMap(ctx, ts, cm, &size, true)
+					_, updated, err := r.updateConfigMap(ctx, ts, cm, &size, true)
 					if err != nil {
 						return desiredSts, true, err
 					}

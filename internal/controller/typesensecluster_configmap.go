@@ -52,7 +52,7 @@ func (r *TypesenseClusterReconciler) ReconcileConfigMap(ctx context.Context, ts 
 		return nil, nil
 	}
 
-	_, _, updated, err := r.updateConfigMap(ctx, &ts, cm, nil, false)
+	_, updated, err := r.updateConfigMap(ctx, &ts, cm, nil, false)
 	if err != nil {
 		return ptr.To[bool](false), err
 	}
@@ -89,7 +89,7 @@ func (r *TypesenseClusterReconciler) createConfigMap(ctx context.Context, key cl
 	return cm, nil
 }
 
-func (r *TypesenseClusterReconciler) updateConfigMap(ctx context.Context, ts *tsv1alpha1.TypesenseCluster, cm *v1.ConfigMap, replicas *int32, resizeOp bool) (*v1.ConfigMap, int, bool, error) {
+func (r *TypesenseClusterReconciler) updateConfigMap(ctx context.Context, ts *tsv1alpha1.TypesenseCluster, cm *v1.ConfigMap, replicas *int32, resizeOp bool) (int, bool, error) {
 	stsName := fmt.Sprintf(ClusterStatefulSet, ts.Name)
 	stsObjectKey := client.ObjectKey{
 		Name:      stsName,
@@ -101,13 +101,13 @@ func (r *TypesenseClusterReconciler) updateConfigMap(ctx context.Context, ts *ts
 		if apierrors.IsNotFound(err) {
 			err := r.deleteConfigMap(ctx, cm)
 			if err != nil {
-				return nil, 0, false, err
+				return 0, false, err
 			}
 		} else {
 			r.logger.Error(err, fmt.Sprintf("unable to fetch statefulset: %s", stsName))
 		}
 
-		return nil, 0, false, err
+		return 0, false, err
 	}
 
 	if replicas == nil {
@@ -116,17 +116,17 @@ func (r *TypesenseClusterReconciler) updateConfigMap(ctx context.Context, ts *ts
 
 	nodes, err := r.getNodes(ctx, ts, *replicas, false)
 	if err != nil {
-		return nil, 0, false, err
+		return 0, false, err
 	}
 	fallback, err := r.getNodes(ctx, ts, *replicas, true)
 	if err != nil {
-		return nil, 0, false, err
+		return 0, false, err
 	}
 
 	availableNodes := len(nodes)
 	if availableNodes == 0 {
 		r.logger.V(debugLevel).Info("empty quorum configuration")
-		return nil, 0, false, fmt.Errorf("empty quorum configuration")
+		return 0, false, fmt.Errorf("empty quorum configuration")
 	}
 
 	desired := cm.DeepCopy()
@@ -151,12 +151,12 @@ func (r *TypesenseClusterReconciler) updateConfigMap(ctx context.Context, ts *ts
 		err := r.Update(ctx, desired)
 		if err != nil {
 			r.logger.Error(err, "updating quorum configuration failed")
-			return nil, 0, false, err
+			return 0, false, err
 		}
 		updated = true
 	}
 
-	return desired, availableNodes, updated, nil
+	return availableNodes, updated, nil
 }
 
 func (r *TypesenseClusterReconciler) deleteConfigMap(ctx context.Context, cm *v1.ConfigMap) error {
