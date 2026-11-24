@@ -284,8 +284,8 @@ func (r *TypesenseClusterReconciler) ReconcileIngress(ctx context.Context, ts *t
 func (r *TypesenseClusterReconciler) createIngress(ctx context.Context, key client.ObjectKey, ts *tsv1alpha1.TypesenseCluster) (*networkingv1.Ingress, error) {
 	labels := map[string]string{}
 	annotations := map[string]string{}
-	var tlsSecretName string
 
+	var tlsSecretName string
 	if ts.Spec.Ingress.ClusterIssuer != nil {
 		annotations[clusterIssuerAnnotationKey] = *ts.Spec.Ingress.ClusterIssuer
 		tlsSecretName = fmt.Sprintf("%s-reverse-proxy-%s-certificate-tls", ts.Name, *ts.Spec.Ingress.ClusterIssuer)
@@ -304,7 +304,7 @@ func (r *TypesenseClusterReconciler) createIngress(ctx context.Context, key clie
 	}
 
 	ingress := &networkingv1.Ingress{
-		ObjectMeta: getIngressObjectMeta(ts, &key.Name, ts.Spec.Ingress.Labels, ts.Spec.Ingress.Annotations),
+		ObjectMeta: getIngressObjectMeta(ts, &key.Name, labels, annotations),
 		Spec: networkingv1.IngressSpec{
 			IngressClassName: ptr.To(ts.Spec.Ingress.IngressClassName),
 			TLS: []networkingv1.IngressTLS{
@@ -360,26 +360,37 @@ func (r *TypesenseClusterReconciler) updateIngress(ctx context.Context, ig netwo
 	ig.Spec.Rules[0].HTTP.Paths[0].Path = ts.Spec.Ingress.Path
 	ig.Spec.Rules[0].HTTP.Paths[0].PathType = ts.Spec.Ingress.PathType
 
-	annotations := map[string]string{}
-	var tlsSecretName string
+	labels := map[string]string{}
+	if ig.Labels != nil {
+		maps.Copy(labels, ig.Labels)
+	}
 
+	annotations := map[string]string{}
+	if ig.Annotations != nil {
+		maps.Copy(annotations, ig.Annotations)
+	}
+
+	var tlsSecretName string
 	if ts.Spec.Ingress.ClusterIssuer != nil {
 		annotations[clusterIssuerAnnotationKey] = *ts.Spec.Ingress.ClusterIssuer
 		tlsSecretName = fmt.Sprintf("%s-reverse-proxy-%s-certificate-tls", ts.Name, *ts.Spec.Ingress.ClusterIssuer)
 	}
 
 	if ts.Spec.Ingress.Labels != nil {
-		maps.Copy(ig.Labels, ts.Spec.Ingress.Labels)
+		maps.Copy(labels, ts.Spec.Ingress.Labels)
 	}
 
 	if ts.Spec.Ingress.Annotations != nil {
-		maps.Copy(ig.Annotations, ts.Spec.Ingress.Annotations)
+		maps.Copy(annotations, ts.Spec.Ingress.Annotations)
 	}
 
 	if ts.Spec.Ingress.TLSSecretName != nil {
 		tlsSecretName = *ts.Spec.Ingress.TLSSecretName
 	}
 	ig.Spec.TLS[0].SecretName = tlsSecretName
+
+	ig.Labels = labels
+	ig.Annotations = annotations
 
 	if err := r.Patch(ctx, &ig, patch); err != nil {
 		return nil, err
