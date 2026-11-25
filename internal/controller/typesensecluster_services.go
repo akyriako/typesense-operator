@@ -67,7 +67,7 @@ func (r *TypesenseClusterReconciler) ReconcileServices(ctx context.Context, ts t
 	if !svcExists {
 		r.logger.V(debugLevel).Info("creating resolver service", "service", svcObjectKey.Name)
 
-		_, err := r.createService(ctx, svcObjectKey, &ts)
+		err := r.createService(ctx, svcObjectKey, &ts)
 		if err != nil {
 			r.logger.Error(err, "creating resolver service failed", "service", svcObjectKey.Name)
 			return err
@@ -80,7 +80,7 @@ func (r *TypesenseClusterReconciler) ReconcileServices(ctx context.Context, ts t
 				return err
 			}
 
-			_, err = r.createService(ctx, svcObjectKey, &ts)
+			err = r.createService(ctx, svcObjectKey, &ts)
 			if err != nil {
 				r.logger.Error(err, "creating resolver service failed", "service", svcObjectKey.Name)
 				return err
@@ -125,7 +125,7 @@ func (r *TypesenseClusterReconciler) createHeadlessService(ctx context.Context, 
 			Selector:                 getLabels(ts),
 			Ports: []v1.ServicePort{
 				{
-					Name:       "http",
+					Name:       httpPortName,
 					Port:       int32(ts.Spec.ApiPort),
 					TargetPort: intstr.IntOrString{IntVal: 8108},
 				},
@@ -157,7 +157,7 @@ func (r *TypesenseClusterReconciler) updateHeadlessService(ctx context.Context, 
 	return nil
 }
 
-func (r *TypesenseClusterReconciler) createService(ctx context.Context, key client.ObjectKey, ts *tsv1alpha1.TypesenseCluster) (*v1.Service, error) {
+func (r *TypesenseClusterReconciler) createService(ctx context.Context, key client.ObjectKey, ts *tsv1alpha1.TypesenseCluster) error {
 	svc := &v1.Service{
 		ObjectMeta: getObjectMeta(ts, &key.Name, getMergedAnnotations(ts)),
 		Spec: v1.ServiceSpec{
@@ -165,12 +165,12 @@ func (r *TypesenseClusterReconciler) createService(ctx context.Context, key clie
 			Selector: getLabels(ts),
 			Ports: []v1.ServicePort{
 				{
-					Name:       "http",
+					Name:       httpPortName,
 					Port:       int32(ts.Spec.ApiPort),
 					TargetPort: intstr.IntOrString{IntVal: 8108},
 				},
 				{
-					Name:       "healthcheck",
+					Name:       healthcheckPortName,
 					Port:       8808,
 					TargetPort: intstr.IntOrString{IntVal: 8808},
 				},
@@ -182,7 +182,7 @@ func (r *TypesenseClusterReconciler) createService(ctx context.Context, key clie
 		svcType := ts.Spec.Service.Type
 		svcExternalTrafficPolicy, err := r.invalidateExternalTrafficPolicy(svcType, ts.Spec.Service)
 		if err != nil {
-			return nil, err
+			return err
 		}
 
 		svc.Spec.Type = svcType
@@ -193,15 +193,15 @@ func (r *TypesenseClusterReconciler) createService(ctx context.Context, key clie
 
 	err := ctrl.SetControllerReference(ts, svc, r.Scheme)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	err = r.Create(ctx, svc)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	return svc, nil
+	return nil
 }
 
 func (r *TypesenseClusterReconciler) updateService(ctx context.Context, svc *v1.Service, ts *tsv1alpha1.TypesenseCluster) error {
@@ -225,10 +225,10 @@ func (r *TypesenseClusterReconciler) updateService(ctx context.Context, svc *v1.
 		svc.Spec.ExternalTrafficPolicy = *svcExternalTrafficPolicy
 	}
 
-	if svc.ObjectMeta.Annotations == nil {
-		svc.ObjectMeta.Annotations = map[string]string{}
+	if svc.Annotations == nil {
+		svc.Annotations = map[string]string{}
 	}
-	svc.ObjectMeta.Annotations = getMergedAnnotations(ts)
+	svc.Annotations = getMergedAnnotations(ts)
 
 	if err := r.Patch(ctx, svc, patch); err != nil {
 		return err

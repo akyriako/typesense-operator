@@ -1,8 +1,9 @@
 package controller
 
 import (
-	v1 "k8s.io/api/core/v1"
 	"net"
+
+	v1 "k8s.io/api/core/v1"
 )
 
 type NodeState string

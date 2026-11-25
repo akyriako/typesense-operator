@@ -3,6 +3,7 @@ package controller
 import (
 	"context"
 	"fmt"
+
 	tsv1alpha1 "github.com/akyriako/typesense-operator/api/v1alpha1"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -70,6 +71,20 @@ func (r *TypesenseClusterReconciler) createAdminApiKey(
 	}
 
 	return secret, nil
+}
+
+func (r *TypesenseClusterReconciler) getAdminApiKeyEnvVar(ts *tsv1alpha1.TypesenseCluster) v1.EnvVar {
+	return v1.EnvVar{
+		Name: "TYPESENSE_API_KEY",
+		ValueFrom: &v1.EnvVarSource{
+			SecretKeyRef: &v1.SecretKeySelector{
+				Key: ClusterAdminApiKeySecretKeyName,
+				LocalObjectReference: v1.LocalObjectReference{
+					Name: r.getAdminApiKeyObjectKey(ts).Name,
+				},
+			},
+		},
+	}
 }
 
 func (r *TypesenseClusterReconciler) getAdminApiKeyObjectKey(ts *tsv1alpha1.TypesenseCluster) client.ObjectKey {

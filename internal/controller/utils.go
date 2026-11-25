@@ -18,7 +18,6 @@ import (
 )
 
 const (
-	letters    = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 	debugLevel = 1
 )
 
@@ -31,19 +30,6 @@ func generateToken() (string, error) {
 
 	base64EncodedToken := base64.StdEncoding.EncodeToString(token)
 	return base64EncodedToken, nil
-}
-
-func generateSecureRandomString(length int) (string, error) {
-	result := make([]byte, length)
-	_, err := rand.Read(result)
-	if err != nil {
-		return "", err
-	}
-
-	for i := range result {
-		result[i] = letters[int(result[i])%len(letters)]
-	}
-	return string(result), nil
 }
 
 func mergeMaps(maps ...map[string]string) map[string]string {
@@ -90,15 +76,15 @@ func getMergedLabels(def map[string]string, scoped map[string]string) map[string
 
 func getDefaultLabels(ts *tsv1alpha1.TypesenseCluster) map[string]string {
 	return map[string]string{
-		"app.kubernetes.io/managed-by": "typesense-operator",
-		"app.kubernetes.io/name":       "typesense",
-		"app.kubernetes.io/instance":   ts.Name,
+		managedByLabelKey: managedByLabelValue,
+		nameLabelKey:      nameLabelValue,
+		instanceLabelKey:  ts.Name,
 	}
 }
 
 func getLabels(ts *tsv1alpha1.TypesenseCluster) map[string]string {
 	return map[string]string{
-		"app": fmt.Sprintf(ClusterAppLabel, ts.Name),
+		appLabelKey: fmt.Sprintf(ClusterAppLabel, ts.Name),
 	}
 }
 
@@ -117,7 +103,7 @@ func getObjectMeta(ts *tsv1alpha1.TypesenseCluster, name *string, annotations ma
 
 func getReverseProxyLabels(ts *tsv1alpha1.TypesenseCluster) map[string]string {
 	return map[string]string{
-		"app": fmt.Sprintf(ClusterReverseProxyAppLabel, ts.Name),
+		appLabelKey: fmt.Sprintf(ClusterReverseProxyAppLabel, ts.Name),
 	}
 }
 
@@ -136,7 +122,7 @@ func getReverseProxyObjectMeta(ts *tsv1alpha1.TypesenseCluster, name *string, an
 
 func getPodMonitorLabels(ts *tsv1alpha1.TypesenseCluster) map[string]string {
 	labels := make(map[string]string)
-	labels["app"] = fmt.Sprintf(ClusterMetricsPodMonitorAppLabel, ts.Name)
+	labels[appLabelKey] = fmt.Sprintf(ClusterMetricsPodMonitorAppLabel, ts.Name)
 
 	if ts.Spec.Metrics.Release != "" {
 		labels["release"] = ts.Spec.Metrics.Release
@@ -183,8 +169,8 @@ func getPodMonitorObjectMeta(ts *tsv1alpha1.TypesenseCluster, name *string, anno
 
 func getHttpRouteLabels(ts *tsv1alpha1.TypesenseCluster, spec tsv1alpha1.HttpRouteSpec) map[string]string {
 	route := map[string]string{
-		"app":   fmt.Sprintf(ClusterAppLabel, ts.Name),
-		"route": fmt.Sprintf(ClusterHttpRoute, ts.Name, spec.Name),
+		appLabelKey: fmt.Sprintf(ClusterAppLabel, ts.Name),
+		"route":     fmt.Sprintf(ClusterHttpRoute, ts.Name, spec.Name),
 	}
 
 	defaults := getDefaultLabels(ts)
@@ -213,32 +199,14 @@ func getReferenceGrantObjectMeta(ts *tsv1alpha1.TypesenseCluster, spec tsv1alpha
 	}
 }
 
-const (
-	minDelayPerReplicaFactor = 1
-	maxDelayPerReplicaFactor = 3
-)
-
-func getDelayPerReplicaFactor(size int) int64 {
-	if size != 0 {
-		if size <= maxDelayPerReplicaFactor {
-			return int64(size)
-		} else {
-			return maxDelayPerReplicaFactor
-		}
-	}
-	return minDelayPerReplicaFactor
-}
-
-func contains(values []string, value string) (int, bool) {
-	//sort.Strings(values)
-
-	for i, v := range values {
+func contains(values []string, value string) bool {
+	for _, v := range values {
 		if v == value {
-			return i, true
+			return true
 		}
 	}
 
-	return -1, false
+	return false
 }
 
 func normalizeVolumes(vols []corev1.Volume) []corev1.Volume {
@@ -248,7 +216,7 @@ func normalizeVolumes(vols []corev1.Volume) []corev1.Volume {
 
 	vcopy := append([]corev1.Volume(nil), vols...)
 	for i := range vcopy {
-		if cm := vcopy[i].VolumeSource.ConfigMap; cm != nil {
+		if cm := vcopy[i].ConfigMap; cm != nil {
 			cm.DefaultMode = nil
 		}
 	}

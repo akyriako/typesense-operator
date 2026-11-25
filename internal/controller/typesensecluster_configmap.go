@@ -52,7 +52,7 @@ func (r *TypesenseClusterReconciler) ReconcileConfigMap(ctx context.Context, ts 
 		return nil, nil
 	}
 
-	_, _, updated, err := r.updateConfigMap(ctx, &ts, cm, nil, false)
+	_, updated, err := r.updateConfigMap(ctx, &ts, cm, nil, false)
 	if err != nil {
 		return ptr.To[bool](false), err
 	}
@@ -89,7 +89,7 @@ func (r *TypesenseClusterReconciler) createConfigMap(ctx context.Context, key cl
 	return cm, nil
 }
 
-func (r *TypesenseClusterReconciler) updateConfigMap(ctx context.Context, ts *tsv1alpha1.TypesenseCluster, cm *v1.ConfigMap, replicas *int32, resizeOp bool) (*v1.ConfigMap, int, bool, error) {
+func (r *TypesenseClusterReconciler) updateConfigMap(ctx context.Context, ts *tsv1alpha1.TypesenseCluster, cm *v1.ConfigMap, replicas *int32, resizeOp bool) (int, bool, error) {
 	stsName := fmt.Sprintf(ClusterStatefulSet, ts.Name)
 	stsObjectKey := client.ObjectKey{
 		Name:      stsName,
@@ -101,13 +101,13 @@ func (r *TypesenseClusterReconciler) updateConfigMap(ctx context.Context, ts *ts
 		if apierrors.IsNotFound(err) {
 			err := r.deleteConfigMap(ctx, cm)
 			if err != nil {
-				return nil, 0, false, err
+				return 0, false, err
 			}
 		} else {
 			r.logger.Error(err, fmt.Sprintf("unable to fetch statefulset: %s", stsName))
 		}
 
-		return nil, 0, false, err
+		return 0, false, err
 	}
 
 	if replicas == nil {
@@ -116,17 +116,17 @@ func (r *TypesenseClusterReconciler) updateConfigMap(ctx context.Context, ts *ts
 
 	nodes, err := r.getNodes(ctx, ts, *replicas, false)
 	if err != nil {
-		return nil, 0, false, err
+		return 0, false, err
 	}
 	fallback, err := r.getNodes(ctx, ts, *replicas, true)
 	if err != nil {
-		return nil, 0, false, err
+		return 0, false, err
 	}
 
 	availableNodes := len(nodes)
 	if availableNodes == 0 {
 		r.logger.V(debugLevel).Info("empty quorum configuration")
-		return nil, 0, false, fmt.Errorf("empty quorum configuration")
+		return 0, false, fmt.Errorf("empty quorum configuration")
 	}
 
 	desired := cm.DeepCopy()
@@ -151,12 +151,12 @@ func (r *TypesenseClusterReconciler) updateConfigMap(ctx context.Context, ts *ts
 		err := r.Update(ctx, desired)
 		if err != nil {
 			r.logger.Error(err, "updating quorum configuration failed")
-			return nil, 0, false, err
+			return 0, false, err
 		}
 		updated = true
 	}
 
-	return desired, availableNodes, updated, nil
+	return availableNodes, updated, nil
 }
 
 func (r *TypesenseClusterReconciler) deleteConfigMap(ctx context.Context, cm *v1.ConfigMap) error {
@@ -176,7 +176,7 @@ func (r *TypesenseClusterReconciler) forcePodsConfigMapUpdate(ctx context.Contex
 	labelSelector := labels.SelectorFromSet(labelMap)
 
 	var podList v1.PodList
-	if err := r.Client.List(ctx, &podList,
+	if err := r.List(ctx, &podList,
 		client.InNamespace(ts.Namespace),
 		client.MatchingLabelsSelector{Selector: labelSelector},
 	); err != nil {
@@ -267,8 +267,8 @@ func (r *TypesenseClusterReconciler) getNodes(ctx context.Context, ts *tsv1alpha
 					continue
 				}
 
-				switch cs.State.Waiting.Reason {
-				case "ContainerCreating", "ErrImagePull", "ImagePullBackOff":
+				reason := cs.State.Waiting.Reason
+				if reason == "ContainerCreating" || reason == "ErrImagePull" || reason == "ImagePullBackOff" {
 					markAsScheduled = true
 					break
 				}
@@ -309,7 +309,6 @@ func (r *TypesenseClusterReconciler) getNodes(ctx context.Context, ts *tsv1alpha
 		for _, e := range s.Endpoints {
 			if len(e.Addresses) > 0 {
 				addr := e.Addresses[0]
-				//r.logger.V(debugLevel).Info("discovered slice endpoint", "slice", s.Name, "endpoint", e.Hostname, "address", addr)
 				nodes = append(nodes, fmt.Sprintf("%s:%d:%d", addr, ts.Spec.PeeringPort, ts.Spec.ApiPort))
 			}
 		}
@@ -325,7 +324,7 @@ func (r *TypesenseClusterReconciler) getEndpointSlicesForStatefulSet(ctx context
 
 	// 1) List EndpointSlices for headless Service
 	var sliceList discoveryv1.EndpointSliceList
-	if err := r.Client.List(ctx, &sliceList,
+	if err := r.List(ctx, &sliceList,
 		client.InNamespace(namespace),
 		client.MatchingLabels{discoveryv1.LabelServiceName: svcName},
 	); err != nil {
@@ -335,7 +334,7 @@ func (r *TypesenseClusterReconciler) getEndpointSlicesForStatefulSet(ctx context
 	// 2) Build a set of “live” Pod IPs for this StatefulSet
 	selector := labels.SelectorFromSet(sts.Spec.Selector.MatchLabels)
 	var podList v1.PodList
-	if err := r.Client.List(ctx, &podList,
+	if err := r.List(ctx, &podList,
 		client.InNamespace(namespace),
 		client.MatchingLabelsSelector{Selector: selector},
 	); err != nil {

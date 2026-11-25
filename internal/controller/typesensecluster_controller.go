@@ -96,6 +96,8 @@ const (
 //
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.18.4/pkg/reconcile
+//
+//nolint:gocyclo // cyclomatic complexity of func is high
 func (r *TypesenseClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	r.logger = log.Log.WithValues("namespace", req.Namespace, "cluster", req.Name)
 

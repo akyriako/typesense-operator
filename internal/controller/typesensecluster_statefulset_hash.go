@@ -21,7 +21,6 @@ var (
 	HashAnnotationChanged           UpdateStatefulSetTrigger = "HashAnnotationChanged"
 	PodAnnotationsChanged           UpdateStatefulSetTrigger = "PodAnnotationsChanged"
 	StatefulSetAnnotationsChanged   UpdateStatefulSetTrigger = "StatefulSetAnnotationsChanged"
-	SpecResourcesChanged            UpdateStatefulSetTrigger = "SpecResourcesChanged"
 	PodSecurityContextChanged       UpdateStatefulSetTrigger = "PodSecurityContextChanged"
 	InvalidContainerCount           UpdateStatefulSetTrigger = "InvalidContainerCount"
 	ContainerSecurityContextChanged UpdateStatefulSetTrigger = "ContainerSecurityContextChanged"
@@ -56,7 +55,7 @@ func (r *TypesenseClusterReconciler) shouldUpdateStatefulSet(sts *appsv1.Statefu
 	}
 
 	mutatedAnnotations := ts.Spec.IgnoreAnnotationsFromExternalMutations
-	stsAnnotations := filterMap(sts.ObjectMeta.Annotations, append([]string{rancherDomainAnnotationKey}, mutatedAnnotations...)...)
+	stsAnnotations := filterMap(sts.Annotations, append([]string{rancherDomainAnnotationKey}, mutatedAnnotations...)...)
 	podAnnotations := filterMap(sts.Spec.Template.Annotations, append([]string{restartPodsAnnotationKey, rancherDomainAnnotationKey}, mutatedAnnotations...)...)
 
 	// PodAnnotationsChanged
@@ -66,16 +65,10 @@ func (r *TypesenseClusterReconciler) shouldUpdateStatefulSet(sts *appsv1.Statefu
 	}
 
 	// StatefulSetAnnotationsChanged
-	if !apiequality.Semantic.DeepEqual(stsAnnotations, desired.ObjectMeta.Annotations) {
+	if !apiequality.Semantic.DeepEqual(stsAnnotations, desired.Annotations) {
 		triggers = append(triggers, StatefulSetAnnotationsChanged)
 		update = true
 	}
-
-	//// SpecResourcesChanged
-	//if !apiequality.Semantic.DeepEqual(sts.Spec.Template.Spec.Containers[0].Resources, ts.Spec.GetResources()) {
-	//	triggers = append(triggers, SpecResourcesChanged)
-	//	update = true
-	//}
 
 	// PodSecurityContextChanged
 	if !apiequality.Semantic.DeepEqual(sts.Spec.Template.Spec.SecurityContext, ts.Spec.GetPodSecurityContext()) {

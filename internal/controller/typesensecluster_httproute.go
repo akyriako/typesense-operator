@@ -21,6 +21,7 @@ const (
 	gatewayApiGroup                   = "gateway.networking.k8s.io"
 )
 
+//nolint:gocyclo // cyclomatic complexity of func is high
 func (r *TypesenseClusterReconciler) ReconcileHttpRoute(ctx context.Context, ts *tsv1alpha1.TypesenseCluster) (err error) {
 	if supported, ver, err := r.IsFeatureSupported(minimumSupportedVersionForGateway); !supported || err != nil {
 		if err != nil {
@@ -70,14 +71,14 @@ func (r *TypesenseClusterReconciler) ReconcileHttpRoute(ctx context.Context, ts 
 		if !httpRouteExists && hrt.Enabled {
 			r.logger.V(debugLevel).Info("creating http route", "http_route", httpRouteName)
 
-			httpRoute, err = r.createHttpRoute(ctx, httpRouteObjectKey, hrt, ts)
+			err = r.createHttpRoute(ctx, httpRouteObjectKey, hrt, ts)
 			if err != nil {
 				r.logger.Error(err, "creating http route failed", "http_route", httpRouteName)
 				return err
 			}
 
 			if *hrt.ReferenceGrant {
-				_, err := r.createReferenceGrant(ctx, hrt, ts)
+				err := r.createReferenceGrant(ctx, hrt, ts)
 				if err != nil {
 					r.logger.Error(err, "creating reference grant failed", "http_route", httpRouteName)
 					return err
@@ -145,7 +146,7 @@ func (r *TypesenseClusterReconciler) ReconcileHttpRoute(ctx context.Context, ts 
 
 				r.logger.V(debugLevel).Info("updating http route", "http_route", httpRouteName)
 
-				httpRoute, err = r.updateHttpRoute(ctx, hrt, httpRoute, ts)
+				err = r.updateHttpRoute(ctx, hrt, httpRoute, ts)
 				if err != nil {
 					r.logger.Error(err, "updating http route failed", "http_route", httpRouteName)
 					return err
@@ -162,7 +163,7 @@ func (r *TypesenseClusterReconciler) ReconcileHttpRoute(ctx context.Context, ts 
 	return nil
 }
 
-func (r *TypesenseClusterReconciler) createHttpRoute(ctx context.Context, key client.ObjectKey, spec tsv1alpha1.HttpRouteSpec, ts *tsv1alpha1.TypesenseCluster) (*gatewayv1.HTTPRoute, error) {
+func (r *TypesenseClusterReconciler) createHttpRoute(ctx context.Context, key client.ObjectKey, spec tsv1alpha1.HttpRouteSpec, ts *tsv1alpha1.TypesenseCluster) error {
 	annotations := map[string]string{}
 	if spec.Annotations != nil {
 		maps.Copy(annotations, spec.Annotations)
@@ -220,15 +221,15 @@ func (r *TypesenseClusterReconciler) createHttpRoute(ctx context.Context, key cl
 
 	err := ctrl.SetControllerReference(ts, httpRoute, r.Scheme)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	err = r.Create(ctx, httpRoute)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	return httpRoute, nil
+	return nil
 }
 
 func (r *TypesenseClusterReconciler) deleteHttpRoute(ctx context.Context, httpRoute *gatewayv1.HTTPRoute) error {
@@ -276,11 +277,11 @@ func (r *TypesenseClusterReconciler) deleteOrphanedHttpRoutes(ctx context.Contex
 	return nil
 }
 
-func (r *TypesenseClusterReconciler) updateHttpRoute(ctx context.Context, spec tsv1alpha1.HttpRouteSpec, httpRoute *gatewayv1.HTTPRoute, ts *tsv1alpha1.TypesenseCluster) (*gatewayv1.HTTPRoute, error) {
+func (r *TypesenseClusterReconciler) updateHttpRoute(ctx context.Context, spec tsv1alpha1.HttpRouteSpec, httpRoute *gatewayv1.HTTPRoute, ts *tsv1alpha1.TypesenseCluster) error {
 	patch := client.MergeFrom(httpRoute.DeepCopy())
 
 	parentRef := r.getGatewayParentRef(spec, ts)
-	httpRoute.Spec.CommonRouteSpec.ParentRefs[0] = parentRef
+	httpRoute.Spec.ParentRefs[0] = parentRef
 
 	hostnames := make([]gatewayv1.Hostname, 0, len(spec.Hostnames))
 	for _, h := range spec.Hostnames {
@@ -298,10 +299,10 @@ func (r *TypesenseClusterReconciler) updateHttpRoute(ctx context.Context, spec t
 	httpRoute.Annotations = annotations
 
 	if err := r.Patch(ctx, httpRoute, patch); err != nil {
-		return nil, err
+		return err
 	}
 
-	return httpRoute, nil
+	return nil
 }
 
 func (r *TypesenseClusterReconciler) getHttpRouteAnnotations(httpRoute *gatewayv1.HTTPRoute, ts *tsv1alpha1.TypesenseCluster) map[string]string {
@@ -342,7 +343,7 @@ func (r *TypesenseClusterReconciler) getGatewayParentRef(spec tsv1alpha1.HttpRou
 	return parentRef
 }
 
-func (r *TypesenseClusterReconciler) createReferenceGrant(ctx context.Context, spec tsv1alpha1.HttpRouteSpec, ts *tsv1alpha1.TypesenseCluster) (*gatewayv1beta1.ReferenceGrant, error) {
+func (r *TypesenseClusterReconciler) createReferenceGrant(ctx context.Context, spec tsv1alpha1.HttpRouteSpec, ts *tsv1alpha1.TypesenseCluster) error {
 	parentRefName := gatewayv1beta1.ObjectName(spec.ParentRef.Name)
 	referenceGrant := &gatewayv1beta1.ReferenceGrant{
 		ObjectMeta: getReferenceGrantObjectMeta(ts, spec),
@@ -371,10 +372,10 @@ func (r *TypesenseClusterReconciler) createReferenceGrant(ctx context.Context, s
 
 	err := r.Create(ctx, referenceGrant)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	return referenceGrant, nil
+	return nil
 }
 
 func (r *TypesenseClusterReconciler) deleteReferenceGrant(ctx context.Context, rg *gatewayv1beta1.ReferenceGrant) error {
@@ -388,7 +389,7 @@ func (r *TypesenseClusterReconciler) deleteReferenceGrant(ctx context.Context, r
 
 func (r *TypesenseClusterReconciler) deleteOrphanedReferenceGrants(ctx context.Context) error {
 	referenceGrantsLabelSelector := labels.SelectorFromSet(map[string]string{
-		"app.kubernetes.io/managed-by": "typesense-operator",
+		managedByLabelKey: managedByLabelValue,
 	})
 
 	var referenceGrants gatewayv1beta1.ReferenceGrantList
@@ -410,7 +411,7 @@ func (r *TypesenseClusterReconciler) deleteOrphanedReferenceGrants(ctx context.C
 	for _, rg := range referenceGrants.Items {
 		exists := false
 		for _, cluster := range typesenseClusters.Items {
-			if rg.Labels["app"] == fmt.Sprintf(ClusterAppLabel, cluster.Name) {
+			if rg.Labels[appLabelKey] == fmt.Sprintf(ClusterAppLabel, cluster.Name) {
 				exists = true
 				break
 			}
@@ -461,7 +462,7 @@ func (r *TypesenseClusterReconciler) updateReferenceGrant(ctx context.Context, s
 	}
 
 	if cre {
-		_, err := r.createReferenceGrant(ctx, spec, ts)
+		err := r.createReferenceGrant(ctx, spec, ts)
 		if err != nil {
 			r.logger.Error(err, "creating reference grant failed", "http_route", spec.Name)
 			return err
